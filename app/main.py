@@ -14,6 +14,7 @@ from .routers import esafs, stats, sync_router, fields
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    force=True,  # override any handlers installed by uvicorn or DM library at import time
 )
 
 
