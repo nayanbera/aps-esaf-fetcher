@@ -42,6 +42,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS esafs (
     esaf_id       TEXT PRIMARY KEY,
     title         TEXT,
+    description   TEXT DEFAULT '',
+    sector        TEXT DEFAULT '',
     beamline      TEXT,
     year          INTEGER,
     status        TEXT,
@@ -49,7 +51,6 @@ CREATE TABLE IF NOT EXISTS esafs (
     end_date      TEXT,
     pi_badge      TEXT,
     pi_name       TEXT,
-    institution   TEXT,
     raw_json      TEXT,
     notes         TEXT DEFAULT '',
     custom_fields TEXT DEFAULT '{}',
@@ -108,6 +109,16 @@ CREATE INDEX IF NOT EXISTS idx_esaf_users_badge ON esaf_users(badge);
 def init_db():
     with get_db() as conn:
         conn.executescript(SCHEMA)
+        # Migrations for existing databases
+        for col, defn in [
+            ("description", "TEXT DEFAULT ''"),
+            ("sector",      "TEXT DEFAULT ''"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +153,7 @@ def list_esafs(
         clauses.append("status = ?"); params.append(status)
     if search:
         clauses.append(
-            "(title LIKE ? OR pi_name LIKE ? OR institution LIKE ? OR esaf_id LIKE ?)"
+            "(title LIKE ? OR pi_name LIKE ? OR description LIKE ? OR esaf_id LIKE ?)"
         )
         params.extend([f"%{search}%"] * 4)
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -206,16 +217,17 @@ def upsert_esaf(data: dict, now: str) -> str:
         ).fetchone()
 
         if existing:
-            # Preserve user-edited fields across syncs
+            # Preserve user-edited fields (notes, custom_fields) across syncs
             conn.execute(
-                """UPDATE esafs SET title=?, beamline=?, year=?, status=?,
-                   start_date=?, end_date=?, pi_badge=?, pi_name=?, institution=?,
+                """UPDATE esafs SET title=?, description=?, sector=?, beamline=?,
+                   year=?, status=?, start_date=?, end_date=?, pi_badge=?, pi_name=?,
                    raw_json=?, last_synced=?, updated_at=datetime('now')
                    WHERE esaf_id=?""",
                 (
-                    data["title"], data["beamline"], data["year"], data["status"],
-                    data["start_date"], data["end_date"], data["pi_badge"],
-                    data["pi_name"], data["institution"],
+                    data["title"], data["description"], data["sector"],
+                    data["beamline"], data["year"], data["status"],
+                    data["start_date"], data["end_date"],
+                    data["pi_badge"], data["pi_name"],
                     json.dumps(data["raw_json"]), now, data["esaf_id"],
                 ),
             )
@@ -223,13 +235,14 @@ def upsert_esaf(data: dict, now: str) -> str:
         else:
             conn.execute(
                 """INSERT INTO esafs
-                   (esaf_id, title, beamline, year, status, start_date, end_date,
-                    pi_badge, pi_name, institution, raw_json, last_synced)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   (esaf_id, title, description, sector, beamline, year, status,
+                    start_date, end_date, pi_badge, pi_name, raw_json, last_synced)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    data["esaf_id"], data["title"], data["beamline"], data["year"],
-                    data["status"], data["start_date"], data["end_date"],
-                    data["pi_badge"], data["pi_name"], data["institution"],
+                    data["esaf_id"], data["title"], data["description"], data["sector"],
+                    data["beamline"], data["year"], data["status"],
+                    data["start_date"], data["end_date"],
+                    data["pi_badge"], data["pi_name"],
                     json.dumps(data["raw_json"]), now,
                 ),
             )

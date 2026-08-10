@@ -40,14 +40,17 @@
         <table class="table table-sm mb-0">
           <tbody>
             <tr><th class="text-nowrap">Beamline</th><td>{{ esaf.beamline or '—' }}</td></tr>
+            <tr><th>Sector</th><td>{{ esaf.sector or '—' }}</td></tr>
             <tr><th>Year</th><td>{{ esaf.year or '—' }}</td></tr>
             <tr><th>Start date</th><td>{{ esaf.start_date or '—' }}</td></tr>
             <tr><th>End date</th><td>{{ esaf.end_date or '—' }}</td></tr>
             <tr><th>PI</th><td>{{ esaf.pi_name or '—' }}</td></tr>
-            <tr><th>Institution</th><td>{{ esaf.institution or '—' }}</td></tr>
             <tr><th>Last synced</th><td>{{ esaf.last_synced or '—' }}</td></tr>
           </tbody>
         </table>
+        {% if esaf.description %}
+          <p class="mt-2 mb-0 text-muted small">{{ esaf.description }}</p>
+        {% endif %}
       </div>
     </div>
   </div>

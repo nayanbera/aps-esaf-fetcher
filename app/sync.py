@@ -36,61 +36,53 @@ def _extract_esaf(raw: Any) -> dict:
     """Normalise one raw ESAF record from the DM API."""
     raw_dict = dict(raw) if not isinstance(raw, dict) else raw
 
-    # User list
+    # User list — API fields confirmed: badge, badgeNumber, firstName, lastName,
+    # email, piFlag ('Yes'/'No'). No institution field in this API.
     raw_users = _get(raw, "experimentUsers", "users", default=[])
     users = []
-    pi_badge = pi_name = institution = ""
+    pi_badge = pi_name = ""
 
     for u in raw_users:
         badge      = str(_get(u, "badge", "badgeNumber", default=""))
-        first_name = str(_get(u, "firstName", "first_name", default=""))
-        last_name  = str(_get(u, "lastName",  "last_name",  default=""))
-        inst       = str(_get(u, "instName",  "institution", "affiliation", default=""))
+        first_name = str(_get(u, "firstName", default=""))
+        last_name  = str(_get(u, "lastName",  default=""))
         email      = str(_get(u, "email", default=""))
-        is_pi      = str(_get(u, "piFlag", "isPi", default="N")).upper() in ("Y", "YES", "TRUE", "1")
-        role       = "pi" if is_pi else str(_get(u, "role", default="user")).lower()
+        pi_flag    = str(_get(u, "piFlag", "isPi", default="No")).strip().lower()
+        is_pi      = pi_flag in ("yes", "y", "true", "1")
+        role       = "pi" if is_pi else "user"
 
         users.append({
             "badge": badge, "first_name": first_name, "last_name": last_name,
-            "institution": inst, "email": email, "role": role,
+            "institution": "", "email": email, "role": role,
             "raw_json": dict(u) if not isinstance(u, dict) else u,
         })
         if is_pi and not pi_badge:
             pi_badge = badge
             pi_name  = f"{first_name} {last_name}".strip()
-            institution = inst
 
-    # Funding sources — stored as a flat list of strings
-    raw_funding = _get(raw, "fundingSupport", "fundingSupportList",
-                       "fundingSourceList", default="")
-    if isinstance(raw_funding, str):
-        funding_sources = [s.strip() for s in raw_funding.split(",") if s.strip()]
-    elif isinstance(raw_funding, list):
-        funding_sources = [
-            str(_get(f, "fundingSupport", "source", default=f)) for f in raw_funding
-        ]
-    else:
-        funding_sources = []
+    # Funding sources — not present in listStationEsafs; kept for future use
+    funding_sources = []
 
-    # Beamline — the API can return a list of beamlineReqs objects
-    beamline_raw = _get(raw, "beamlineReqs", "beamlineName", "beamline", default=[])
-    if isinstance(beamline_raw, list) and beamline_raw:
-        first = beamline_raw[0]
-        beamline = str(_get(first, "beamlineName", "name", default=first))
-    else:
-        beamline = str(beamline_raw)
+    # Beamline — API returns beamlineStation ('15-ID-CD') and beamline (['15-ID-C,D'])
+    # Use beamlineStation as the canonical value; fall back to first item in beamline list
+    beamline = str(_get(raw, "beamlineStation", default=""))
+    if not beamline:
+        bl_list = _get(raw, "beamline", default=[])
+        if isinstance(bl_list, list) and bl_list:
+            beamline = str(bl_list[0])
+        else:
+            beamline = str(bl_list)
 
-    esaf_id  = str(_get(raw, "esafId", "id", "esaf_id", default=""))
-    title    = str(_get(raw, "title", "esafTitle", default=""))
-    status   = str(_get(raw, "esafStatus", "status", default=""))
-    start    = str(_get(raw, "experimentStartDate", "startDate", "start_date", default=""))
-    end      = str(_get(raw, "experimentEndDate",   "endDate",   "end_date",   default=""))
+    esaf_id     = str(_get(raw, "esafId", "id", "esaf_id", default=""))
+    title       = str(_get(raw, "esafTitle", "title", default=""))
+    description = str(_get(raw, "description", default=""))
+    sector      = str(_get(raw, "sector", default=""))
+    status      = str(_get(raw, "esafStatus", "status", default=""))
+    start       = str(_get(raw, "experimentStartDate", "startDate", default=""))
+    end         = str(_get(raw, "experimentEndDate",   "endDate",   default=""))
 
-    # Year: prefer explicit field, else parse from start_date, else current year
-    year_raw = _get(raw, "year")
-    if year_raw:
-        year = int(year_raw)
-    elif start:
+    # Year: parse from experimentStartDate, else current year
+    if start:
         try:
             year = int(start[:4])
         except (ValueError, IndexError):
@@ -99,9 +91,10 @@ def _extract_esaf(raw: Any) -> dict:
         year = datetime.now().year
 
     return {
-        "esaf_id": esaf_id, "title": title, "beamline": beamline,
-        "year": year, "status": status, "start_date": start, "end_date": end,
-        "pi_badge": pi_badge, "pi_name": pi_name, "institution": institution,
+        "esaf_id": esaf_id, "title": title, "description": description,
+        "sector": sector, "beamline": beamline, "year": year,
+        "status": status, "start_date": start, "end_date": end,
+        "pi_badge": pi_badge, "pi_name": pi_name,
         "users": users, "funding_sources": funding_sources, "raw_json": raw_dict,
     }
 
