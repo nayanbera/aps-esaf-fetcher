@@ -9,7 +9,6 @@ from .. import db
 from ..templates_env import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 FIELD_TYPES = ["text", "textarea", "number", "date", "select"]
 

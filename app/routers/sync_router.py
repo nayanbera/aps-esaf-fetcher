@@ -8,7 +8,6 @@ from .. import db, sync
 from ..templates_env import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 _sync_running = False
 _last_result: dict | None = None
