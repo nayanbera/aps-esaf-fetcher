@@ -56,21 +56,34 @@ bash launch.sh
 
 ## Production deployment (systemd)
 
+The install script clones the repo, creates a `conda` environment named
+`aps-esaf-fetcher`, installs dependencies, patches the systemd unit with real
+paths, and places credentials in `/etc/aps-esaf-fetcher/secrets.env` (mode 600).
+
 ```bash
-# On the RE machine as root:
-sudo bash deploy/install.sh
-sudo vi /etc/aps-esaf-fetcher/secrets.env   # fill in DM_USERNAME / DM_PASSWORD
+# On the RE machine — the systemd steps require sudo:
+cd ~
+git clone https://github.com/nayanbera/aps-esaf-fetcher.git
+cd aps-esaf-fetcher
+
+# Pass service user and conda prefix if different from defaults
+sudo bash deploy/install.sh chem_epics /home/chem_epics/anaconda3
+
+# Fill in credentials
+sudo vi /etc/aps-esaf-fetcher/secrets.env
+
+# Install the dm library into the new conda env (replace <channel> and <pkg>)
+conda activate aps-esaf-fetcher
+conda install -c <channel> <dm-package-name>
+
 sudo systemctl start aps-esaf-fetcher
 sudo journalctl -fu aps-esaf-fetcher
 ```
 
-The install script copies files to `/opt/aps-esaf-fetcher`, creates a virtualenv,
-installs a systemd unit, and places credentials in `/etc/aps-esaf-fetcher/secrets.env`
-(mode 600, owned by the service user).
-
-### procServ alternative
+### procServ alternative (no root needed for the process itself)
 
 ```bash
+# Credentials still need to be at /etc/aps-esaf-fetcher/secrets.env (sudo once)
 bash deploy/procserv-start.sh
 ```
 
