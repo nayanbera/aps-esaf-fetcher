@@ -14,8 +14,18 @@ from .routers import esafs, stats, sync_router, fields
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    force=True,  # override any handlers installed by uvicorn or DM library at import time
+    force=True,
 )
+# Give app.* its own handler so the DM library importing mid-sync
+# (which rewrites the root logger level) can't silence our messages.
+_app_handler = logging.StreamHandler()
+_app_handler.setFormatter(
+    logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+)
+_app_log = logging.getLogger("app")
+_app_log.addHandler(_app_handler)
+_app_log.setLevel(logging.DEBUG)
+_app_log.propagate = False
 
 
 @asynccontextmanager
