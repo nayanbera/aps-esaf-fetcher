@@ -1,0 +1,52 @@
+<!-- Edit form for notes + custom fields. Submitted via HTMX PUT. -->
+<div class="card mb-3 border-primary">
+  <div class="card-header fw-semibold text-primary">
+    <i class="bi bi-pencil me-1"></i>Editing Notes &amp; Custom Fields
+  </div>
+  <div class="card-body">
+    <form hx-put="/esafs/{{ esaf.esaf_id }}"
+          hx-target="#esaf-editable"
+          hx-swap="innerHTML">
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Notes</label>
+        <textarea name="notes" class="form-control" rows="4">{{ esaf.notes or '' }}</textarea>
+      </div>
+
+      {% for fd in field_defs %}
+        {% set val = esaf.custom_fields.get(fd.name, '') if esaf.custom_fields else '' %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ fd.label }}</label>
+          {% if fd.field_type == 'textarea' %}
+            <textarea name="{{ fd.name }}" class="form-control" rows="3">{{ val }}</textarea>
+          {% elif fd.field_type == 'select' %}
+            <select name="{{ fd.name }}" class="form-select">
+              <option value="">— select —</option>
+              {% for opt in fd.options %}
+                <option value="{{ opt }}" {% if val == opt %}selected{% endif %}>{{ opt }}</option>
+              {% endfor %}
+            </select>
+          {% elif fd.field_type == 'number' %}
+            <input type="number" name="{{ fd.name }}" class="form-control" value="{{ val }}" step="any">
+          {% elif fd.field_type == 'date' %}
+            <input type="date" name="{{ fd.name }}" class="form-control" value="{{ val }}">
+          {% else %}
+            <input type="text" name="{{ fd.name }}" class="form-control" value="{{ val }}">
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Save
+        </button>
+        <button type="button" class="btn btn-outline-secondary"
+                hx-get="/esafs/{{ esaf.esaf_id }}/edit-cancel"
+                hx-target="#esaf-editable"
+                hx-swap="innerHTML">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

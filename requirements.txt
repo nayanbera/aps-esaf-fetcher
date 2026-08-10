@@ -1,0 +1,10 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+jinja2>=3.1.4
+aiofiles>=23.2.1
+apscheduler>=3.10.4
+python-dotenv>=1.0.1
+httpx>=0.27.0
+# APS Data Management package — install from APS-provided source:
+#   pip install dm-aps  (or follow APS DM installation guide)
+# dm>=1.0.0

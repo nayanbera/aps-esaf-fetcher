@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Custom Fields — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-sliders me-1"></i>Custom Field Definitions</h4>
+<p class="text-muted small">
+  Define extra fields that appear on every ESAF detail page. Fields are stored per ESAF
+  and never overwritten by a sync.
+</p>
+
+<!-- Existing fields -->
+<div id="field-list">
+  {% include "partials/field_list.html" %}
+</div>
+
+<!-- Add new field form -->
+<div class="card mt-4" style="max-width:560px">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-plus-circle me-1"></i>Add Field
+  </div>
+  <div class="card-body">
+    <form method="post" action="/fields">
+      <div class="mb-3">
+        <label class="form-label">Internal name <span class="text-muted small">(letters, digits, underscores)</span></label>
+        <input type="text" name="name" class="form-control" required
+               pattern="[a-zA-Z0-9_ ]+"
+               placeholder="e.g. sample_type">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Display label</label>
+        <input type="text" name="label" class="form-control" required
+               placeholder="e.g. Sample Type">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Field type</label>
+        <select name="field_type" class="form-select">
+          {% for ft in field_types %}
+            <option value="{{ ft }}">{{ ft }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">
+          Options <span class="text-muted small">(comma-separated, for <em>select</em> type only)</span>
+        </label>
+        <input type="text" name="options" class="form-control"
+               placeholder="Option A, Option B, Option C">
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

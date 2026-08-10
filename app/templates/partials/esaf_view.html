@@ -1,0 +1,35 @@
+<!-- Read-only view of notes + custom fields. Replaced by edit form via HTMX. -->
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+    <span><i class="bi bi-pencil-square me-1"></i>Notes &amp; Custom Fields</span>
+    <button class="btn btn-sm btn-outline-primary"
+            hx-get="/esafs/{{ esaf.esaf_id }}/edit"
+            hx-target="#esaf-editable"
+            hx-swap="innerHTML">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </button>
+  </div>
+  <div class="card-body">
+    {% if esaf.notes %}
+      <p class="mb-{% if field_defs %}3{% else %}0{% endif %} white-space-pre-wrap">{{ esaf.notes }}</p>
+    {% else %}
+      <p class="text-muted fst-italic mb-{% if field_defs %}3{% else %}0{% endif %}">No notes.</p>
+    {% endif %}
+
+    {% if field_defs %}
+      <table class="table table-sm mb-0">
+        <tbody>
+        {% for fd in field_defs %}
+          <tr>
+            <th class="text-nowrap" style="width:200px">{{ fd.label }}</th>
+            <td>
+              {% set val = esaf.custom_fields.get(fd.name, '') if esaf.custom_fields else '' %}
+              {{ val if val else '—' }}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+</div>

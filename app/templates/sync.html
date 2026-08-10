@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Sync — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-arrow-repeat me-1"></i>Sync</h4>
+
+<div id="sync-status"
+     hx-get="/sync/status"
+     hx-trigger="every 3s [document.querySelector('.sync-running')]"
+     hx-swap="outerHTML">
+  {% include "partials/sync_status.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+<div id="sync-status" {% if running %}class="sync-running"{% endif %}
+     hx-get="/sync/status"
+     hx-trigger="{% if running %}every 3s{% endif %}"
+     hx-swap="outerHTML">
+
+  {% if running %}
+    <div class="alert alert-info d-flex align-items-center">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+      Sync in progress…
+    </div>
+  {% endif %}
+
+  {% if last_result %}
+    {% if last_result.error %}
+      <div class="alert alert-danger">
+        <strong>Last sync error:</strong> {{ last_result.error }}
+      </div>
+    {% else %}
+      <div class="alert alert-success">
+        Last sync: <strong>{{ last_result.added }}</strong> added,
+        <strong>{{ last_result.updated }}</strong> updated.
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {% if last_sync %}
+    <table class="table table-sm table-bordered w-auto mb-3">
+      <tbody>
+        <tr><th>Last sync time</th><td>{{ last_sync.synced_at }}</td></tr>
+        <tr><th>Beamlines</th><td>{{ last_sync.beamlines }}</td></tr>
+        <tr><th>Years</th><td>{{ last_sync.years }}</td></tr>
+        <tr><th>Records added</th><td>{{ last_sync.records_added }}</td></tr>
+        <tr><th>Records updated</th><td>{{ last_sync.records_updated }}</td></tr>
+        {% if last_sync.error %}
+          <tr class="table-danger"><th>Error</th><td>{{ last_sync.error }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="text-muted">No sync has been run yet.</p>
+  {% endif %}
+
+  {% if not running %}
+    <form hx-post="/sync/trigger" hx-target="#sync-status" hx-swap="outerHTML">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-arrow-repeat me-1"></i>Sync Now
+      </button>
+    </form>
+  {% endif %}
+</div>

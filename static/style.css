@@ -1,0 +1,11 @@
+body { background-color: #f8f9fa; }
+
+.cursor-pointer { cursor: pointer; }
+
+.white-space-pre-wrap { white-space: pre-wrap; }
+
+/* Tighter card padding on small tables */
+.card-body .table td, .card-body .table th { padding: .35rem .6rem; }
+
+/* Navbar brand */
+.navbar-brand { letter-spacing: .02em; }

@@ -1,0 +1,30 @@
+<table class="table table-sm table-hover align-middle" style="max-width:700px">
+  <thead class="table-dark">
+    <tr><th>Name</th><th>Label</th><th>Type</th><th>Options</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for fd in field_defs %}
+    <tr>
+      <td><code>{{ fd.name }}</code></td>
+      <td>{{ fd.label }}</td>
+      <td><span class="badge bg-secondary">{{ fd.field_type }}</span></td>
+      <td class="text-muted small">
+        {% if fd.options %}
+          {{ fd.options | join(', ') }}
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        <button class="btn btn-sm btn-outline-danger"
+                hx-delete="/fields/{{ fd.name }}"
+                hx-target="#field-list"
+                hx-swap="innerHTML"
+                hx-confirm="Delete field '{{ fd.name }}'? Values stored on ESAFs will not be removed.">
+          <i class="bi bi-trash"></i>
+        </button>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="text-muted text-center py-3">No custom fields defined yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
