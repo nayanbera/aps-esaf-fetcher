@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS esafs (
     status        TEXT,
     start_date    TEXT,
     end_date      TEXT,
+    doi           TEXT DEFAULT '',
     pi_badge      TEXT,
     pi_name       TEXT,
     raw_json      TEXT,
@@ -113,6 +114,7 @@ def init_db():
         for col, defn in [
             ("description", "TEXT DEFAULT ''"),
             ("sector",      "TEXT DEFAULT ''"),
+            ("doi",         "TEXT DEFAULT ''"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
@@ -220,13 +222,14 @@ def upsert_esaf(data: dict, now: str) -> str:
             # Preserve user-edited fields (notes, custom_fields) across syncs
             conn.execute(
                 """UPDATE esafs SET title=?, description=?, sector=?, beamline=?,
-                   year=?, status=?, start_date=?, end_date=?, pi_badge=?, pi_name=?,
-                   raw_json=?, last_synced=?, updated_at=datetime('now')
+                   year=?, status=?, start_date=?, end_date=?, doi=?,
+                   pi_badge=?, pi_name=?, raw_json=?, last_synced=?,
+                   updated_at=datetime('now')
                    WHERE esaf_id=?""",
                 (
                     data["title"], data["description"], data["sector"],
                     data["beamline"], data["year"], data["status"],
-                    data["start_date"], data["end_date"],
+                    data["start_date"], data["end_date"], data.get("doi", ""),
                     data["pi_badge"], data["pi_name"],
                     json.dumps(data["raw_json"]), now, data["esaf_id"],
                 ),
@@ -236,12 +239,12 @@ def upsert_esaf(data: dict, now: str) -> str:
             conn.execute(
                 """INSERT INTO esafs
                    (esaf_id, title, description, sector, beamline, year, status,
-                    start_date, end_date, pi_badge, pi_name, raw_json, last_synced)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    start_date, end_date, doi, pi_badge, pi_name, raw_json, last_synced)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     data["esaf_id"], data["title"], data["description"], data["sector"],
                     data["beamline"], data["year"], data["status"],
-                    data["start_date"], data["end_date"],
+                    data["start_date"], data["end_date"], data.get("doi", ""),
                     data["pi_badge"], data["pi_name"],
                     json.dumps(data["raw_json"]), now,
                 ),

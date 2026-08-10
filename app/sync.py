@@ -80,6 +80,7 @@ def _extract_esaf(raw: Any) -> dict:
     status      = str(_get(raw, "esafStatus", "status", default=""))
     start       = str(_get(raw, "experimentStartDate", "startDate", default=""))
     end         = str(_get(raw, "experimentEndDate",   "endDate",   default=""))
+    doi         = str(_get(raw, "doi", default=""))
 
     # Year: parse from experimentStartDate, else current year
     if start:
@@ -93,7 +94,7 @@ def _extract_esaf(raw: Any) -> dict:
     return {
         "esaf_id": esaf_id, "title": title, "description": description,
         "sector": sector, "beamline": beamline, "year": year,
-        "status": status, "start_date": start, "end_date": end,
+        "status": status, "start_date": start, "end_date": end, "doi": doi,
         "pi_badge": pi_badge, "pi_name": pi_name,
         "users": users, "funding_sources": funding_sources, "raw_json": raw_dict,
     }
