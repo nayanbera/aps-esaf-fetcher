@@ -23,12 +23,20 @@ _scheduler: BackgroundScheduler | None = None
 def _get(obj: Any, *keys: str, default: Any = None) -> Any:
     """Try multiple attribute/key names on a dict-like object."""
     for k in keys:
+        # Try subscript access first (works for dict AND dict-like DM API objects)
         try:
-            v = obj[k] if isinstance(obj, dict) else getattr(obj, k, None)
+            v = obj[k]
             if v is not None:
                 return v
         except (KeyError, TypeError):
-            continue
+            pass
+        # Fall back to attribute access
+        try:
+            v = getattr(obj, k, None)
+            if v is not None:
+                return v
+        except Exception:
+            pass
     return default
 
 
