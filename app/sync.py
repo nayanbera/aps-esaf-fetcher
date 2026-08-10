@@ -138,6 +138,8 @@ def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = 
                     log.warning("API error beamline=%s year=%s: %s", beamline, year, exc)
                     continue
 
+                records = list(records)
+                log.info("API returned %d records for beamline=%s year=%s", len(records), beamline, year)
                 for raw in records:
                     try:
                         data   = _extract_esaf(raw)
