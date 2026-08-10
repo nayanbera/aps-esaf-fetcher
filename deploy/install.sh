@@ -43,16 +43,8 @@ echo "==> Installing Python dependencies"
 sudo -u "$SERVICE_USER" "$ENV_PIP" install --quiet -r "$INSTALL_DIR/requirements.txt"
 
 # ── 3. Install dm library (APS Data Management) ──────────────────────────────
-# Uncomment and set the correct channel once confirmed:
-#   sudo -u "$SERVICE_USER" "$CONDA_BIN" run -n "$CONDA_ENV" \
-#       conda install -c <channel> <dm-package-name> -y
-echo ""
-echo "  *** ACTION REQUIRED ***"
-echo "  Install the APS dm library into the '$CONDA_ENV' conda env before syncing."
-echo "  Example (replace <channel> and <package> with the correct values):"
-echo "    conda activate $CONDA_ENV"
-echo "    conda install -c <channel> <dm-package-name>"
-echo ""
+echo "==> Installing aps-dm-api into conda env '$CONDA_ENV'"
+sudo -u "$SERVICE_USER" "$CONDA_BIN" install -n "$CONDA_ENV" aps-anl-tag::aps-dm-api -y
 
 # ── 4. Secrets file (root-owned, mode 600) ───────────────────────────────────
 echo "==> Setting up secrets at $SECRETS_DIR/secrets.env"

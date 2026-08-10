@@ -72,9 +72,8 @@ sudo bash deploy/install.sh chem_epics /home/chem_epics/anaconda3
 # Fill in credentials
 sudo vi /etc/aps-esaf-fetcher/secrets.env
 
-# Install the dm library into the new conda env (replace <channel> and <pkg>)
-conda activate aps-esaf-fetcher
-conda install -c <channel> <dm-package-name>
+# dm library is installed automatically by install.sh via:
+#   conda install aps-anl-tag::aps-dm-api
 
 sudo systemctl start aps-esaf-fetcher
 sudo journalctl -fu aps-esaf-fetcher
@@ -128,7 +127,9 @@ deploy/
 
 ## DM library installation
 
-The `dm` package is provided by APS and is not on PyPI. Install it following the
-[APS Data Management documentation](https://git.aps.anl.gov/DM/dm-docs) before running
-a sync. The service starts and serves the web UI without it; syncing will fail with a
-clear error message until the library is installed.
+The `dm` package is provided by APS via the `aps-anl-tag` conda channel and is
+not on PyPI. The install script handles this automatically:
+
+```bash
+conda install aps-anl-tag::aps-dm-api
+```
