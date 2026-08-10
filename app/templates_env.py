@@ -1,38 +1,32 @@
-"""Shared Jinja2Templates instance used by all routers."""
+"""Shared Jinja2 template renderer.
+
+Uses Jinja2's Environment directly instead of Starlette's Jinja2Templates to
+avoid the unhashable-dict TypeError that arises when Starlette injects url_for
+(a closure) into env.globals, which in some Starlette/Jinja2 version
+combinations corrupts the LRU cache key tuple.
+"""
 
 from pathlib import Path
+
 from jinja2 import Environment, FileSystemLoader
-from jinja2.utils import LRUCache
-from starlette.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 
 _templates_dir = Path(__file__).parent / "templates"
-
-
-class _SafeCache(LRUCache):
-    """LRUCache that silently ignores unhashable cache keys.
-
-    Starlette injects env.globals (a dict) into the Jinja2 cache key tuple,
-    making it unhashable on certain Jinja2/Starlette version combinations.
-    This wrapper catches the TypeError so templates are loaded fresh on a
-    cache miss rather than crashing.
-    """
-    def get(self, key):
-        try:
-            return super().get(key)
-        except TypeError:
-            return None
-
-    def __setitem__(self, key, value):
-        try:
-            super().__setitem__(key, value)
-        except TypeError:
-            pass
-
 
 _env = Environment(
     loader=FileSystemLoader(str(_templates_dir)),
     autoescape=True,
 )
-_env.cache = _SafeCache(400)
 
-templates = Jinja2Templates(env=_env)
+
+class _Templates:
+    """Drop-in replacement for Starlette's Jinja2Templates."""
+
+    def TemplateResponse(
+        self, name: str, context: dict, status_code: int = 200
+    ) -> HTMLResponse:
+        content = _env.get_template(name).render(**context)
+        return HTMLResponse(content=content, status_code=status_code)
+
+
+templates = _Templates()
