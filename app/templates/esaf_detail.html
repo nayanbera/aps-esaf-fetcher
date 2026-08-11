@@ -158,15 +158,17 @@
               {% endif %}
             </td>
             <td>
-              {% if u.email and '@' in u.email and (not u.institution or not u.country or not u.state) %}
-                <button class="btn btn-outline-secondary btn-sm py-0"
+              {% if u.email and '@' in u.email %}
+                {% set _missing = not u.institution or not u.country or not u.state %}
+                <button class="btn btn-sm py-0 {{ 'btn-outline-secondary' if _missing else 'btn-outline-light text-muted border-0' }}"
                         data-domain="{{ u.email.split('@')[1] }}"
                         data-institution="{{ u.institution or '' }}"
                         data-country="{{ u.country or '' }}"
                         data-state="{{ u.state or '' }}"
                         data-bs-toggle="modal"
-                        data-bs-target="#affiliationModal">
-                  {% if not u.institution %}Set{% else %}Complete{% endif %}
+                        data-bs-target="#affiliationModal"
+                        title="{{ 'Set affiliation' if not u.institution else 'Edit affiliation' }}">
+                  {% if not u.institution %}Set{% elif _missing %}Complete{% else %}<i class="bi bi-pencil"></i>{% endif %}
                 </button>
               {% else %}
                 &nbsp;
@@ -319,18 +321,34 @@ document.getElementById('affiliationModal').addEventListener('show.bs.modal', fu
 
 document.getElementById('aff-save').addEventListener('click', function() {
   var domain = document.getElementById('aff-domain-val').value;
+  var resultEl = document.getElementById('aff-result');
   var data = new URLSearchParams({
     domain: domain,
     institution: document.getElementById('aff-institution').value,
     country: document.getElementById('aff-country').value,
     state: document.getElementById('aff-state').value,
   });
+  resultEl.className = 'text-muted small me-auto';
+  resultEl.textContent = 'Saving…';
   fetch('/api/domain-overrides', {method: 'POST', body: data})
-    .then(r => r.json())
+    .then(function(r) {
+      if (!r.ok) {
+        return r.json().then(function(j) {
+          throw new Error(j.detail || ('Server error ' + r.status));
+        }).catch(function() {
+          throw new Error('Server error ' + r.status);
+        });
+      }
+      return r.json();
+    })
     .then(function(j) {
-      document.getElementById('aff-result').textContent =
-        'Saved — updated ' + j.updated_users + ' user record(s).';
+      resultEl.className = 'text-success small me-auto';
+      resultEl.textContent = 'Saved — updated ' + j.updated_users + ' user record(s).';
       setTimeout(function(){ location.reload(); }, 1200);
+    })
+    .catch(function(err) {
+      resultEl.className = 'text-danger small me-auto';
+      resultEl.textContent = 'Error: ' + err.message;
     });
 });
 </script>
