@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}PI Groups — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h5 class="mb-0"><i class="bi bi-person-badge me-2"></i>PI Groups</h5>
+</div>
+
+<!-- Add new PI Group form -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-plus-circle me-1"></i>Add PI Group
+  </div>
+  <div class="card-body">
+    <form hx-post="/pi-groups"
+          hx-target="#pg-tbody"
+          hx-swap="afterbegin"
+          hx-on::after-request="this.reset(); document.getElementById('user-fill-hint').textContent=''">
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">PI Group Name <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required
+                 placeholder="e.g. Smith Lab">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">PI Name</label>
+          <input type="text" name="pi_name" id="add-pi-name" class="form-control"
+                 list="add-users-list"
+                 placeholder="Type to search existing users or enter new">
+          <datalist id="add-users-list">
+            {% for u in all_users %}
+              <option value="{{ u.first_name }} {{ u.last_name }}">
+            {% endfor %}
+          </datalist>
+          <div class="form-text" id="user-fill-hint"></div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">PI Email</label>
+          <input type="text" name="pi_email" id="add-pi-email" class="form-control"
+                 placeholder="email@example.com">
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-md-5">
+          <label class="form-label fw-semibold mb-1">Institution</label>
+          <input type="text" name="institution" id="add-institution" class="form-control"
+                 placeholder="University / Lab name">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold mb-1">Country</label>
+          <input type="text" name="country" id="add-country" class="form-control"
+                 maxlength="2" placeholder="US">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold mb-1">State</label>
+          <input type="text" name="state" id="add-state" class="form-control"
+                 placeholder="IL">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold mb-1">ORCID</label>
+          <input type="text" name="orcid_id" id="add-orcid" class="form-control"
+                 placeholder="0000-0000-0000-0000">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Add PI Group
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- PI Groups table -->
+<div class="card">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-list-ul me-1"></i>Existing PI Groups ({{ pi_groups | length }})
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Group Name</th>
+            <th>PI Name</th>
+            <th>Institution</th>
+            <th>Country</th>
+            <th>State</th>
+            <th>ORCID</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="pg-tbody">
+          {% for pg in pi_groups %}
+            {% include "partials/pi_group_row_view.html" %}
+          {% else %}
+            <tr id="pg-empty"><td colspan="7" class="text-center text-muted py-3">
+              No PI Groups yet. Add one above.
+            </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- User lookup data for auto-fill -->
+<script id="users-json" type="application/json">{{ all_users | tojson }}</script>
+
+<script>
+(function () {
+  const users = JSON.parse(document.getElementById('users-json').textContent);
+  const byName = {};
+  users.forEach(u => {
+    const full = (u.first_name + ' ' + u.last_name).trim();
+    if (full) byName[full] = u;
+  });
+
+  function wireAutoFill(nameInputId, emailId, instId, countryId, stateId, orcidId, hintId) {
+    const nameInput = document.getElementById(nameInputId);
+    if (!nameInput) return;
+    nameInput.addEventListener('change', function () {
+      const u = byName[this.value.trim()];
+      if (u) {
+        if (emailId)   setField(emailId,   u.email       || '');
+        if (instId)    setField(instId,    u.institution || '');
+        if (countryId) setField(countryId, u.country     || '');
+        if (stateId)   setField(stateId,   u.state       || '');
+        if (orcidId)   setField(orcidId,   u.orcid_id    || '');
+        if (hintId) {
+          const el = document.getElementById(hintId);
+          if (el) el.textContent = u.institution
+            ? 'Auto-filled from known user.'
+            : 'User found but no institution on record — fill manually.';
+        }
+      }
+    });
+  }
+
+  function setField(id, val) {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = val;
+  }
+
+  wireAutoFill('add-pi-name', 'add-pi-email', 'add-institution',
+               'add-country', 'add-state', 'add-orcid', 'user-fill-hint');
+})();
+</script>
+{% endblock %}

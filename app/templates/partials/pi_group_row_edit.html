@@ -1,0 +1,72 @@
+<tr id="pg-row-{{ pg.name | urlencode }}">
+  <td class="fw-semibold">{{ pg.name }}</td>
+  <form hx-post="/pi-groups/{{ pg.name | urlencode }}"
+        hx-target="#pg-row-{{ pg.name | urlencode }}"
+        hx-swap="outerHTML"
+        style="display:contents">
+    <td>
+      <input type="text" name="pi_name" id="edit-pi-name-{{ loop.index | default(0) }}"
+             value="{{ pg.pi_name }}" class="form-control form-control-sm"
+             list="edit-users-list-{{ loop.index | default(0) }}"
+             placeholder="Type to search users or enter new">
+      <datalist id="edit-users-list-{{ loop.index | default(0) }}">
+        {% for u in all_users %}
+          <option value="{{ u.first_name }} {{ u.last_name }}">
+        {% endfor %}
+      </datalist>
+    </td>
+    <td>
+      <input type="text" name="institution" id="edit-institution-{{ loop.index | default(0) }}"
+             value="{{ pg.institution }}" class="form-control form-control-sm"
+             placeholder="Institution">
+    </td>
+    <td>
+      <input type="text" name="country"
+             value="{{ pg.country }}" class="form-control form-control-sm"
+             maxlength="2" placeholder="US">
+    </td>
+    <td>
+      <input type="text" name="state"
+             value="{{ pg.state }}" class="form-control form-control-sm"
+             placeholder="IL">
+    </td>
+    <td>
+      <input type="text" name="orcid_id" id="edit-orcid-{{ loop.index | default(0) }}"
+             value="{{ pg.orcid_id }}" class="form-control form-control-sm"
+             placeholder="0000-0000-0000-0000">
+      <input type="hidden" name="pi_email" value="{{ pg.pi_email }}">
+    </td>
+    <td class="text-end text-nowrap">
+      <button type="submit" class="btn btn-success btn-sm py-0 me-1">
+        <i class="bi bi-check-lg"></i>
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm py-0"
+              hx-get="/pi-groups/{{ pg.name | urlencode }}/view"
+              hx-target="#pg-row-{{ pg.name | urlencode }}"
+              hx-swap="outerHTML">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </td>
+  </form>
+</tr>
+
+<script>
+(function () {
+  const idx = '{{ loop.index | default(0) }}';
+  const users = JSON.parse(document.getElementById('users-json').textContent);
+  const byName = {};
+  users.forEach(u => {
+    byName[(u.first_name + ' ' + u.last_name).trim()] = u;
+  });
+  const nameEl = document.getElementById('edit-pi-name-' + idx);
+  if (!nameEl) return;
+  nameEl.addEventListener('change', function () {
+    const u = byName[this.value.trim()];
+    if (!u) return;
+    const inst  = document.getElementById('edit-institution-' + idx);
+    const orcid = document.getElementById('edit-orcid-' + idx);
+    if (inst  && !inst.value)  inst.value  = u.institution || '';
+    if (orcid && !orcid.value) orcid.value = u.orcid_id    || '';
+  });
+})();
+</script>

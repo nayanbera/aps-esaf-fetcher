@@ -149,10 +149,60 @@ class MongoESAFRepository(ESAFRepository):
             )
         return result.matched_count > 0
 
-    def list_pi_groups(self) -> list[str]:
-        return sorted(
-            d["name"] for d in self._pi_groups().find({}, {"name": 1})
+    def list_pi_groups(self) -> list[dict]:
+        docs = self._pi_groups().find({}, {"_id": 0}).sort("name", ASCENDING)
+        return [
+            {k: d.get(k, "") for k in
+             ("name", "pi_name", "pi_email", "institution", "country", "state",
+              "orcid_id", "created_at")}
+            for d in docs
+        ]
+
+    def upsert_pi_group(
+        self, name: str, pi_name: str = "", pi_email: str = "",
+        institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+    ) -> None:
+        self._pi_groups().update_one(
+            {"name": name},
+            {"$set": {"pi_name": pi_name, "pi_email": pi_email,
+                      "institution": institution, "country": country,
+                      "state": state, "orcid_id": orcid_id}},
+            upsert=True,
         )
+
+    def delete_pi_group(self, name: str) -> bool:
+        return self._pi_groups().delete_one({"name": name}).deleted_count > 0
+
+    def list_users_for_lookup(self, q: str = "") -> list[dict]:
+        filt = {}
+        if q:
+            filt = {"$or": [
+                {"first_name": {"$regex": q, "$options": "i"}},
+                {"last_name":  {"$regex": q, "$options": "i"}},
+                {"email":      {"$regex": q, "$options": "i"}},
+            ]}
+        pipeline = [
+            {"$unwind": "$users"},
+            {"$replaceRoot": {"newRoot": "$users"}},
+            *(([{"$match": filt}]) if filt else []),
+            {"$group": {"_id": "$badge",
+                        "badge":       {"$first": "$badge"},
+                        "first_name":  {"$first": "$first_name"},
+                        "last_name":   {"$first": "$last_name"},
+                        "institution": {"$first": "$institution"},
+                        "country":     {"$first": "$country"},
+                        "state":       {"$first": "$state"},
+                        "email":       {"$first": "$email"},
+                        "orcid_id":    {"$first": "$orcid_id"}}},
+            {"$sort": {"last_name": 1, "first_name": 1}},
+            {"$limit": 50 if q else 500},
+        ]
+        return [
+            {k: d.get(k, "") for k in
+             ("badge", "first_name", "last_name", "institution",
+              "country", "state", "email", "orcid_id")}
+            for d in self._esafs().aggregate(pipeline)
+        ]
 
     def upsert_esaf(self, data: dict, now: str) -> str:
         esaf_id = data["esaf_id"]

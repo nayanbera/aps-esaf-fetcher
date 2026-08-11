@@ -13,6 +13,7 @@ from . import db, sync
 from .institution import _load_uni_db, load_overrides
 from .routers import esafs, stats, sync_router, fields
 from .routers import overrides as overrides_router
+from .routers import pi_groups_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +57,7 @@ app.include_router(stats.router)
 app.include_router(sync_router.router)
 app.include_router(fields.router)
 app.include_router(overrides_router.router)
+app.include_router(pi_groups_router.router)
 
 
 @app.get("/", include_in_schema=False)

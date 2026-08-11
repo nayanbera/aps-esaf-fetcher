@@ -67,8 +67,23 @@ def update_esaf_fields(
     return _r().update_esaf_fields(esaf_id, notes, custom_fields, pi_group)
 
 
-def list_pi_groups() -> list[str]:
+def list_pi_groups() -> list[dict]:
     return _r().list_pi_groups()
+
+
+def upsert_pi_group(
+    name: str, pi_name: str = "", pi_email: str = "",
+    institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+) -> None:
+    _r().upsert_pi_group(name, pi_name, pi_email, institution, country, state, orcid_id)
+
+
+def delete_pi_group(name: str) -> bool:
+    return _r().delete_pi_group(name)
+
+
+def list_users_for_lookup(q: str = "") -> list[dict]:
+    return _r().list_users_for_lookup(q)
 
 
 def upsert_esaf(data: dict, now: str) -> str:

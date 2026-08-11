@@ -18,7 +18,7 @@
                value="{{ esaf.pi_group or '' }}">
         <datalist id="pi-groups-list">
           {% for pg in pi_groups %}
-            <option value="{{ pg }}">
+            <option value="{{ pg.name }}">
           {% endfor %}
         </datalist>
         <div class="form-text">The actual PI of the experimental group (may not be listed in the ESAF). Saved entries appear as autocomplete options.</div>

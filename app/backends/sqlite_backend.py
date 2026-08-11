@@ -80,8 +80,14 @@ CREATE TABLE IF NOT EXISTS sync_log (
 );
 
 CREATE TABLE IF NOT EXISTS pi_groups (
-    name       TEXT PRIMARY KEY,
-    created_at TEXT DEFAULT (datetime('now'))
+    name        TEXT PRIMARY KEY,
+    pi_name     TEXT NOT NULL DEFAULT '',
+    pi_email    TEXT NOT NULL DEFAULT '',
+    institution TEXT NOT NULL DEFAULT '',
+    country     TEXT NOT NULL DEFAULT '',
+    state       TEXT NOT NULL DEFAULT '',
+    orcid_id    TEXT NOT NULL DEFAULT '',
+    created_at  TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS domain_overrides (
@@ -168,14 +174,33 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
-            # Explicit create in case executescript didn't reach it on an existing DB
+            # Ensure pi_groups table exists with full schema on existing DBs
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS pi_groups (
-                    name       TEXT PRIMARY KEY,
-                    created_at TEXT DEFAULT (datetime('now'))
+                    name        TEXT PRIMARY KEY,
+                    pi_name     TEXT NOT NULL DEFAULT '',
+                    pi_email    TEXT NOT NULL DEFAULT '',
+                    institution TEXT NOT NULL DEFAULT '',
+                    country     TEXT NOT NULL DEFAULT '',
+                    state       TEXT NOT NULL DEFAULT '',
+                    orcid_id    TEXT NOT NULL DEFAULT '',
+                    created_at  TEXT DEFAULT (datetime('now'))
                 )
             """)
             conn.commit()
+            for col, defn in [
+                ("pi_name",     "TEXT NOT NULL DEFAULT ''"),
+                ("pi_email",    "TEXT NOT NULL DEFAULT ''"),
+                ("institution", "TEXT NOT NULL DEFAULT ''"),
+                ("country",     "TEXT NOT NULL DEFAULT ''"),
+                ("state",       "TEXT NOT NULL DEFAULT ''"),
+                ("orcid_id",    "TEXT NOT NULL DEFAULT ''"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE pi_groups ADD COLUMN {col} {defn}")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
 
     # ------------------------------------------------------------------
     # ESAFs
@@ -302,13 +327,55 @@ class SQLiteESAFRepository(ESAFRepository):
                 )
         return cur.rowcount > 0
 
-    def list_pi_groups(self) -> list[str]:
+    def list_pi_groups(self) -> list[dict]:
         with self._db() as conn:
-            return [
-                r[0] for r in conn.execute(
-                    "SELECT name FROM pi_groups ORDER BY name"
+            rows = conn.execute(
+                "SELECT name, pi_name, pi_email, institution, country, state, "
+                "orcid_id, created_at FROM pi_groups ORDER BY name"
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def upsert_pi_group(
+        self, name: str, pi_name: str = "", pi_email: str = "",
+        institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+    ) -> None:
+        with self._db() as conn:
+            conn.execute(
+                """INSERT INTO pi_groups (name, pi_name, pi_email, institution,
+                       country, state, orcid_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(name) DO UPDATE SET
+                       pi_name=excluded.pi_name, pi_email=excluded.pi_email,
+                       institution=excluded.institution, country=excluded.country,
+                       state=excluded.state, orcid_id=excluded.orcid_id""",
+                (name, pi_name, pi_email, institution, country, state, orcid_id),
+            )
+
+    def delete_pi_group(self, name: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute("DELETE FROM pi_groups WHERE name = ?", (name,))
+            return cur.rowcount > 0
+
+    def list_users_for_lookup(self, q: str = "") -> list[dict]:
+        with self._db() as conn:
+            if q:
+                pat = f"%{q}%"
+                rows = conn.execute(
+                    """SELECT badge, first_name, last_name, institution,
+                              country, state, email, orcid_id
+                       FROM users
+                       WHERE (first_name || ' ' || last_name) LIKE ?
+                          OR last_name LIKE ? OR email LIKE ?
+                       ORDER BY last_name, first_name LIMIT 50""",
+                    (pat, pat, pat),
                 ).fetchall()
-            ]
+            else:
+                rows = conn.execute(
+                    """SELECT badge, first_name, last_name, institution,
+                              country, state, email, orcid_id
+                       FROM users ORDER BY last_name, first_name LIMIT 500""",
+                ).fetchall()
+            return [dict(r) for r in rows]
 
     def upsert_esaf(self, data: dict, now: str) -> str:
         with self._db() as conn:

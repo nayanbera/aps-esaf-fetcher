@@ -53,7 +53,19 @@ class ESAFRepository(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def list_pi_groups(self) -> list[str]: ...
+    def list_pi_groups(self) -> list[dict]: ...
+
+    @abstractmethod
+    def upsert_pi_group(
+        self, name: str, pi_name: str = "", pi_email: str = "",
+        institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+    ) -> None: ...
+
+    @abstractmethod
+    def delete_pi_group(self, name: str) -> bool: ...
+
+    @abstractmethod
+    def list_users_for_lookup(self, q: str = "") -> list[dict]: ...
 
     @abstractmethod
     def upsert_esaf(self, data: dict, now: str) -> str:
