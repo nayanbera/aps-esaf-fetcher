@@ -98,10 +98,42 @@ CREATE TABLE IF NOT EXISTS domain_overrides (
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_esafs_year     ON esafs(year);
-CREATE INDEX IF NOT EXISTS idx_esafs_beamline ON esafs(beamline);
-CREATE INDEX IF NOT EXISTS idx_esafs_status   ON esafs(status);
+CREATE TABLE IF NOT EXISTS gups (
+    gup_id         TEXT PRIMARY KEY,
+    title          TEXT DEFAULT '',
+    pi_name        TEXT DEFAULT '',
+    pi_institution TEXT DEFAULT '',
+    run_cycle      TEXT DEFAULT '',
+    proposal_type  TEXT DEFAULT '',
+    primary_area   TEXT DEFAULT '',
+    keywords       TEXT DEFAULT '',
+    abstract       TEXT DEFAULT '',
+    beamlines      TEXT DEFAULT '',
+    status         TEXT DEFAULT '',
+    submitted_at   TEXT DEFAULT '',
+    notes          TEXT DEFAULT '',
+    pdf_path       TEXT DEFAULT '',
+    raw_fields     TEXT DEFAULT '{}',
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS gup_funding_sources (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    gup_id       TEXT NOT NULL REFERENCES gups(gup_id) ON DELETE CASCADE,
+    agency       TEXT DEFAULT '',
+    details      TEXT DEFAULT '',
+    grant_number TEXT DEFAULT '',
+    percentage   INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_esafs_year       ON esafs(year);
+CREATE INDEX IF NOT EXISTS idx_esafs_beamline   ON esafs(beamline);
+CREATE INDEX IF NOT EXISTS idx_esafs_status     ON esafs(status);
+CREATE INDEX IF NOT EXISTS idx_esafs_gup_id     ON esafs(gup_id);
 CREATE INDEX IF NOT EXISTS idx_esaf_users_badge ON esaf_users(badge);
+CREATE INDEX IF NOT EXISTS idx_gups_run_cycle   ON gups(run_cycle);
+CREATE INDEX IF NOT EXISTS idx_gup_fs_gup_id    ON gup_funding_sources(gup_id);
 """
 
 
@@ -201,6 +233,49 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
+            # GUP-related migrations for esafs table
+            for col, defn in [
+                ("gup_id",   "TEXT DEFAULT ''"),
+                ("pdf_path", "TEXT DEFAULT ''"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+            # GUP tables (already in _SCHEMA but ensure on old DBs)
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS gups (
+                    gup_id         TEXT PRIMARY KEY,
+                    title          TEXT DEFAULT '',
+                    pi_name        TEXT DEFAULT '',
+                    pi_institution TEXT DEFAULT '',
+                    run_cycle      TEXT DEFAULT '',
+                    proposal_type  TEXT DEFAULT '',
+                    primary_area   TEXT DEFAULT '',
+                    keywords       TEXT DEFAULT '',
+                    abstract       TEXT DEFAULT '',
+                    beamlines      TEXT DEFAULT '',
+                    status         TEXT DEFAULT '',
+                    submitted_at   TEXT DEFAULT '',
+                    notes          TEXT DEFAULT '',
+                    pdf_path       TEXT DEFAULT '',
+                    raw_fields     TEXT DEFAULT '{}',
+                    created_at     TEXT DEFAULT (datetime('now')),
+                    updated_at     TEXT DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS gup_funding_sources (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    gup_id       TEXT NOT NULL REFERENCES gups(gup_id) ON DELETE CASCADE,
+                    agency       TEXT DEFAULT '',
+                    details      TEXT DEFAULT '',
+                    grant_number TEXT DEFAULT '',
+                    percentage   INTEGER DEFAULT 0
+                );
+                CREATE INDEX IF NOT EXISTS idx_esafs_gup_id   ON esafs(gup_id);
+                CREATE INDEX IF NOT EXISTS idx_gups_run_cycle ON gups(run_cycle);
+                CREATE INDEX IF NOT EXISTS idx_gup_fs_gup_id ON gup_funding_sources(gup_id);
+            """)
 
     # ------------------------------------------------------------------
     # ESAFs
@@ -616,3 +691,182 @@ class SQLiteESAFRepository(ESAFRepository):
                 (institution, country, state, f"%@{domain}"),
             )
         return cur.rowcount
+
+    # ------------------------------------------------------------------
+    # GUPs
+    # ------------------------------------------------------------------
+
+    def list_gups(
+        self,
+        search: Optional[str] = None,
+        run_cycle: Optional[str] = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> list[dict]:
+        clauses, params = [], []
+        if run_cycle:
+            clauses.append("g.run_cycle = ?"); params.append(run_cycle)
+        if search:
+            clauses.append(
+                "(g.title LIKE ? OR g.pi_name LIKE ? OR g.gup_id LIKE ?)"
+            )
+            params.extend([f"%{search}%"] * 3)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        sql = f"""
+            SELECT g.*,
+                   COUNT(DISTINCT gf.id) AS funding_count,
+                   COUNT(DISTINCT e.esaf_id) AS linked_esaf_count
+            FROM gups g
+            LEFT JOIN gup_funding_sources gf ON g.gup_id = gf.gup_id
+            LEFT JOIN esafs e ON e.gup_id = g.gup_id
+            {where}
+            GROUP BY g.gup_id
+            ORDER BY g.run_cycle DESC, g.gup_id DESC
+            LIMIT ? OFFSET ?
+        """
+        params.extend([limit, offset])
+        with self._db() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        result = []
+        for r in rows:
+            d = self._row_to_dict(r)
+            d["funding_sources"] = self._load_gup_funding(d["gup_id"])
+            result.append(d)
+        return result
+
+    def get_gup(self, gup_id: str) -> Optional[dict]:
+        with self._db() as conn:
+            row = conn.execute("SELECT * FROM gups WHERE gup_id = ?", (gup_id,)).fetchone()
+            if row is None:
+                return None
+            d = self._row_to_dict(row)
+            d["linked_esaf_count"] = conn.execute(
+                "SELECT COUNT(*) FROM esafs WHERE gup_id = ?", (gup_id,)
+            ).fetchone()[0]
+        d["funding_sources"] = self._load_gup_funding(gup_id)
+        return d
+
+    def _load_gup_funding(self, gup_id: str) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT agency, details, grant_number, percentage "
+                "FROM gup_funding_sources WHERE gup_id = ? ORDER BY id",
+                (gup_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def count_gups(
+        self,
+        search: Optional[str] = None,
+        run_cycle: Optional[str] = None,
+    ) -> int:
+        clauses, params = [], []
+        if run_cycle:
+            clauses.append("run_cycle = ?"); params.append(run_cycle)
+        if search:
+            clauses.append("(title LIKE ? OR pi_name LIKE ? OR gup_id LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self._db() as conn:
+            return conn.execute(f"SELECT COUNT(*) FROM gups {where}", params).fetchone()[0]
+
+    def upsert_gup(self, data: dict, now: str) -> str:
+        gup_id = data["gup_id"]
+        with self._db() as conn:
+            existing = conn.execute(
+                "SELECT gup_id FROM gups WHERE gup_id = ?", (gup_id,)
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """UPDATE gups SET title=?, pi_name=?, pi_institution=?, run_cycle=?,
+                       proposal_type=?, primary_area=?, keywords=?, abstract=?, beamlines=?,
+                       status=?, submitted_at=?, pdf_path=?, raw_fields=?,
+                       updated_at=datetime('now') WHERE gup_id=?""",
+                    (
+                        data.get("title", ""), data.get("pi_name", ""),
+                        data.get("pi_institution", ""), data.get("run_cycle", ""),
+                        data.get("proposal_type", ""), data.get("primary_area", ""),
+                        data.get("keywords", ""), data.get("abstract", ""),
+                        data.get("beamlines", ""), data.get("status", ""),
+                        data.get("submitted_at", ""), data.get("pdf_path", ""),
+                        json.dumps(data.get("raw_fields", {})), gup_id,
+                    ),
+                )
+                action = "updated"
+            else:
+                conn.execute(
+                    """INSERT INTO gups
+                       (gup_id, title, pi_name, pi_institution, run_cycle, proposal_type,
+                        primary_area, keywords, abstract, beamlines, status, submitted_at,
+                        pdf_path, raw_fields)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        gup_id, data.get("title", ""), data.get("pi_name", ""),
+                        data.get("pi_institution", ""), data.get("run_cycle", ""),
+                        data.get("proposal_type", ""), data.get("primary_area", ""),
+                        data.get("keywords", ""), data.get("abstract", ""),
+                        data.get("beamlines", ""), data.get("status", ""),
+                        data.get("submitted_at", ""), data.get("pdf_path", ""),
+                        json.dumps(data.get("raw_fields", {})),
+                    ),
+                )
+                action = "added"
+
+            # Replace funding sources
+            conn.execute("DELETE FROM gup_funding_sources WHERE gup_id = ?", (gup_id,))
+            for fs in data.get("funding_sources", []):
+                conn.execute(
+                    "INSERT INTO gup_funding_sources (gup_id, agency, details, grant_number, percentage) "
+                    "VALUES (?,?,?,?,?)",
+                    (gup_id, fs.get("agency", ""), fs.get("details", ""),
+                     fs.get("grant_number", ""), fs.get("percentage", 0)),
+                )
+        return action
+
+    def delete_gup(self, gup_id: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute("DELETE FROM gups WHERE gup_id = ?", (gup_id,))
+        return cur.rowcount > 0
+
+    def get_esafs_for_gup(self, gup_id: str) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                """SELECT esaf_id, title, beamline, year, status, start_date, end_date, pi_name
+                   FROM esafs WHERE gup_id = ? ORDER BY start_date""",
+                (gup_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_esaf_pdf(self, esaf_id: str, gup_id: str, pdf_path: str) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE esafs SET gup_id=?, pdf_path=?, updated_at=datetime('now') WHERE esaf_id=?",
+                (gup_id, pdf_path, esaf_id),
+            )
+
+    def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:
+        with self._db() as conn:
+            esaf_ids = [
+                r[0] for r in conn.execute(
+                    "SELECT esaf_id FROM esafs WHERE gup_id = ?", (gup_id,)
+                ).fetchall()
+            ]
+            count = 0
+            for esaf_id in esaf_ids:
+                conn.execute(
+                    "DELETE FROM funding_sources WHERE esaf_id = ?", (esaf_id,)
+                )
+                for src in funding_strings:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO funding_sources (esaf_id, source) VALUES (?,?)",
+                        (esaf_id, src),
+                    )
+                count += 1
+        return count
+
+    def get_gup_run_cycles(self) -> list[str]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT run_cycle FROM gups WHERE run_cycle != '' ORDER BY run_cycle DESC"
+            ).fetchall()
+        return [r[0] for r in rows]

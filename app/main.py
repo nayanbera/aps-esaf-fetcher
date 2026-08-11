@@ -14,6 +14,7 @@ from .institution import _load_uni_db, load_overrides
 from .routers import esafs, stats, sync_router, fields
 from .routers import overrides as overrides_router
 from .routers import pi_groups_router
+from .routers import gups as gups_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,6 +54,7 @@ _static = Path(__file__).parent.parent / "static"
 app.mount("/static", StaticFiles(directory=str(_static)), name="static")
 
 app.include_router(esafs.router)
+app.include_router(gups_router.router)
 app.include_router(stats.router)
 app.include_router(sync_router.router)
 app.include_router(fields.router)

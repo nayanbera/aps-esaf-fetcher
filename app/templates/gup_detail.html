@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}GUP {{ gup.gup_id }} — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="/gups" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Back to GUPs
+  </a>
+</div>
+
+<!-- Header -->
+<div class="d-flex align-items-start justify-content-between mb-3">
+  <div>
+    <h4 class="mb-1">{{ gup.title or '(No title)' }}</h4>
+    <span class="text-muted small">GUP ID: <code>{{ gup.gup_id }}</code></span>
+    {% if gup.run_cycle %}
+      <span class="badge bg-light text-dark border ms-2">{{ gup.run_cycle }}</span>
+    {% endif %}
+    {% if gup.status %}
+      <span class="badge bg-secondary ms-1">{{ gup.status }}</span>
+    {% endif %}
+  </div>
+  <button class="btn btn-outline-danger btn-sm"
+          hx-delete="/gups/{{ gup.gup_id }}"
+          hx-confirm="Delete GUP {{ gup.gup_id }}? This cannot be undone."
+          hx-target="body"
+          hx-push-url="/gups">
+    <i class="bi bi-trash me-1"></i>Delete
+  </button>
+</div>
+
+<!-- Core info row -->
+<div class="row g-3 mb-3">
+  <!-- Proposal details -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-info-circle me-1"></i>Proposal Details
+      </div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr><th class="text-nowrap" style="width:40%">GUP ID</th><td><code>{{ gup.gup_id }}</code></td></tr>
+            <tr><th>PI Name</th><td>{{ gup.pi_name or '—' }}</td></tr>
+            <tr><th>Institution</th><td>{{ gup.pi_institution or '—' }}</td></tr>
+            <tr><th>Run Cycle</th><td>{{ gup.run_cycle or '—' }}</td></tr>
+            <tr><th>Proposal Type</th><td>{{ gup.proposal_type or '—' }}</td></tr>
+            <tr><th>Primary Area</th><td>{{ gup.primary_area or '—' }}</td></tr>
+            <tr><th>Status</th><td>{{ gup.status or '—' }}</td></tr>
+            <tr><th>Submitted</th><td>{{ gup.submitted_at or '—' }}</td></tr>
+            <tr><th>Beamlines</th><td>{{ gup.beamlines or '—' }}</td></tr>
+            {% if gup.pdf_path %}
+            <tr><th>PDF</th><td><span class="badge bg-success"><i class="bi bi-file-earmark-pdf me-1"></i>Stored</span></td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+        {% if gup.keywords %}
+          <p class="mt-2 mb-0 text-muted small"><strong>Keywords:</strong> {{ gup.keywords }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Funding sources -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-cash-coin me-1"></i>Funding Sources
+      </div>
+      <div class="card-body p-0">
+        {% if gup.funding_sources %}
+          <table class="table table-sm mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Agency</th>
+                <th>Grant</th>
+                <th class="text-end">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for fs in gup.funding_sources %}
+              <tr>
+                <td>{{ fs.agency }}</td>
+                <td class="font-monospace small">{{ fs.grant_number or '—' }}</td>
+                <td class="text-end">{{ fs.percentage }}%</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="card-body">
+            <span class="text-muted">No funding sources recorded.</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Abstract -->
+{% if gup.abstract %}
+<div class="card mb-3">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-text-paragraph me-1"></i>Abstract
+  </div>
+  <div class="card-body">
+    <p class="mb-0">{{ gup.abstract }}</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Linked ESAFs -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-link-45deg me-1"></i>Linked ESAFs
+    <span class="badge bg-secondary ms-1">{{ linked_esafs | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>ESAF ID</th>
+            <th>Title</th>
+            <th>Beamline</th>
+            <th>Year</th>
+            <th>Status</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in linked_esafs %}
+          <tr>
+            <td>
+              <a href="/esafs/{{ e.esaf_id }}" class="fw-semibold text-decoration-none">
+                {{ e.esaf_id }}
+              </a>
+            </td>
+            <td>{{ e.title or '—' }}</td>
+            <td>{{ e.beamline or '—' }}</td>
+            <td>{{ e.year or '—' }}</td>
+            <td>{{ e.status or '—' }}</td>
+            <td>{{ e.start_date or '—' }}</td>
+            <td>{{ e.end_date or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-3">
+              No ESAFs linked to this GUP. Upload an ESAF PDF that references GUP {{ gup.gup_id }},
+              or set the GUP ID on an ESAF manually.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

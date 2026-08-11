@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}GUPs — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>General User Proposals (GUPs)</h5>
+  <span class="text-muted small">{{ total }} proposal{{ 's' if total != 1 }}</span>
+</div>
+
+<!-- Upload / import cards -->
+<div class="row g-3 mb-4">
+  <!-- Single PDF upload -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-upload me-1"></i>Upload GUP PDF
+      </div>
+      <div class="card-body">
+        <form hx-post="/gups/upload"
+              hx-target="#gup-upload-result"
+              hx-swap="innerHTML"
+              hx-encoding="multipart/form-data"
+              hx-on::after-request="this.reset()">
+          <div class="mb-2">
+            <label class="form-label mb-1 small">Select a GUP PDF file:</label>
+            <input type="file" name="pdf_file" accept=".pdf" class="form-control form-control-sm" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-upload me-1"></i>Upload &amp; Parse
+          </button>
+        </form>
+        <div id="gup-upload-result" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk import from folder -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-folder2-open me-1"></i>Bulk Import from Folder
+      </div>
+      <div class="card-body">
+        <form hx-post="/gups/import"
+              hx-target="#gup-bulk-result"
+              hx-swap="innerHTML"
+              hx-on::after-request="this.querySelector('[name=folder_path]').value=''">
+          <div class="mb-2">
+            <label class="form-label mb-1 small">Server folder path containing GUP PDFs:</label>
+            <input type="text" name="folder_path" class="form-control form-control-sm"
+                   placeholder="/path/to/gups/folder" required>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm">
+            <i class="bi bi-folder-symlink me-1"></i>Import All PDFs
+          </button>
+        </form>
+        <div id="gup-bulk-result" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<form method="get" action="/gups" class="row g-2 mb-3">
+  <div class="col-md-5">
+    <input type="text" name="search" value="{{ search }}"
+           class="form-control form-control-sm"
+           placeholder="Search by GUP ID, title, or PI…">
+  </div>
+  <div class="col-md-3">
+    <select name="run_cycle" class="form-select form-select-sm">
+      <option value="">All run cycles</option>
+      {% for rc in run_cycles %}
+        <option value="{{ rc }}" {% if rc == run_cycle %}selected{% endif %}>{{ rc }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+    <a href="/gups" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+  </div>
+</form>
+
+<!-- GUPs table -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>GUP ID</th>
+            <th>Title</th>
+            <th>PI</th>
+            <th>Run Cycle</th>
+            <th>Beamlines</th>
+            <th>Funding Sources</th>
+            <th>ESAFs</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for gup in gups %}
+          <tr>
+            <td class="text-nowrap">
+              <a href="/gups/{{ gup.gup_id }}" class="fw-semibold text-decoration-none">
+                {{ gup.gup_id }}
+              </a>
+            </td>
+            <td>
+              <a href="/gups/{{ gup.gup_id }}" class="text-decoration-none text-dark">
+                {{ gup.title or '—' }}
+              </a>
+            </td>
+            <td class="text-nowrap">{{ gup.pi_name or '—' }}</td>
+            <td class="text-nowrap">
+              {% if gup.run_cycle %}
+                <span class="badge bg-light text-dark border">{{ gup.run_cycle }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="small">{{ gup.beamlines or '—' }}</td>
+            <td class="text-center">
+              {% set fs = gup.funding_sources if gup.funding_sources else [] %}
+              {% if fs %}
+                <span class="badge bg-info text-dark" title="{{ fs | map(attribute='agency') | join(', ') }}">
+                  {{ fs | length }}
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if gup.linked_esaf_count %}
+                <span class="badge bg-secondary">{{ gup.linked_esaf_count }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-nowrap">
+              {% if gup.status %}
+                <span class="badge bg-light text-dark border small">{{ gup.status }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-end text-nowrap">
+              <a href="/gups/{{ gup.gup_id }}" class="btn btn-outline-secondary btn-sm py-0">
+                <i class="bi bi-eye"></i>
+              </a>
+              <button class="btn btn-outline-danger btn-sm py-0 ms-1"
+                      hx-delete="/gups/{{ gup.gup_id }}"
+                      hx-confirm="Delete GUP {{ gup.gup_id }}?"
+                      hx-target="closest tr"
+                      hx-swap="outerHTML">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="text-center text-muted py-4">
+              No GUPs yet. Upload PDF files above to get started.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if pages > 1 %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center mb-0">
+    {% for p in range(1, pages + 1) %}
+      <li class="page-item {% if p == page %}active{% endif %}">
+        <a class="page-link"
+           href="/gups?page={{ p }}&search={{ search }}&run_cycle={{ run_cycle }}">
+          {{ p }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

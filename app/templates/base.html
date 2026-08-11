@@ -45,6 +45,10 @@
              href="/overrides"><i class="bi bi-patch-check me-1"></i>Affiliations</a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.url.path.startswith('/gups') %}active{% endif %}"
+             href="/gups"><i class="bi bi-file-earmark-text me-1"></i>GUPs</a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.url.path == '/pi-groups' %}active{% endif %}"
              href="/pi-groups"><i class="bi bi-person-badge me-1"></i>PI Groups</a>
         </li>

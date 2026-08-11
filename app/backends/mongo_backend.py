@@ -51,9 +51,12 @@ class MongoESAFRepository(ESAFRepository):
         self._esafs().create_index([("beamline", ASCENDING)])
         self._esafs().create_index([("status", ASCENDING)])
         self._esafs().create_index([("users.badge", ASCENDING)])
+        self._esafs().create_index([("gup_id", ASCENDING)])
         self._field_defs().create_index([("name", ASCENDING)], unique=True)
         self._domain_overrides().create_index([("domain", ASCENDING)], unique=True)
         self._pi_groups().create_index([("name", ASCENDING)], unique=True)
+        self._gups().create_index([("gup_id", ASCENDING)], unique=True)
+        self._gups().create_index([("run_cycle", DESCENDING)])
 
     # ------------------------------------------------------------------
     # ESAFs
@@ -435,3 +438,125 @@ class MongoESAFRepository(ESAFRepository):
             array_filters=[{"u.email": {"$regex": f"@{re.escape(domain)}$", "$options": "i"}}],
         )
         return result.modified_count
+
+    # ------------------------------------------------------------------
+    # GUPs
+    # ------------------------------------------------------------------
+
+    def _gups(self):
+        return self._client[self._db_name]["gups"]
+
+    def list_gups(
+        self,
+        search: Optional[str] = None,
+        run_cycle: Optional[str] = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> list[dict]:
+        query: dict = {}
+        if run_cycle:
+            query["run_cycle"] = run_cycle
+        if search:
+            query["$or"] = [
+                {"title":   {"$regex": search, "$options": "i"}},
+                {"pi_name": {"$regex": search, "$options": "i"}},
+                {"gup_id":  {"$regex": search, "$options": "i"}},
+            ]
+        docs = (
+            self._gups()
+            .find(query, {"_id": 0})
+            .sort([("run_cycle", DESCENDING), ("gup_id", DESCENDING)])
+            .skip(offset)
+            .limit(limit)
+        )
+        result = []
+        for d in docs:
+            d["linked_esaf_count"] = self._esafs().count_documents({"gup_id": d["gup_id"]})
+            result.append(d)
+        return result
+
+    def get_gup(self, gup_id: str) -> Optional[dict]:
+        doc = self._gups().find_one({"gup_id": gup_id}, {"_id": 0})
+        if doc is None:
+            return None
+        doc["linked_esaf_count"] = self._esafs().count_documents({"gup_id": gup_id})
+        return doc
+
+    def count_gups(
+        self,
+        search: Optional[str] = None,
+        run_cycle: Optional[str] = None,
+    ) -> int:
+        query: dict = {}
+        if run_cycle:
+            query["run_cycle"] = run_cycle
+        if search:
+            query["$or"] = [
+                {"title":   {"$regex": search, "$options": "i"}},
+                {"pi_name": {"$regex": search, "$options": "i"}},
+                {"gup_id":  {"$regex": search, "$options": "i"}},
+            ]
+        return self._gups().count_documents(query)
+
+    def upsert_gup(self, data: dict, now: str) -> str:
+        gup_id = data["gup_id"]
+        existing = self._gups().find_one({"gup_id": gup_id})
+        doc = {
+            "gup_id":        gup_id,
+            "title":         data.get("title", ""),
+            "pi_name":       data.get("pi_name", ""),
+            "pi_institution": data.get("pi_institution", ""),
+            "run_cycle":     data.get("run_cycle", ""),
+            "proposal_type": data.get("proposal_type", ""),
+            "primary_area":  data.get("primary_area", ""),
+            "keywords":      data.get("keywords", ""),
+            "abstract":      data.get("abstract", ""),
+            "beamlines":     data.get("beamlines", ""),
+            "status":        data.get("status", ""),
+            "submitted_at":  data.get("submitted_at", ""),
+            "pdf_path":      data.get("pdf_path", ""),
+            "raw_fields":    data.get("raw_fields", {}),
+            "funding_sources": data.get("funding_sources", []),
+            "updated_at":    now,
+        }
+        if existing:
+            doc["notes"]      = existing.get("notes", "")
+            doc["created_at"] = existing.get("created_at", now)
+            self._gups().replace_one({"gup_id": gup_id}, doc)
+            return "updated"
+        else:
+            doc["notes"]      = ""
+            doc["created_at"] = now
+            self._gups().insert_one(doc)
+            return "added"
+
+    def delete_gup(self, gup_id: str) -> bool:
+        return self._gups().delete_one({"gup_id": gup_id}).deleted_count > 0
+
+    def get_esafs_for_gup(self, gup_id: str) -> list[dict]:
+        docs = self._esafs().find(
+            {"gup_id": gup_id},
+            {"_id": 0, "esaf_id": 1, "title": 1, "beamline": 1,
+             "year": 1, "status": 1, "start_date": 1, "end_date": 1, "pi_name": 1},
+        ).sort("start_date", ASCENDING)
+        return list(docs)
+
+    def update_esaf_pdf(self, esaf_id: str, gup_id: str, pdf_path: str) -> None:
+        self._esafs().update_one(
+            {"esaf_id": esaf_id},
+            {"$set": {"gup_id": gup_id, "pdf_path": pdf_path, "updated_at": _now_iso()}},
+        )
+
+    def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:
+        result = self._esafs().update_many(
+            {"gup_id": gup_id},
+            {"$set": {"funding_sources": funding_strings, "updated_at": _now_iso()}},
+        )
+        return result.modified_count
+
+    def get_gup_run_cycles(self) -> list[str]:
+        cycles = sorted(
+            (c for c in self._gups().distinct("run_cycle") if c),
+            reverse=True,
+        )
+        return cycles

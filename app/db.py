@@ -156,3 +156,51 @@ def apply_domain_override(
     domain: str, institution: str, country: str, state: str
 ) -> int:
     return _r().apply_domain_override(domain, institution, country, state)
+
+
+# ------------------------------------------------------------------
+# GUPs (General User Proposals)
+# ------------------------------------------------------------------
+
+def list_gups(
+    search: Optional[str] = None,
+    run_cycle: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> list[dict]:
+    return _r().list_gups(search=search, run_cycle=run_cycle, limit=limit, offset=offset)
+
+
+def get_gup(gup_id: str) -> Optional[dict]:
+    return _r().get_gup(gup_id)
+
+
+def count_gups(
+    search: Optional[str] = None,
+    run_cycle: Optional[str] = None,
+) -> int:
+    return _r().count_gups(search=search, run_cycle=run_cycle)
+
+
+def upsert_gup(data: dict, now: str) -> str:
+    return _r().upsert_gup(data, now)
+
+
+def delete_gup(gup_id: str) -> bool:
+    return _r().delete_gup(gup_id)
+
+
+def get_esafs_for_gup(gup_id: str) -> list[dict]:
+    return _r().get_esafs_for_gup(gup_id)
+
+
+def update_esaf_pdf(esaf_id: str, gup_id: str, pdf_path: str) -> None:
+    _r().update_esaf_pdf(esaf_id, gup_id, pdf_path)
+
+
+def propagate_gup_funding(gup_id: str, funding_strings: list[str]) -> int:
+    return _r().propagate_gup_funding(gup_id, funding_strings)
+
+
+def get_gup_run_cycles() -> list[str]:
+    return _r().get_gup_run_cycles()

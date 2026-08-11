@@ -133,6 +133,55 @@ class ESAFRepository(ABC):
         """Update all users whose email matches @domain. Returns row count."""
         ...
 
+    # ------------------------------------------------------------------
+    # GUPs (General User Proposals)
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def list_gups(
+        self,
+        search: Optional[str] = None,
+        run_cycle: Optional[str] = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> list[dict]: ...
+
+    @abstractmethod
+    def get_gup(self, gup_id: str) -> Optional[dict]: ...
+
+    @abstractmethod
+    def count_gups(
+        self,
+        search: Optional[str] = None,
+        run_cycle: Optional[str] = None,
+    ) -> int: ...
+
+    @abstractmethod
+    def upsert_gup(self, data: dict, now: str) -> str:
+        """Insert or update one GUP. Returns 'added' or 'updated'."""
+        ...
+
+    @abstractmethod
+    def delete_gup(self, gup_id: str) -> bool: ...
+
+    @abstractmethod
+    def get_esafs_for_gup(self, gup_id: str) -> list[dict]: ...
+
+    @abstractmethod
+    def update_esaf_pdf(self, esaf_id: str, gup_id: str, pdf_path: str) -> None:
+        """Set gup_id and pdf_path on an ESAF record."""
+        ...
+
+    @abstractmethod
+    def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:
+        """Replace funding_sources on all ESAFs linked to gup_id. Returns count updated."""
+        ...
+
+    @abstractmethod
+    def get_gup_run_cycles(self) -> list[str]:
+        """Return distinct run_cycle values from the gups table."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Factory

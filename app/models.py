@@ -29,6 +29,8 @@ class ESAFRecord(BaseModel):
     doi: str = ""
     pi_badge: str = ""
     pi_name: str = ""
+    gup_id: str = ""
+    pdf_path: str = ""
     raw_json: dict = Field(default_factory=dict)
     notes: str = ""
     custom_fields: dict = Field(default_factory=dict)
@@ -38,6 +40,44 @@ class ESAFRecord(BaseModel):
     users: list[ESAFUser] = Field(default_factory=list)
     funding_sources: list[str] = Field(default_factory=list)
     user_count: int = 0          # populated by list_esafs(), not stored
+
+
+class FundingSource(BaseModel):
+    agency: str = ""
+    details: str = ""
+    grant_number: str = ""
+    percentage: int = 0
+
+    def as_string(self) -> str:
+        parts = [self.agency.strip()]
+        if self.grant_number:
+            parts.append(self.grant_number.strip())
+        result = " — ".join(p for p in parts if p)
+        if self.percentage:
+            result += f" ({self.percentage}%)"
+        return result
+
+
+class GUPRecord(BaseModel):
+    gup_id: str
+    title: str = ""
+    pi_name: str = ""
+    pi_institution: str = ""
+    run_cycle: str = ""
+    proposal_type: str = ""
+    primary_area: str = ""
+    keywords: str = ""
+    abstract: str = ""
+    beamlines: str = ""
+    status: str = ""
+    submitted_at: str = ""
+    notes: str = ""
+    pdf_path: str = ""
+    raw_fields: dict = Field(default_factory=dict)
+    funding_sources: list[FundingSource] = Field(default_factory=list)
+    created_at: str = ""
+    updated_at: str = ""
+    linked_esaf_count: int = 0   # populated by list_gups(), not stored
 
 
 class SyncLog(BaseModel):
