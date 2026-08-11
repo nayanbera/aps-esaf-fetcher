@@ -1,6 +1,7 @@
 """aps-esaf-fetcher — FastAPI application entry point."""
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from . import db, sync
+from .institution import _load_uni_db
 from .routers import esafs, stats, sync_router, fields
 
 logging.basicConfig(
@@ -31,6 +33,7 @@ _app_log.propagate = False
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    threading.Thread(target=_load_uni_db, daemon=True, name="uni-db-loader").start()
     sync.start_scheduler()
     yield
     sync.stop_scheduler()
