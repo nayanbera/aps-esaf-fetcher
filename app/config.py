@@ -31,5 +31,9 @@ SYNC_INTERVAL_HOURS: int = int(os.getenv("SYNC_INTERVAL_HOURS", "24"))
 _default_db = str(Path.home() / ".aps-esaf-fetcher" / "esaf.db")
 DB_PATH: str = os.getenv("DB_PATH", _default_db)
 
+# MongoDB — set MONGODB_URI to switch the backend; leave unset to use SQLite
+MONGODB_URI: str = os.getenv("MONGODB_URI", "")
+MONGODB_DB: str  = os.getenv("MONGODB_DB", "aps_esaf")
+
 HOST: str = os.getenv("HOST", "0.0.0.0")
 PORT: int = int(os.getenv("PORT", "8088"))
