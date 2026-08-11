@@ -16,14 +16,15 @@ router = APIRouter()
 
 @router.get("/api/esafs")
 def api_list_esafs(
-    year: int | None = None,
+    year: str | None = None,
     beamline: str | None = None,
     status: str | None = None,
     search: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ):
-    return db.list_esafs(year=year, beamline=beamline, status=status,
+    year_int = int(year) if year else None
+    return db.list_esafs(year=year_int, beamline=beamline, status=status,
                          search=search, limit=limit, offset=offset)
 
 
@@ -42,18 +43,19 @@ def api_get_esaf(esaf_id: str):
 @router.get("/esafs", response_class=HTMLResponse)
 def esafs_page(
     request: Request,
-    year: int | None = None,
+    year: str | None = None,
     beamline: str | None = None,
     status: str | None = None,
     search: str | None = None,
 ):
-    esafs = db.list_esafs(year=year, beamline=beamline, status=status, search=search)
+    year_int = int(year) if year else None
+    esafs = db.list_esafs(year=year_int, beamline=beamline, status=status, search=search)
     opts  = db.get_filter_options()
 
     return templates.TemplateResponse("esafs.html", {
         "request": request, "esafs": esafs,
         "years": opts["years"], "beamlines": opts["beamlines"], "statuses": opts["statuses"],
-        "filter_year": year, "filter_beamline": beamline,
+        "filter_year": year_int, "filter_beamline": beamline,
         "filter_status": status, "filter_search": search or "",
     })
 
