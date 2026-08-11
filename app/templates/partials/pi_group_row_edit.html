@@ -1,51 +1,50 @@
 <tr id="pg-row-{{ pg.name | urlencode }}">
   <td class="fw-semibold">{{ pg.name }}</td>
-  <form hx-post="/pi-groups/{{ pg.name | urlencode }}"
-        hx-target="#pg-row-{{ pg.name | urlencode }}"
-        hx-swap="outerHTML"
-        style="display:contents">
-    <td>
-      <input type="text" name="pi_name"
-             value="{{ pg.pi_name }}" class="form-control form-control-sm"
-             list="pg-users-list"
-             data-pi-name-input
-             placeholder="Type to search users or enter new">
-    </td>
-    <td>
-      <input type="text" name="institution"
-             value="{{ pg.institution }}" class="form-control form-control-sm"
-             data-pi-field="institution"
-             placeholder="Institution">
-    </td>
-    <td>
-      <input type="text" name="country"
-             value="{{ pg.country }}" class="form-control form-control-sm"
-             data-pi-field="country"
-             maxlength="2" placeholder="US">
-    </td>
-    <td>
-      <input type="text" name="state"
-             value="{{ pg.state }}" class="form-control form-control-sm"
-             data-pi-field="state"
-             placeholder="IL">
-    </td>
-    <td>
-      <input type="text" name="orcid_id"
-             value="{{ pg.orcid_id }}" class="form-control form-control-sm"
-             data-pi-field="orcid_id"
-             placeholder="0000-0000-0000-0000">
-      <input type="hidden" name="pi_email" value="{{ pg.pi_email }}">
-    </td>
-    <td class="text-end text-nowrap">
-      <button type="submit" class="btn btn-success btn-sm py-0 me-1">
-        <i class="bi bi-check-lg"></i>
-      </button>
-      <button type="button" class="btn btn-outline-secondary btn-sm py-0"
-              hx-get="/pi-groups/{{ pg.name | urlencode }}/view"
-              hx-target="#pg-row-{{ pg.name | urlencode }}"
-              hx-swap="outerHTML">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </td>
-  </form>
+  <td>
+    <input type="text" name="pi_name"
+           value="{{ pg.pi_name }}" class="form-control form-control-sm"
+           list="pg-users-list"
+           data-pi-name-input
+           placeholder="Type to search users or enter new">
+  </td>
+  <td>
+    <input type="text" name="institution"
+           value="{{ pg.institution }}" class="form-control form-control-sm"
+           data-pi-field="institution"
+           placeholder="Institution">
+  </td>
+  <td>
+    <input type="text" name="country"
+           value="{{ pg.country }}" class="form-control form-control-sm"
+           data-pi-field="country"
+           maxlength="2" placeholder="US">
+  </td>
+  <td>
+    <input type="text" name="state"
+           value="{{ pg.state }}" class="form-control form-control-sm"
+           data-pi-field="state"
+           placeholder="IL">
+  </td>
+  <td>
+    <input type="text" name="orcid_id"
+           value="{{ pg.orcid_id }}" class="form-control form-control-sm"
+           data-pi-field="orcid_id"
+           placeholder="0000-0000-0000-0000">
+    <input type="hidden" name="pi_email" value="{{ pg.pi_email }}">
+  </td>
+  <td class="text-end text-nowrap">
+    <button type="button" class="btn btn-success btn-sm py-0 me-1"
+            hx-post="/pi-groups/{{ pg.name | urlencode }}"
+            hx-target="#pg-row-{{ pg.name | urlencode }}"
+            hx-swap="outerHTML"
+            hx-include="closest tr">
+      <i class="bi bi-check-lg"></i>
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm py-0"
+            hx-get="/pi-groups/{{ pg.name | urlencode }}/view"
+            hx-target="#pg-row-{{ pg.name | urlencode }}"
+            hx-swap="outerHTML">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </td>
 </tr>
