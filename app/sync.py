@@ -60,14 +60,19 @@ def _extract_esaf(raw: Any) -> dict:
         is_pi      = pi_flag in ("yes", "y", "true", "1")
         role       = "pi" if is_pi else "user"
 
+        institution = lookup_by_email(email)
         users.append({
             "badge": badge, "first_name": first_name, "last_name": last_name,
-            "institution": lookup_by_email(email), "email": email, "role": role,
+            "institution": institution, "email": email, "role": role,
             "raw_json": dict(u) if not isinstance(u, dict) else u,
         })
         if is_pi and not pi_badge:
-            pi_badge = badge
-            pi_name  = f"{first_name} {last_name}".strip()
+            pi_badge        = badge
+            pi_name         = f"{first_name} {last_name}".strip()
+            pi_institution  = institution
+
+    if not pi_badge:
+        pi_institution = ""
 
     # Funding sources — not present in listStationEsafs; kept for future use
     funding_sources = []
@@ -104,7 +109,7 @@ def _extract_esaf(raw: Any) -> dict:
         "esaf_id": esaf_id, "title": title, "description": description,
         "sector": sector, "beamline": beamline, "year": year,
         "status": status, "start_date": start, "end_date": end, "doi": doi,
-        "pi_badge": pi_badge, "pi_name": pi_name,
+        "pi_badge": pi_badge, "pi_name": pi_name, "pi_institution": pi_institution,
         "users": users, "funding_sources": funding_sources, "raw_json": raw_dict,
     }
 

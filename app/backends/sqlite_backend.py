@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS esafs (
     doi           TEXT DEFAULT '',
     pi_badge      TEXT,
     pi_name       TEXT,
+    pi_institution TEXT DEFAULT '',
     raw_json      TEXT,
     notes         TEXT DEFAULT '',
     custom_fields TEXT DEFAULT '{}',
@@ -129,9 +130,10 @@ class SQLiteESAFRepository(ESAFRepository):
         with self._db() as conn:
             conn.executescript(_SCHEMA)
             for col, defn in [
-                ("description", "TEXT DEFAULT ''"),
-                ("sector",      "TEXT DEFAULT ''"),
-                ("doi",         "TEXT DEFAULT ''"),
+                ("description",    "TEXT DEFAULT ''"),
+                ("sector",         "TEXT DEFAULT ''"),
+                ("doi",            "TEXT DEFAULT ''"),
+                ("pi_institution", "TEXT DEFAULT ''"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
@@ -245,14 +247,14 @@ class SQLiteESAFRepository(ESAFRepository):
                 conn.execute(
                     """UPDATE esafs SET title=?, description=?, sector=?, beamline=?,
                        year=?, status=?, start_date=?, end_date=?, doi=?,
-                       pi_badge=?, pi_name=?, raw_json=?, last_synced=?,
+                       pi_badge=?, pi_name=?, pi_institution=?, raw_json=?, last_synced=?,
                        updated_at=datetime('now')
                        WHERE esaf_id=?""",
                     (
                         data["title"], data["description"], data["sector"],
                         data["beamline"], data["year"], data["status"],
                         data["start_date"], data["end_date"], data.get("doi", ""),
-                        data["pi_badge"], data["pi_name"],
+                        data["pi_badge"], data["pi_name"], data.get("pi_institution", ""),
                         json.dumps(data["raw_json"]), now, data["esaf_id"],
                     ),
                 )
@@ -261,13 +263,14 @@ class SQLiteESAFRepository(ESAFRepository):
                 conn.execute(
                     """INSERT INTO esafs
                        (esaf_id, title, description, sector, beamline, year, status,
-                        start_date, end_date, doi, pi_badge, pi_name, raw_json, last_synced)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        start_date, end_date, doi, pi_badge, pi_name, pi_institution,
+                        raw_json, last_synced)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         data["esaf_id"], data["title"], data["description"], data["sector"],
                         data["beamline"], data["year"], data["status"],
                         data["start_date"], data["end_date"], data.get("doi", ""),
-                        data["pi_badge"], data["pi_name"],
+                        data["pi_badge"], data["pi_name"], data.get("pi_institution", ""),
                         json.dumps(data["raw_json"]), now,
                     ),
                 )
