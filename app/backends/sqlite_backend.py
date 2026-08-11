@@ -916,3 +916,15 @@ class SQLiteESAFRepository(ESAFRepository):
                 "SELECT DISTINCT run_cycle FROM gups WHERE run_cycle != '' ORDER BY run_cycle DESC"
             ).fetchall()
         return [r[0] for r in rows]
+
+    def list_distinct_institutions(self) -> list[str]:
+        with self._db() as conn:
+            rows = conn.execute("""
+                SELECT institution FROM users WHERE institution != ''
+                UNION
+                SELECT pi_institution FROM esafs WHERE pi_institution != ''
+                UNION
+                SELECT institution FROM pi_groups WHERE institution != ''
+                ORDER BY institution
+            """).fetchall()
+        return [r[0] for r in rows]

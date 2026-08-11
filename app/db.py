@@ -214,3 +214,7 @@ def propagate_gup_funding(gup_id: str, funding_strings: list[str]) -> int:
 
 def get_gup_run_cycles() -> list[str]:
     return _r().get_gup_run_cycles()
+
+
+def list_distinct_institutions() -> list[str]:
+    return _r().list_distinct_institutions()

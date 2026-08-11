@@ -197,15 +197,19 @@
         <input type="hidden" id="aff-domain-val">
         <div class="mb-2">
           <label class="form-label mb-1">Institution</label>
-          <input type="text" id="aff-institution" class="form-control form-control-sm">
+          <input type="text" id="aff-institution" class="form-control form-control-sm"
+                 list="geo-institutions-list">
         </div>
         <div class="mb-2">
-          <label class="form-label mb-1">Country (ISO-2, e.g. US, CA, GB)</label>
-          <input type="text" id="aff-country" class="form-control form-control-sm" maxlength="2">
+          <label class="form-label mb-1">Country</label>
+          <input type="text" id="aff-country" class="form-control form-control-sm"
+                 list="geo-countries-list"
+                 data-country-input placeholder="US">
         </div>
         <div class="mb-2">
           <label class="form-label mb-1">State / Province</label>
-          <input type="text" id="aff-state" class="form-control form-control-sm">
+          <input type="text" id="aff-state" class="form-control form-control-sm"
+                 data-state-input placeholder="IL">
         </div>
       </div>
       <div class="modal-footer">
@@ -263,9 +267,16 @@ document.getElementById('affiliationModal').addEventListener('show.bs.modal', fu
   document.getElementById('aff-domain').textContent = btn.dataset.domain;
   document.getElementById('aff-domain-val').value = btn.dataset.domain;
   document.getElementById('aff-institution').value = btn.dataset.institution || '';
-  document.getElementById('aff-country').value = btn.dataset.country || '';
+  var countryVal = btn.dataset.country || '';
+  document.getElementById('aff-country').value = countryVal;
   document.getElementById('aff-state').value = btn.dataset.state || '';
   document.getElementById('aff-result').textContent = '';
+  var stateInput = document.getElementById('aff-state');
+  if (countryVal.trim().toUpperCase() === 'US') {
+    stateInput.setAttribute('list', 'geo-states-list');
+  } else {
+    stateInput.removeAttribute('list');
+  }
 });
 document.getElementById('aff-save').addEventListener('click', function() {
   var domain = document.getElementById('aff-domain-val').value;

@@ -594,3 +594,12 @@ class MongoESAFRepository(ESAFRepository):
             reverse=True,
         )
         return cycles
+
+    def list_distinct_institutions(self) -> list[str]:
+        db = self._client[self._db_name]
+        from_users = db["users"].distinct("institution")
+        from_esafs = self._esafs().distinct("pi_institution")
+        from_groups = self._pi_groups().distinct("institution")
+        return sorted(set(
+            i for i in (from_users + from_esafs + from_groups) if i
+        ))

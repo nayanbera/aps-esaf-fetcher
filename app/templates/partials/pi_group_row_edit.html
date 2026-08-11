@@ -11,18 +11,23 @@
     <input type="text" name="institution"
            value="{{ pg.institution }}" class="form-control form-control-sm"
            data-pi-field="institution"
+           list="geo-institutions-list"
            placeholder="Institution">
   </td>
   <td>
     <input type="text" name="country"
            value="{{ pg.country }}" class="form-control form-control-sm"
            data-pi-field="country"
-           maxlength="2" placeholder="US">
+           data-country-input
+           list="geo-countries-list"
+           placeholder="US">
   </td>
   <td>
     <input type="text" name="state"
            value="{{ pg.state }}" class="form-control form-control-sm"
            data-pi-field="state"
+           data-state-input
+           {% if pg.country == 'US' %}list="geo-states-list"{% endif %}
            placeholder="IL">
   </td>
   <td>

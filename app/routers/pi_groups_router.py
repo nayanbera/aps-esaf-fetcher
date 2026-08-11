@@ -34,6 +34,11 @@ def users_search(q: str = "") -> list[dict]:
     return db.list_users_for_lookup(q=q)
 
 
+@router.get("/api/institutions")
+def institutions_list() -> list[str]:
+    return db.list_distinct_institutions()
+
+
 # ---------------------------------------------------------------------------
 # Create (from the add form at the top of the page)
 # ---------------------------------------------------------------------------

@@ -198,6 +198,11 @@ class ESAFRepository(ABC):
         """Return distinct run_cycle values from the gups table."""
         ...
 
+    @abstractmethod
+    def list_distinct_institutions(self) -> list[str]:
+        """Return sorted distinct institution names from users, esafs, and pi_groups."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Factory

@@ -9,6 +9,7 @@
   <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/geo-data.js"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
 </head>
 <body>
@@ -62,5 +63,61 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Shared geo datalists — populated by geo-data.js + /api/institutions -->
+<datalist id="geo-countries-list"></datalist>
+<datalist id="geo-states-list"></datalist>
+<datalist id="geo-institutions-list"></datalist>
+
+<script>
+(function () {
+  function addOpts(listId, pairs) {
+    var dl = document.getElementById(listId);
+    if (!dl) return;
+    pairs.forEach(function (p) {
+      var o = document.createElement('option');
+      o.value = p[0];
+      o.textContent = p[1];
+      dl.appendChild(o);
+    });
+  }
+  if (typeof GEO_COUNTRIES !== 'undefined') addOpts('geo-countries-list', GEO_COUNTRIES);
+  if (typeof US_STATES    !== 'undefined') addOpts('geo-states-list',    US_STATES);
+
+  fetch('/api/institutions').then(function (r) { return r.json(); }).then(function (names) {
+    var dl = document.getElementById('geo-institutions-list');
+    if (!dl) return;
+    names.forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n;
+      dl.appendChild(o);
+    });
+  }).catch(function () {});
+
+  // Show US-state suggestions only when country input value is "US".
+  document.addEventListener('input', function (e) {
+    var input = e.target;
+    if (!input.hasAttribute('data-country-input')) return;
+    var container = input.closest('tr, form, .modal-body');
+    if (!container) return;
+    var stateInput = container.querySelector('[data-state-input]');
+    if (!stateInput) return;
+    if (input.value.trim().toUpperCase() === 'US') {
+      stateInput.setAttribute('list', 'geo-states-list');
+    } else {
+      stateInput.removeAttribute('list');
+    }
+  });
+
+  // On page load, set state datalist for any country inputs already set to "US".
+  document.querySelectorAll('[data-country-input]').forEach(function (input) {
+    if (input.value.trim().toUpperCase() === 'US') {
+      var container = input.closest('tr, form, .modal-body');
+      var stateInput = container && container.querySelector('[data-state-input]');
+      if (stateInput) stateInput.setAttribute('list', 'geo-states-list');
+    }
+  });
+})();
+</script>
 </body>
 </html>
