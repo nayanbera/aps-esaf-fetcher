@@ -68,6 +68,12 @@ class ESAFRepository(ABC):
     def list_users_for_lookup(self, q: str = "") -> list[dict]: ...
 
     @abstractmethod
+    def propagate_pi_group_by_pi_name(self, group_name: str, pi_name: str) -> int:
+        """Set pi_group on ESAFs whose pi_name matches, where pi_group is not yet set.
+        Returns the number of ESAFs updated."""
+        ...
+
+    @abstractmethod
     def upsert_esaf(self, data: dict, now: str) -> str:
         """Insert or update one ESAF. Returns 'added' or 'updated'."""
         ...

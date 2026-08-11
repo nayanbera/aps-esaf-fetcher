@@ -176,6 +176,23 @@ class MongoESAFRepository(ESAFRepository):
     def delete_pi_group(self, name: str) -> bool:
         return self._pi_groups().delete_one({"name": name}).deleted_count > 0
 
+    def propagate_pi_group_by_pi_name(self, group_name: str, pi_name: str) -> int:
+        if not pi_name.strip():
+            return 0
+        name = pi_name.strip()
+        last = name.split(",")[0].strip() if "," in name else name.split()[-1].strip()
+        if not last:
+            return 0
+        import re as _re
+        result = self._esafs().update_many(
+            {
+                "$or": [{"pi_group": {"$in": ["", None]}}, {"pi_group": {"$exists": False}}],
+                "pi_name": {"$regex": _re.escape(last), "$options": "i"},
+            },
+            {"$set": {"pi_group": group_name, "updated_at": _now_iso()}},
+        )
+        return result.modified_count
+
     def list_users_for_lookup(self, q: str = "") -> list[dict]:
         filt = {}
         if q:

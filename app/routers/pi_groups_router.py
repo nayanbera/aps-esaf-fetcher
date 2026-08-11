@@ -52,10 +52,13 @@ def create_pi_group(
     name = name.strip()
     if not name:
         raise HTTPException(422, "PI Group name is required")
-    db.upsert_pi_group(name, pi_name.strip(), pi_email.strip(),
+    pi_name = pi_name.strip()
+    db.upsert_pi_group(name, pi_name, pi_email.strip(),
                        institution.strip(), country.strip().upper(),
                        state.strip(), orcid_id.strip())
-    pg = {"name": name, "pi_name": pi_name.strip(), "pi_email": pi_email.strip(),
+    if pi_name:
+        db.propagate_pi_group_by_pi_name(name, pi_name)
+    pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email.strip(),
           "institution": institution.strip(), "country": country.strip().upper(),
           "state": state.strip(), "orcid_id": orcid_id.strip(), "created_at": ""}
     return templates.TemplateResponse("partials/pi_group_row_view.html",
@@ -86,6 +89,25 @@ def pi_group_view_row(request: Request, name: str):
                                       {"request": request, "pg": pg})
 
 
+@router.post("/pi-groups/{name}/propagate", response_class=HTMLResponse)
+def propagate_pi_group(name: str):
+    groups = {g["name"]: g for g in db.list_pi_groups()}
+    pg = groups.get(name)
+    if not pg or not pg.get("pi_name"):
+        return HTMLResponse(
+            '<span class="text-warning">No PI name set — cannot match ESAFs.</span>'
+        )
+    count = db.propagate_pi_group_by_pi_name(name, pg["pi_name"])
+    if count:
+        return HTMLResponse(
+            f'<span class="text-success">'
+            f'<i class="bi bi-check-lg me-1"></i>Linked {count} ESAF(s).</span>'
+        )
+    return HTMLResponse(
+        '<span class="text-muted">No unassigned ESAFs matched.</span>'
+    )
+
+
 @router.post("/pi-groups/{name}", response_class=HTMLResponse)
 def update_pi_group(
     request:     Request,
@@ -97,10 +119,13 @@ def update_pi_group(
     state:       str = Form(""),
     orcid_id:    str = Form(""),
 ):
-    db.upsert_pi_group(name, pi_name.strip(), pi_email.strip(),
+    pi_name = pi_name.strip()
+    db.upsert_pi_group(name, pi_name, pi_email.strip(),
                        institution.strip(), country.strip().upper(),
                        state.strip(), orcid_id.strip())
-    pg = {"name": name, "pi_name": pi_name.strip(), "pi_email": pi_email.strip(),
+    if pi_name:
+        db.propagate_pi_group_by_pi_name(name, pi_name)
+    pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email.strip(),
           "institution": institution.strip(), "country": country.strip().upper(),
           "state": state.strip(), "orcid_id": orcid_id.strip()}
     return templates.TemplateResponse("partials/pi_group_row_view.html",

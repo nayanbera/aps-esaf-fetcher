@@ -11,7 +11,19 @@
       —
     {% endif %}
   </td>
+  <td>
+    <span id="pg-link-result-{{ pg.name | urlencode }}" class="small"></span>
+  </td>
   <td class="text-end text-nowrap">
+    {% if pg.pi_name %}
+    <button class="btn btn-outline-info btn-sm py-0 me-1"
+            hx-post="/pi-groups/{{ pg.name | urlencode }}/propagate"
+            hx-target="#pg-link-result-{{ pg.name | urlencode }}"
+            hx-swap="innerHTML"
+            title="Link ESAFs whose PI matches '{{ pg.pi_name }}'">
+      <i class="bi bi-link-45deg"></i>
+    </button>
+    {% endif %}
     <button class="btn btn-outline-secondary btn-sm py-0 me-1"
             hx-get="/pi-groups/{{ pg.name | urlencode }}/edit"
             hx-target="#pg-row-{{ pg.name | urlencode }}"

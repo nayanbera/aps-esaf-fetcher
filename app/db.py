@@ -86,6 +86,10 @@ def list_users_for_lookup(q: str = "") -> list[dict]:
     return _r().list_users_for_lookup(q)
 
 
+def propagate_pi_group_by_pi_name(group_name: str, pi_name: str) -> int:
+    return _r().propagate_pi_group_by_pi_name(group_name, pi_name)
+
+
 def upsert_esaf(data: dict, now: str) -> str:
     return _r().upsert_esaf(data, now)
 

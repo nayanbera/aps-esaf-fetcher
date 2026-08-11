@@ -95,13 +95,14 @@
             <th>State</th>
             <th>Email</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="pg-tbody">
           {% for pg in pi_groups %}
             {% include "partials/pi_group_row_view.html" %}
           {% else %}
-            <tr id="pg-empty"><td colspan="7" class="text-center text-muted py-3">
+            <tr id="pg-empty"><td colspan="8" class="text-center text-muted py-3">
               No PI Groups yet. Add one above.
             </td></tr>
           {% endfor %}

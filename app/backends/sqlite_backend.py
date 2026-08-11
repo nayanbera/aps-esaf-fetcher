@@ -440,6 +440,25 @@ class SQLiteESAFRepository(ESAFRepository):
             cur = conn.execute("DELETE FROM pi_groups WHERE name = ?", (name,))
             return cur.rowcount > 0
 
+    def propagate_pi_group_by_pi_name(self, group_name: str, pi_name: str) -> int:
+        if not pi_name.strip():
+            return 0
+        # Extract last name to use as the matching token.
+        # Handles "Last, First" and "First Last" formats.
+        name = pi_name.strip()
+        last = name.split(",")[0].strip() if "," in name else name.split()[-1].strip()
+        if not last:
+            return 0
+        with self._db() as conn:
+            cur = conn.execute(
+                """UPDATE esafs
+                   SET pi_group = ?, updated_at = datetime('now')
+                   WHERE (pi_group = '' OR pi_group IS NULL)
+                     AND pi_name LIKE ? COLLATE NOCASE""",
+                (group_name, f"%{last}%"),
+            )
+        return cur.rowcount
+
     def list_users_for_lookup(self, q: str = "") -> list[dict]:
         fields = ("badge", "first_name", "last_name", "institution",
                   "country", "state", "email", "orcid_id")
