@@ -72,8 +72,16 @@
   <!-- Funding sources -->
   <div class="col-md-6">
     <div class="card h-100">
-      <div class="card-header fw-semibold">
-        <i class="bi bi-cash-coin me-1"></i>Funding Sources
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-cash-coin me-1"></i>Funding Sources</span>
+        <span id="propagate-result" class="small me-2"></span>
+        <button class="btn btn-outline-secondary btn-sm py-0"
+                hx-post="/gups/{{ gup.gup_id }}/propagate-funding"
+                hx-target="#propagate-result"
+                hx-swap="innerHTML"
+                {% if not gup.linked_esaf_count %}disabled title="No linked ESAFs"{% endif %}>
+          <i class="bi bi-arrow-repeat me-1"></i>Push to ESAFs
+        </button>
       </div>
       <div class="card-body p-0">
         {% if gup.funding_sources %}

@@ -232,6 +232,29 @@ def view_gup_pdf(gup_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Re-propagate funding sources to linked ESAFs
+# ---------------------------------------------------------------------------
+
+@router.post("/gups/{gup_id}/propagate-funding", response_class=HTMLResponse)
+def propagate_funding(gup_id: str):
+    gup = db.get_gup(gup_id)
+    if gup is None:
+        raise HTTPException(404, f"GUP {gup_id} not found")
+    funding_sources = gup.get("funding_sources") or []
+    if not funding_sources:
+        return HTMLResponse(
+            '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>'
+            "No funding sources on this GUP to propagate.</span>"
+        )
+    _propagate_funding(gup_id, funding_sources)
+    count = gup.get("linked_esaf_count", 0)
+    return HTMLResponse(
+        f'<span class="text-success"><i class="bi bi-check-lg me-1"></i>'
+        f"Propagated {len(funding_sources)} source(s) to {count} linked ESAF(s).</span>"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Delete GUP
 # ---------------------------------------------------------------------------
 
