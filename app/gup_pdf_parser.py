@@ -165,12 +165,20 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
 # Table parsing helpers
 # ---------------------------------------------------------------------------
 
+_ETR_SKIP = re.compile(
+    r"experiment\s+time\s+request|lifetime\s+shift|run\s+cycle\s+resource"
+    r"|number\s+of\s+shifts|\bETR\b",
+    re.IGNORECASE,
+)
+
+
 def _try_funding_table(table: list, funding_rows: list[dict]) -> None:
     """Detect and parse a Funding Sources table, appending rows to funding_rows."""
     for i, row in enumerate(table):
         cells = [c or "" for c in row]
         row_text = " ".join(cells).lower()
-        if "source" in row_text and "percentage" in row_text:
+        # Use word boundary so "Resource" in ETR headers doesn't match "source".
+        if re.search(r"\bsource\b", row_text) and "percentage" in row_text:
             h = [c.lower().strip() for c in cells]
             src_i = next((j for j, x in enumerate(h) if "source" in x), 0)
             det_i = next((j for j, x in enumerate(h) if "detail" in x), -1)
@@ -184,11 +192,13 @@ def _try_funding_table(table: list, funding_rows: list[dict]) -> None:
                 det = dc[det_i].strip() if det_i >= 0 and det_i < len(dc) else ""
                 grn = dc[grn_i].strip() if grn_i >= 0 and grn_i < len(dc) else ""
                 pct_raw = dc[pct_i].strip() if pct_i >= 0 and pct_i < len(dc) else "0"
-                if src:
+                if src and not _ETR_SKIP.search(src):
                     try:
                         pct = int(re.sub(r"[^\d]", "", pct_raw) or "0")
                     except ValueError:
                         pct = 0
+                    if pct > 100:
+                        continue  # nonsensical percentage — ETR or parse artifact
                     funding_rows.append({
                         "agency": src, "details": det,
                         "grant_number": grn, "percentage": pct,
