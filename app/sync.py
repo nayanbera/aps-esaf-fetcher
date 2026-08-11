@@ -6,8 +6,12 @@ from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from . import config, db
+from . import config, db, osti
 from .institution import lookup_by_email
+
+# Per-sync ORCID cache: badge → enrich result. Avoids re-querying the same
+# person when they appear in multiple ESAFs within one sync run.
+_osti_cache: dict[str, dict] = {}
 
 log = logging.getLogger(__name__)
 
@@ -61,10 +65,21 @@ def _extract_esaf(raw: Any) -> dict:
         role       = "pi" if is_pi else "user"
 
         affil = lookup_by_email(email)
+        orcid_id = ""
+        # Fall back to OSTI → ORCID when email-based lookup has no institution
+        if not affil["institution"] and first_name and last_name:
+            cached = _osti_cache.get(badge)
+            if cached is None:
+                cached = osti.enrich_person(first_name, last_name)
+                _osti_cache[badge] = cached
+            if cached.get("institution"):
+                affil = {k: cached.get(k, "") for k in ("institution", "country", "state")}
+            orcid_id = cached.get("orcid_id", "")
         users.append({
             "badge": badge, "first_name": first_name, "last_name": last_name,
             "institution": affil["institution"], "country": affil["country"],
             "state": affil["state"], "email": email, "role": role,
+            "orcid_id": orcid_id,
             "raw_json": dict(u) if not isinstance(u, dict) else u,
         })
         if is_pi and not pi_badge:
@@ -121,6 +136,9 @@ def _extract_esaf(raw: Any) -> dict:
 
 def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = None) -> dict:
     """Fetch ESAFs from DM API and upsert into local DB. Returns summary dict."""
+    global _osti_cache
+    _osti_cache = {}
+
     from .institution import load_overrides as _load_overrides
     from . import db as _db
     _load_overrides(_db.list_domain_overrides())

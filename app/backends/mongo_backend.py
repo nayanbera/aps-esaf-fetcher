@@ -157,7 +157,8 @@ class MongoESAFRepository(ESAFRepository):
     def upsert_esaf(self, data: dict, now: str) -> str:
         esaf_id = data["esaf_id"]
         existing = self._esafs().find_one(
-            {"esaf_id": esaf_id}, {"notes": 1, "custom_fields": 1, "created_at": 1}
+            {"esaf_id": esaf_id},
+            {"notes": 1, "custom_fields": 1, "pi_group": 1, "created_at": 1, "users": 1},
         )
 
         doc = {
@@ -186,6 +187,18 @@ class MongoESAFRepository(ESAFRepository):
             doc["custom_fields"] = existing.get("custom_fields", {})
             doc["pi_group"]      = existing.get("pi_group", "")
             doc["created_at"]    = existing.get("created_at", now)
+            # Preserve orcid_id / institution set by previous enrichment
+            existing_users = {u.get("badge", ""): u for u in (existing.get("users") or [])}
+            for u in doc.get("users", []):
+                prev = existing_users.get(u.get("badge", ""), {})
+                if not u.get("orcid_id") and prev.get("orcid_id"):
+                    u["orcid_id"] = prev["orcid_id"]
+                if not u.get("institution") and prev.get("institution"):
+                    u["institution"] = prev["institution"]
+                if not u.get("country") and prev.get("country"):
+                    u["country"] = prev["country"]
+                if not u.get("state") and prev.get("state"):
+                    u["state"] = prev["state"]
             self._esafs().replace_one({"esaf_id": esaf_id}, doc)
             return "updated"
         else:

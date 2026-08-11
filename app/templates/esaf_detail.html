@@ -89,7 +89,7 @@
       <table class="table table-sm mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Badge</th><th>Name</th><th>Institution</th><th>Country</th><th>State</th><th>Email</th><th>Role</th><th>Affiliation</th>
+            <th>Badge</th><th>Name</th><th>Institution</th><th>Country</th><th>State</th><th>Email</th><th>Role</th><th>ORCID</th><th>Affiliation</th>
           </tr>
         </thead>
         <tbody>
@@ -109,6 +109,17 @@
               {% endif %}
             </td>
             <td>
+              {% if u.orcid_id %}
+                <a href="https://orcid.org/{{ u.orcid_id }}" target="_blank"
+                   rel="noopener" class="text-nowrap small font-monospace">
+                  <img src="https://orcid.org/sites/default/files/images/orcid_16x16.png"
+                       width="14" height="14" alt="ORCID" class="me-1">{{ u.orcid_id }}
+                </a>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
               {% if u.email and '@' in u.email and (not u.institution or not u.country or not u.state) %}
                 <button class="btn btn-outline-secondary btn-sm py-0"
                         data-domain="{{ u.email.split('@')[1] }}"
@@ -125,7 +136,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="8" class="text-muted text-center py-3">No users recorded.</td></tr>
+          <tr><td colspan="9" class="text-muted text-center py-3">No users recorded.</td></tr>
         {% endfor %}
         </tbody>
       </table>

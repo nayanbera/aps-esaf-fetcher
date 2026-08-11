@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS users (
     country       TEXT DEFAULT '',
     state         TEXT DEFAULT '',
     email         TEXT,
+    orcid_id      TEXT DEFAULT '',
     raw_json      TEXT
 );
 
@@ -158,8 +159,9 @@ class SQLiteESAFRepository(ESAFRepository):
                 except sqlite3.OperationalError:
                     pass
             for col, defn in [
-                ("country", "TEXT DEFAULT ''"),
-                ("state",   "TEXT DEFAULT ''"),
+                ("country",  "TEXT DEFAULT ''"),
+                ("state",    "TEXT DEFAULT ''"),
+                ("orcid_id", "TEXT DEFAULT ''"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE users ADD COLUMN {col} {defn}")
@@ -353,12 +355,27 @@ class SQLiteESAFRepository(ESAFRepository):
 
             for u in data.get("users", []):
                 conn.execute(
-                    """INSERT OR REPLACE INTO users
-                       (badge, first_name, last_name, institution, country, state, email, raw_json)
-                       VALUES (?,?,?,?,?,?,?,?)""",
+                    """INSERT INTO users
+                       (badge, first_name, last_name, institution, country,
+                        state, email, orcid_id, raw_json)
+                       VALUES (?,?,?,?,?,?,?,?,?)
+                       ON CONFLICT(badge) DO UPDATE SET
+                           first_name  = excluded.first_name,
+                           last_name   = excluded.last_name,
+                           institution = CASE WHEN excluded.institution != ''
+                                              THEN excluded.institution
+                                              ELSE institution END,
+                           country     = CASE WHEN excluded.country != ''
+                                              THEN excluded.country ELSE country END,
+                           state       = CASE WHEN excluded.state != ''
+                                              THEN excluded.state ELSE state END,
+                           email       = excluded.email,
+                           orcid_id    = CASE WHEN excluded.orcid_id != ''
+                                              THEN excluded.orcid_id ELSE orcid_id END,
+                           raw_json    = excluded.raw_json""",
                     (u["badge"], u["first_name"], u["last_name"],
                      u["institution"], u.get("country", ""), u.get("state", ""),
-                     u["email"], json.dumps(u["raw_json"])),
+                     u["email"], u.get("orcid_id", ""), json.dumps(u["raw_json"])),
                 )
                 conn.execute(
                     "INSERT OR IGNORE INTO esaf_users (esaf_id, badge, role) VALUES (?,?,?)",
