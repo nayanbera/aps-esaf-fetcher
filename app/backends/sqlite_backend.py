@@ -308,7 +308,7 @@ class SQLiteESAFRepository(ESAFRepository):
             clauses.append("status = ?"); params.append(status)
         if search:
             clauses.append(
-                "(title LIKE ? OR pi_name LIKE ? OR description LIKE ? OR esaf_id LIKE ?)"
+                "(e.title LIKE ? OR e.pi_name LIKE ? OR e.description LIKE ? OR e.esaf_id LIKE ?)"
             )
             params.extend([f"%{search}%"] * 4)
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
