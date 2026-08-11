@@ -104,6 +104,10 @@ def set_pi_group_technique(name: str, technique: str) -> None:
     _r().set_pi_group_technique(name, technique)
 
 
+def add_pi_group_technique(name: str, technique: str) -> None:
+    _r().add_pi_group_technique(name, technique)
+
+
 def set_esaf_technique(esaf_id: str, technique: str) -> None:
     _r().set_esaf_technique(esaf_id, technique)
 

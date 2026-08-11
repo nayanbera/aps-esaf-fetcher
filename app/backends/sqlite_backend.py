@@ -937,6 +937,19 @@ class SQLiteESAFRepository(ESAFRepository):
                 (technique, name),
             )
 
+    def add_pi_group_technique(self, name: str, technique: str) -> None:
+        _ORDER = ["Surf", "Xtal", "ASWAXS", "Beamline"]
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT technique FROM pi_groups WHERE name=?", (name,)
+            ).fetchone()
+            if row is None:
+                return
+            current = {t for t in (row[0] or "").split(",") if t}
+            current.add(technique)
+            new_csv = ",".join(t for t in _ORDER if t in current)
+            conn.execute("UPDATE pi_groups SET technique=? WHERE name=?", (new_csv, name))
+
     def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
         with self._db() as conn:
             conn.execute(

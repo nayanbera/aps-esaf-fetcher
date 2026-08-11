@@ -205,7 +205,12 @@ class ESAFRepository(ABC):
 
     @abstractmethod
     def set_pi_group_technique(self, name: str, technique: str) -> None:
-        """Set the technique classification on a PI Group."""
+        """Set the technique classification on a PI Group (replaces existing value)."""
+        ...
+
+    @abstractmethod
+    def add_pi_group_technique(self, name: str, technique: str) -> None:
+        """Add a technique to a PI Group's multi-select set without removing others."""
         ...
 
     @abstractmethod

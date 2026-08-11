@@ -42,21 +42,30 @@ def institutions_list() -> list[str]:
 _VALID_TECHNIQUES = {"", "Surf", "Xtal", "ASWAXS", "Beamline"}
 
 
-@router.post("/pi-groups/{name}/set-technique", response_class=HTMLResponse)
-def set_pi_group_technique(
+@router.post("/pi-groups/{name}/toggle-technique", response_class=HTMLResponse)
+def toggle_pi_group_technique(
     request: Request,
     name: str,
     technique: str = Form(""),
 ):
-    technique = technique.strip()
-    if technique not in _VALID_TECHNIQUES:
-        raise HTTPException(400, f"Invalid technique '{technique}'")
-    db.set_pi_group_technique(name, technique)
     from urllib.parse import quote
-    post_url = f"/pi-groups/{quote(name, safe='')}/set-technique"
+    technique = technique.strip()
+    if technique not in {"Surf", "Xtal", "ASWAXS", "Beamline"}:
+        raise HTTPException(400, f"Invalid technique '{technique}'")
+    groups = {g["name"]: g for g in db.list_pi_groups()}
+    pg = groups.get(name) or {}
+    current = {t for t in (pg.get("technique", "") or "").split(",") if t}
+    if technique in current:
+        current.discard(technique)
+    else:
+        current.add(technique)
+    _ORDER = ["Surf", "Xtal", "ASWAXS", "Beamline"]
+    new_technique = ",".join(t for t in _ORDER if t in current)
+    db.set_pi_group_technique(name, new_technique)
+    post_url = f"/pi-groups/{quote(name, safe='')}/toggle-technique"
     return templates.TemplateResponse(
-        "partials/technique_select.html",
-        {"request": request, "technique": technique, "post_url": post_url},
+        "partials/pi_group_technique_toggles.html",
+        {"request": request, "technique": new_technique, "post_url": post_url},
     )
 
 
@@ -84,7 +93,8 @@ def create_pi_group(
                        state.strip(), orcid_id.strip())
     pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email.strip(),
           "institution": institution.strip(), "country": country.strip().upper(),
-          "state": state.strip(), "orcid_id": orcid_id.strip(), "created_at": ""}
+          "state": state.strip(), "orcid_id": orcid_id.strip(),
+          "technique": "", "created_at": ""}
     return templates.TemplateResponse("partials/pi_group_row_view.html",
                                       {"request": request, "pg": pg})
 
@@ -98,7 +108,7 @@ def pi_group_edit_form(request: Request, name: str):
     groups = {g["name"]: g for g in db.list_pi_groups()}
     pg = groups.get(name) or {"name": name, "pi_name": "", "pi_email": "",
                                "institution": "", "country": "", "state": "",
-                               "orcid_id": "", "created_at": ""}
+                               "orcid_id": "", "technique": "", "created_at": ""}
     return templates.TemplateResponse("partials/pi_group_row_edit.html",
                                       {"request": request, "pg": pg})
 
@@ -154,7 +164,6 @@ def update_pi_group(
     country:     str = Form(""),
     state:       str = Form(""),
     orcid_id:    str = Form(""),
-    technique:   str = Form(""),
 ):
     new_name = new_name.strip() or name
     if not new_name:
@@ -164,18 +173,16 @@ def update_pi_group(
             db.rename_pi_group(name, new_name)
         except Exception:
             raise HTTPException(409, f"A PI Group named '{new_name}' already exists.")
-    pi_name = pi_name.strip()
-    technique = technique.strip()
-    if technique not in _VALID_TECHNIQUES:
-        technique = ""
-    db.upsert_pi_group(new_name, pi_name, pi_email.strip(),
+    db.upsert_pi_group(new_name, pi_name.strip(), pi_email.strip(),
                        institution.strip(), country.strip().upper(),
                        state.strip(), orcid_id.strip())
-    db.set_pi_group_technique(new_name, technique)
-    pg = {"name": new_name, "pi_name": pi_name, "pi_email": pi_email.strip(),
-          "institution": institution.strip(), "country": country.strip().upper(),
-          "state": state.strip(), "orcid_id": orcid_id.strip(),
-          "technique": technique}
+    # Technique is managed independently by toggle-technique; read back from DB.
+    groups = {g["name"]: g for g in db.list_pi_groups()}
+    pg = groups.get(new_name) or {
+        "name": new_name, "pi_name": pi_name.strip(), "pi_email": pi_email.strip(),
+        "institution": institution.strip(), "country": country.strip().upper(),
+        "state": state.strip(), "orcid_id": orcid_id.strip(), "technique": "",
+    }
     return templates.TemplateResponse("partials/pi_group_row_view.html",
                                       {"request": request, "pg": pg})
 

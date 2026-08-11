@@ -607,6 +607,16 @@ class MongoESAFRepository(ESAFRepository):
             {"$set": {"technique": technique}},
         )
 
+    def add_pi_group_technique(self, name: str, technique: str) -> None:
+        _ORDER = ["Surf", "Xtal", "ASWAXS", "Beamline"]
+        doc = self._pi_groups().find_one({"name": name}, {"technique": 1})
+        if doc is None:
+            return
+        current = {t for t in (doc.get("technique") or "").split(",") if t}
+        current.add(technique)
+        new_csv = ",".join(t for t in _ORDER if t in current)
+        self._pi_groups().update_one({"name": name}, {"$set": {"technique": new_csv}})
+
     def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
         self._esafs().update_one(
             {"esaf_id": esaf_id},

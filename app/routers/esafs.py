@@ -122,6 +122,11 @@ def set_esaf_technique(
     if technique not in _VALID_TECHNIQUES:
         raise HTTPException(400, f"Invalid technique '{technique}'")
     db.set_esaf_technique(esaf_id, technique)
+    if technique:
+        esaf = db.get_esaf(esaf_id)
+        pi_group = (esaf or {}).get("pi_group", "")
+        if pi_group:
+            db.add_pi_group_technique(pi_group, technique)
     return templates.TemplateResponse(
         "partials/esaf_technique_select.html",
         {"request": request, "esaf_id": esaf_id, "technique": technique},

@@ -1,5 +1,6 @@
+{% set _techs = (pg.technique or '').split(',') %}
 <tr id="pg-row-{{ pg.name | urlencode }}"
-    class="{% if pg.technique == 'Surf' %}table-primary{% elif pg.technique == 'Xtal' %}table-success{% elif pg.technique == 'ASWAXS' %}table-warning{% elif pg.technique == 'Beamline' %}table-info{% endif %}">
+    class="{% if 'Surf' in _techs %}table-primary{% elif 'Xtal' in _techs %}table-success{% elif 'ASWAXS' in _techs %}table-warning{% elif 'Beamline' in _techs %}table-info{% endif %}">
   <td>
     <input type="text" name="new_name"
            value="{{ pg.name }}" class="form-control form-control-sm fw-semibold"
@@ -44,8 +45,8 @@
   </td>
   <td>
     {% set technique = pg.technique or '' %}
-    {% set post_url = "/pi-groups/" ~ (pg.name | urlencode | replace('+', '%20')) ~ "/set-technique" %}
-    {% include "partials/technique_select.html" %}
+    {% set post_url = "/pi-groups/" ~ (pg.name | urlencode | replace('+', '%20')) ~ "/toggle-technique" %}
+    {% include "partials/pi_group_technique_toggles.html" %}
   </td>
   <td class="text-end text-nowrap">
     <button type="button" class="btn btn-success btn-sm py-0 me-1"

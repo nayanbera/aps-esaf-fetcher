@@ -1,0 +1,11 @@
+{% set _techs = (technique or '').split(',') %}
+<div class="d-flex flex-wrap gap-1" data-techniques="{{ technique or '' }}">
+  {% for t, cls in [('Surf', 'primary'), ('Xtal', 'success'), ('ASWAXS', 'warning'), ('Beamline', 'info')] %}
+    <button type="button"
+            class="btn btn-sm py-0 px-2 {{ 'btn-' ~ cls if t in _techs else 'btn-outline-' ~ cls }}"
+            hx-post="{{ post_url }}"
+            hx-vals='{"technique": "{{ t }}"}'
+            hx-target="closest td"
+            hx-swap="innerHTML">{{ t }}</button>
+  {% endfor %}
+</div>
