@@ -206,6 +206,25 @@ class SQLiteESAFRepository(ESAFRepository):
             ]
         return esaf
 
+    def get_filter_options(self) -> dict:
+        with self._db() as conn:
+            years = [
+                r[0] for r in conn.execute(
+                    "SELECT DISTINCT year FROM esafs ORDER BY year DESC"
+                ).fetchall()
+            ]
+            beamlines = [
+                r[0] for r in conn.execute(
+                    "SELECT DISTINCT beamline FROM esafs WHERE beamline != '' ORDER BY beamline"
+                ).fetchall()
+            ]
+            statuses = [
+                r[0] for r in conn.execute(
+                    "SELECT DISTINCT status FROM esafs WHERE status != '' ORDER BY status"
+                ).fetchall()
+            ]
+        return {"years": years, "beamlines": beamlines, "statuses": statuses}
+
     def update_esaf_fields(self, esaf_id: str, notes: str, custom_fields: dict) -> bool:
         with self._db() as conn:
             cur = conn.execute(

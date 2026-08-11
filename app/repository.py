@@ -30,6 +30,11 @@ class ESAFRepository(ABC):
     def get_esaf(self, esaf_id: str) -> Optional[dict]: ...
 
     @abstractmethod
+    def get_filter_options(self) -> dict:
+        """Return distinct years, beamlines, and statuses for filter dropdowns."""
+        ...
+
+    @abstractmethod
     def update_esaf_fields(self, esaf_id: str, notes: str, custom_fields: dict) -> bool: ...
 
     @abstractmethod

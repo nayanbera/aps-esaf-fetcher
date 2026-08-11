@@ -48,6 +48,10 @@ def get_esaf(esaf_id: str) -> Optional[dict]:
     return _r().get_esaf(esaf_id)
 
 
+def get_filter_options() -> dict:
+    return _r().get_filter_options()
+
+
 def update_esaf_fields(esaf_id: str, notes: str, custom_fields: dict) -> bool:
     return _r().update_esaf_fields(esaf_id, notes, custom_fields)
 

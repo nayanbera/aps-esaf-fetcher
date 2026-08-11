@@ -48,16 +48,11 @@ def esafs_page(
     search: str | None = None,
 ):
     esafs = db.list_esafs(year=year, beamline=beamline, status=status, search=search)
-
-    # Collect filter options from DB
-    with db.get_db() as conn:
-        years     = [r[0] for r in conn.execute("SELECT DISTINCT year FROM esafs ORDER BY year DESC")]
-        beamlines = [r[0] for r in conn.execute("SELECT DISTINCT beamline FROM esafs WHERE beamline != '' ORDER BY beamline")]
-        statuses  = [r[0] for r in conn.execute("SELECT DISTINCT status FROM esafs WHERE status != '' ORDER BY status")]
+    opts  = db.get_filter_options()
 
     return templates.TemplateResponse("esafs.html", {
         "request": request, "esafs": esafs,
-        "years": years, "beamlines": beamlines, "statuses": statuses,
+        "years": opts["years"], "beamlines": opts["beamlines"], "statuses": opts["statuses"],
         "filter_year": year, "filter_beamline": beamline,
         "filter_status": status, "filter_search": search or "",
     })

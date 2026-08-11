@@ -92,6 +92,12 @@ class MongoESAFRepository(ESAFRepository):
         doc = self._esafs().find_one({"esaf_id": esaf_id})
         return self._clean(doc) if doc else None
 
+    def get_filter_options(self) -> dict:
+        years     = sorted(self._esafs().distinct("year"), reverse=True)
+        beamlines = sorted(b for b in self._esafs().distinct("beamline") if b)
+        statuses  = sorted(s for s in self._esafs().distinct("status")   if s)
+        return {"years": years, "beamlines": beamlines, "statuses": statuses}
+
     def update_esaf_fields(self, esaf_id: str, notes: str, custom_fields: dict) -> bool:
         result = self._esafs().update_one(
             {"esaf_id": esaf_id},
