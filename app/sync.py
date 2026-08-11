@@ -7,6 +7,7 @@ from typing import Any
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from . import config, db
+from .institution import lookup_by_email
 
 log = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def _extract_esaf(raw: Any) -> dict:
 
         users.append({
             "badge": badge, "first_name": first_name, "last_name": last_name,
-            "institution": "", "email": email, "role": role,
+            "institution": lookup_by_email(email), "email": email, "role": role,
             "raw_json": dict(u) if not isinstance(u, dict) else u,
         })
         if is_pi and not pi_badge:
