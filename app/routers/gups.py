@@ -66,6 +66,26 @@ def gups_page(
     })
 
 
+_VALID_TECHNIQUES = {"", "Surf", "Xtal", "ASWAXS", "Beamline"}
+
+
+@router.post("/gups/{gup_id}/set-technique", response_class=HTMLResponse)
+def set_gup_technique(
+    request: Request,
+    gup_id: str,
+    technique: str = Form(""),
+):
+    technique = technique.strip()
+    if technique not in _VALID_TECHNIQUES:
+        raise HTTPException(400, f"Invalid technique '{technique}'")
+    db.set_gup_technique(gup_id, technique)
+    post_url = f"/gups/{gup_id}/set-technique"
+    return templates.TemplateResponse(
+        "partials/technique_select.html",
+        {"request": request, "technique": technique, "post_url": post_url},
+    )
+
+
 # ---------------------------------------------------------------------------
 # GUP detail page
 # ---------------------------------------------------------------------------

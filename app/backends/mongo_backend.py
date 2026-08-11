@@ -157,7 +157,7 @@ class MongoESAFRepository(ESAFRepository):
         return [
             {k: d.get(k, "") for k in
              ("name", "pi_name", "pi_email", "institution", "country", "state",
-              "orcid_id", "created_at")}
+              "orcid_id", "technique", "created_at")}
             for d in docs
         ]
 
@@ -594,6 +594,18 @@ class MongoESAFRepository(ESAFRepository):
             reverse=True,
         )
         return cycles
+
+    def set_gup_technique(self, gup_id: str, technique: str) -> None:
+        self._gups().update_one(
+            {"gup_id": gup_id},
+            {"$set": {"technique": technique, "updated_at": _now_iso()}},
+        )
+
+    def set_pi_group_technique(self, name: str, technique: str) -> None:
+        self._pi_groups().update_one(
+            {"name": name},
+            {"$set": {"technique": technique}},
+        )
 
     def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
         self._esafs().update_one(

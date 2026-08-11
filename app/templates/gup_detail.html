@@ -19,6 +19,11 @@
     {% if gup.status %}
       <span class="badge bg-secondary ms-1">{{ gup.status }}</span>
     {% endif %}
+    {% set _t = gup.technique or '' %}
+    <span id="gup-technique-badge"
+          class="badge ms-2{% if _t == 'Surf' %} bg-primary{% elif _t == 'Xtal' %} bg-success{% elif _t == 'ASWAXS' %} bg-warning text-dark{% elif _t == 'Beamline' %} bg-info text-dark{% else %} d-none{% endif %}">
+      {{ _t }}
+    </span>
   </div>
   <button class="btn btn-outline-danger btn-sm"
           hx-delete="/gups/{{ gup.gup_id }}"
@@ -40,6 +45,14 @@
       <div class="card-body">
         <table class="table table-sm mb-0">
           <tbody>
+            <tr>
+              <th class="text-nowrap align-middle" style="width:40%">Technique</th>
+              <td>
+                {% set technique = gup.technique or '' %}
+                {% set post_url = "/gups/" ~ gup.gup_id ~ "/set-technique" %}
+                {% include "partials/technique_select.html" %}
+              </td>
+            </tr>
             <tr><th class="text-nowrap" style="width:40%">GUP ID</th><td><code>{{ gup.gup_id }}</code></td></tr>
             <tr><th>PI Name</th><td>{{ gup.pi_name or '—' }}</td></tr>
             <tr><th>Institution</th><td>{{ gup.pi_institution or '—' }}</td></tr>
@@ -173,4 +186,31 @@
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var BADGE_CLS = {
+    Surf: 'badge ms-2 bg-primary',
+    Xtal: 'badge ms-2 bg-success',
+    ASWAXS: 'badge ms-2 bg-warning text-dark',
+    Beamline: 'badge ms-2 bg-info text-dark'
+  };
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    var target = e.detail && e.detail.target;
+    if (!target) return;
+    var sel = target.querySelector && target.querySelector('.technique-select');
+    if (!sel) return;
+    var t = sel.dataset.technique || '';
+    var badge = document.getElementById('gup-technique-badge');
+    if (!badge) return;
+    if (t) {
+      badge.className = BADGE_CLS[t] || 'badge ms-2 bg-secondary';
+      badge.textContent = t;
+    } else {
+      badge.className = 'badge ms-2 d-none';
+      badge.textContent = '';
+    }
+  });
+})();
+</script>
 {% endblock %}

@@ -98,6 +98,7 @@
             <th>Country</th>
             <th>State</th>
             <th>Email</th>
+            <th>Technique</th>
             <th></th>
           </tr>
         </thead>
@@ -105,7 +106,7 @@
           {% for pg in pi_groups %}
             {% include "partials/pi_group_row_view.html" %}
           {% else %}
-            <tr id="pg-empty"><td colspan="7" class="text-center text-muted py-3">
+            <tr id="pg-empty"><td colspan="8" class="text-center text-muted py-3">
               No PI Groups yet. Add one above.
             </td></tr>
           {% endfor %}
@@ -198,6 +199,20 @@
         : 'User found but no institution on record — fill manually.';
     }
   });
+
+  // Technique select — update row color on change.
+  (function () {
+    var TECHNIQUE_ROW = {Surf: 'table-primary', Xtal: 'table-success', ASWAXS: 'table-warning', Beamline: 'table-info'};
+    var ROW_CLASSES = Object.values(TECHNIQUE_ROW);
+    document.addEventListener('change', function (e) {
+      var sel = e.target;
+      if (!sel.classList.contains('technique-select')) return;
+      var tr = sel.closest('tr');
+      if (!tr) return;
+      ROW_CLASSES.forEach(function (c) { tr.classList.remove(c); });
+      if (TECHNIQUE_ROW[sel.value]) tr.classList.add(TECHNIQUE_ROW[sel.value]);
+    });
+  })();
 })();
 </script>
 {% endblock %}

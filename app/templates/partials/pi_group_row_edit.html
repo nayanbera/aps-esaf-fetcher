@@ -1,4 +1,5 @@
-<tr id="pg-row-{{ pg.name | urlencode }}">
+<tr id="pg-row-{{ pg.name | urlencode }}"
+    class="{% if pg.technique == 'Surf' %}table-primary{% elif pg.technique == 'Xtal' %}table-success{% elif pg.technique == 'ASWAXS' %}table-warning{% elif pg.technique == 'Beamline' %}table-info{% endif %}">
   <td>
     <input type="text" name="new_name"
            value="{{ pg.name }}" class="form-control form-control-sm fw-semibold"
@@ -40,6 +41,11 @@
            data-pi-field="orcid_id"
            placeholder="0000-0000-0000-0000">
     <input type="hidden" name="pi_email" value="{{ pg.pi_email }}">
+  </td>
+  <td>
+    {% set technique = pg.technique or '' %}
+    {% set post_url = "/pi-groups/" ~ (pg.name | urlencode | replace('+', '%20')) ~ "/set-technique" %}
+    {% include "partials/technique_select.html" %}
   </td>
   <td class="text-end text-nowrap">
     <button type="button" class="btn btn-success btn-sm py-0 me-1"

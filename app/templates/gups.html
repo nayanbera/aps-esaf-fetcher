@@ -96,12 +96,14 @@
             <th>Funding Sources</th>
             <th>ESAFs</th>
             <th>Status</th>
+            <th>Technique</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for gup in gups %}
-          <tr>
+          {% set technique = gup.technique or '' %}
+          <tr class="{% if technique == 'Surf' %}table-primary{% elif technique == 'Xtal' %}table-success{% elif technique == 'ASWAXS' %}table-warning{% elif technique == 'Beamline' %}table-info{% endif %}">
             <td class="text-nowrap">
               <a href="/gups/{{ gup.gup_id }}" class="fw-semibold text-decoration-none">
                 {{ gup.gup_id }}
@@ -141,6 +143,10 @@
                 <span class="badge bg-light text-dark border small">{{ gup.status }}</span>
               {% else %}—{% endif %}
             </td>
+            <td>
+              {% set post_url = "/gups/" ~ gup.gup_id ~ "/set-technique" %}
+              {% include "partials/technique_select.html" %}
+            </td>
             <td class="text-end text-nowrap">
               <a href="/gups/{{ gup.gup_id }}" class="btn btn-outline-secondary btn-sm py-0">
                 <i class="bi bi-eye"></i>
@@ -156,7 +162,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="9" class="text-center text-muted py-4">
+            <td colspan="10" class="text-center text-muted py-4">
               No GUPs yet. Upload PDF files above to get started.
             </td>
           </tr>
@@ -182,4 +188,19 @@
   </ul>
 </nav>
 {% endif %}
+
+<script>
+(function () {
+  var TECHNIQUE_ROW = {Surf: 'table-primary', Xtal: 'table-success', ASWAXS: 'table-warning', Beamline: 'table-info'};
+  var ROW_CLASSES = Object.values(TECHNIQUE_ROW);
+  document.addEventListener('change', function (e) {
+    var sel = e.target;
+    if (!sel.classList.contains('technique-select')) return;
+    var tr = sel.closest('tr');
+    if (!tr) return;
+    ROW_CLASSES.forEach(function (c) { tr.classList.remove(c); });
+    if (TECHNIQUE_ROW[sel.value]) tr.classList.add(TECHNIQUE_ROW[sel.value]);
+  });
+})();
+</script>
 {% endblock %}

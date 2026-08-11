@@ -199,6 +199,16 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
+    def set_gup_technique(self, gup_id: str, technique: str) -> None:
+        """Set the technique classification on a GUP."""
+        ...
+
+    @abstractmethod
+    def set_pi_group_technique(self, name: str, technique: str) -> None:
+        """Set the technique classification on a PI Group."""
+        ...
+
+    @abstractmethod
     def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
         """Set the technique classification ('Surf', 'Xtal', 'ASWAXS', or '') on an ESAF."""
         ...

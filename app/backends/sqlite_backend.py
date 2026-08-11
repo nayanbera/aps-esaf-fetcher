@@ -235,11 +235,12 @@ class SQLiteESAFRepository(ESAFRepository):
                 except sqlite3.OperationalError:
                     pass
             # technique column (user-assigned classification)
-            try:
-                conn.execute("ALTER TABLE esafs ADD COLUMN technique TEXT DEFAULT ''")
-                conn.commit()
-            except sqlite3.OperationalError:
-                pass
+            for tbl in ("esafs", "gups", "pi_groups"):
+                try:
+                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN technique TEXT DEFAULT ''")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
             # GUP-related migrations for esafs table
             for col, defn in [
                 ("gup_id",   "TEXT DEFAULT ''"),
@@ -420,8 +421,7 @@ class SQLiteESAFRepository(ESAFRepository):
     def list_pi_groups(self) -> list[dict]:
         with self._db() as conn:
             rows = conn.execute(
-                "SELECT name, pi_name, pi_email, institution, country, state, "
-                "orcid_id, created_at FROM pi_groups ORDER BY name"
+                "SELECT * FROM pi_groups ORDER BY name"
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -922,6 +922,20 @@ class SQLiteESAFRepository(ESAFRepository):
                 "SELECT DISTINCT run_cycle FROM gups WHERE run_cycle != '' ORDER BY run_cycle DESC"
             ).fetchall()
         return [r[0] for r in rows]
+
+    def set_gup_technique(self, gup_id: str, technique: str) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE gups SET technique=?, updated_at=datetime('now') WHERE gup_id=?",
+                (technique, gup_id),
+            )
+
+    def set_pi_group_technique(self, name: str, technique: str) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE pi_groups SET technique=? WHERE name=?",
+                (technique, name),
+            )
 
     def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
         with self._db() as conn:
