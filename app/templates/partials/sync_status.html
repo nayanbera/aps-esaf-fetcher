@@ -1,6 +1,7 @@
-<div id="sync-status" {% if running %}class="sync-running"{% endif %}
+<div id="sync-status"
+     {% if running %}class="sync-running"{% endif %}
      hx-get="/sync/status"
-     hx-trigger="{% if running %}every 3s{% endif %}"
+     {% if running %}hx-trigger="every 3s"{% endif %}
      hx-swap="outerHTML">
 
   {% if running %}

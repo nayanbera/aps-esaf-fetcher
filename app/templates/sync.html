@@ -4,12 +4,5 @@
 {% block content %}
 <h4 class="mb-4"><i class="bi bi-arrow-repeat me-1"></i>Sync</h4>
 
-<div id="sync-status"
-     hx-get="/sync/status"
-     hx-trigger="every 3s [document.querySelector('.sync-running')]"
-     hx-swap="outerHTML">
-  {% with year_choices=year_choices, current_year=current_year %}
-    {% include "partials/sync_status.html" %}
-  {% endwith %}
-</div>
+{% include "partials/sync_status.html" %}
 {% endblock %}
