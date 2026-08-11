@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DM_USERNAME: str = os.getenv("DM_USERNAME", "")
-DM_PASSWORD: str = os.getenv("DM_PASSWORD", "")
+DM_USERNAME: str = os.getenv("DM_USERNAME", "").strip()
+DM_PASSWORD: str = os.getenv("DM_PASSWORD", "").strip()
 DM_URL: str = os.getenv("DM_URL", "https://catdtn03.aps.anl.gov:11337")
 STATION_ID: str = os.getenv("STATION_ID", "CHMCARS")
 
