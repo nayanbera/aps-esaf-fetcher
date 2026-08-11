@@ -48,6 +48,15 @@ def get_esaf(esaf_id: str) -> Optional[dict]:
     return _r().get_esaf(esaf_id)
 
 
+def count_esafs(
+    year: Optional[int] = None,
+    beamline: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+) -> int:
+    return _r().count_esafs(year=year, beamline=beamline, status=status, search=search)
+
+
 def get_filter_options() -> dict:
     return _r().get_filter_options()
 

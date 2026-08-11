@@ -92,6 +92,29 @@ class MongoESAFRepository(ESAFRepository):
         doc = self._esafs().find_one({"esaf_id": esaf_id})
         return self._clean(doc) if doc else None
 
+    def count_esafs(
+        self,
+        year: Optional[int] = None,
+        beamline: Optional[str] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> int:
+        query: dict = {}
+        if year:
+            query["year"] = year
+        if beamline:
+            query["beamline"] = {"$regex": beamline, "$options": "i"}
+        if status:
+            query["status"] = status
+        if search:
+            query["$or"] = [
+                {"title":       {"$regex": search, "$options": "i"}},
+                {"pi_name":     {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+                {"esaf_id":     {"$regex": search, "$options": "i"}},
+            ]
+        return self._esafs().count_documents(query)
+
     def get_filter_options(self) -> dict:
         years     = sorted(self._esafs().distinct("year"), reverse=True)
         beamlines = sorted(b for b in self._esafs().distinct("beamline") if b)

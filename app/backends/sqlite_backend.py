@@ -219,6 +219,29 @@ class SQLiteESAFRepository(ESAFRepository):
             ]
         return esaf
 
+    def count_esafs(
+        self,
+        year: Optional[int] = None,
+        beamline: Optional[str] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> int:
+        clauses, params = [], []
+        if year:
+            clauses.append("year = ?"); params.append(year)
+        if beamline:
+            clauses.append("beamline LIKE ?"); params.append(f"%{beamline}%")
+        if status:
+            clauses.append("status = ?"); params.append(status)
+        if search:
+            clauses.append(
+                "(title LIKE ? OR pi_name LIKE ? OR description LIKE ? OR esaf_id LIKE ?)"
+            )
+            params.extend([f"%{search}%"] * 4)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self._db() as conn:
+            return conn.execute(f"SELECT COUNT(*) FROM esafs {where}", params).fetchone()[0]
+
     def get_filter_options(self) -> dict:
         with self._db() as conn:
             years = [

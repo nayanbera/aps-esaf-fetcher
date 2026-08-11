@@ -30,6 +30,15 @@ class ESAFRepository(ABC):
     def get_esaf(self, esaf_id: str) -> Optional[dict]: ...
 
     @abstractmethod
+    def count_esafs(
+        self,
+        year: Optional[int] = None,
+        beamline: Optional[str] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> int: ...
+
+    @abstractmethod
     def get_filter_options(self) -> dict:
         """Return distinct years, beamlines, and statuses for filter dropdowns."""
         ...

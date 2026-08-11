@@ -40,6 +40,9 @@ def api_get_esaf(esaf_id: str):
 # Web UI — list
 # ---------------------------------------------------------------------------
 
+_PER_PAGE = 100
+
+
 @router.get("/esafs", response_class=HTMLResponse)
 def esafs_page(
     request: Request,
@@ -47,9 +50,19 @@ def esafs_page(
     beamline: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    page: int = 1,
 ):
     year_int = int(year) if year else None
-    esafs = db.list_esafs(year=year_int, beamline=beamline, status=status, search=search)
+    page     = max(1, page)
+    offset   = (page - 1) * _PER_PAGE
+
+    total       = db.count_esafs(year=year_int, beamline=beamline, status=status, search=search)
+    total_pages = max(1, (total + _PER_PAGE - 1) // _PER_PAGE)
+    page        = min(page, total_pages)
+    offset      = (page - 1) * _PER_PAGE
+
+    esafs = db.list_esafs(year=year_int, beamline=beamline, status=status,
+                          search=search, limit=_PER_PAGE, offset=offset)
     opts  = db.get_filter_options()
 
     return templates.TemplateResponse("esafs.html", {
@@ -57,6 +70,9 @@ def esafs_page(
         "years": opts["years"], "beamlines": opts["beamlines"], "statuses": opts["statuses"],
         "filter_year": year_int, "filter_beamline": beamline,
         "filter_status": status, "filter_search": search or "",
+        "page": page, "total_pages": total_pages,
+        "total": total, "per_page": _PER_PAGE,
+        "offset": offset,
     })
 
 
