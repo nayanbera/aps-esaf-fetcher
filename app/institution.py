@@ -132,6 +132,25 @@ _DOMAIN_MAP: dict[str, str] = {
     "uwaterloo.ca":     "University of Waterloo",
     "queensu.ca":       "Queen's University",
     "yorku.ca":         "York University",
+    # ---------- Additional US universities ----------
+    "albany.edu":       "University at Albany, SUNY",
+    "uakron.edu":       "University of Akron",
+    "boisestate.edu":   "Boise State University",
+    "hawaii.edu":       "University of Hawaii",
+    "iit.edu":          "Illinois Institute of Technology",
+    "marquette.edu":    "Marquette University",
+    "ohio.edu":         "Ohio University",
+    "ou.edu":           "University of Oklahoma",
+    "rochester.edu":    "University of Rochester",
+    "umt.edu":          "University of Montana",
+    # ---------- Additional Canadian universities ----------
+    "concordia.ca":     "Concordia University",
+    "umontreal.ca":     "Université de Montréal",
+    "usask.ca":         "University of Saskatchewan",
+    # ---------- Chinese institutions ----------
+    "sdu.edu.cn":       "Shandong University",
+    # ---------- Additional national labs ----------
+    "ameslab.gov":      "Ames National Laboratory",
     # ---------- Industry / other ----------
     "dow.com":          "Dow Chemical",
     "dupont.com":       "DuPont",
