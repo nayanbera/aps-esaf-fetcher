@@ -110,7 +110,7 @@
     <tbody>
     {% for e in esafs %}
       {% set technique = e.technique or '' %}
-      <tr class="cursor-pointer{% if technique == 'Surf' %} table-primary{% elif technique == 'Xtal' %} table-success{% elif technique == 'ASWAXS' %} table-warning{% endif %}"
+      <tr class="cursor-pointer{% if technique == 'Surf' %} table-primary{% elif technique == 'Xtal' %} table-success{% elif technique == 'ASWAXS' %} table-warning{% elif technique == 'Beamline' %} table-info{% endif %}"
           onclick="window.location='/esafs/{{ e.esaf_id }}'">
         <td><code>{{ e.esaf_id }}</code></td>
         <td class="text-truncate" style="max-width:280px" title="{{ e.title }}">{{ e.title }}</td>
@@ -169,7 +169,7 @@
 
 <script>
 (function () {
-  var TECHNIQUE_ROW = {Surf: 'table-primary', Xtal: 'table-success', ASWAXS: 'table-warning'};
+  var TECHNIQUE_ROW = {Surf: 'table-primary', Xtal: 'table-success', ASWAXS: 'table-warning', Beamline: 'table-info'};
   var TECHNIQUE_ROW_CLASSES = Object.values(TECHNIQUE_ROW);
 
   function applyTechniqueRow(tr, technique) {
@@ -178,7 +178,7 @@
   }
 
   function applySelectStyle(sel, technique) {
-    ['technique-Surf', 'technique-Xtal', 'technique-ASWAXS'].forEach(function (c) {
+    ['technique-Surf', 'technique-Xtal', 'technique-ASWAXS', 'technique-Beamline'].forEach(function (c) {
       sel.classList.remove(c);
     });
     if (technique) sel.classList.add('technique-' + technique);

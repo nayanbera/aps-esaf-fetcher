@@ -109,7 +109,7 @@ def api_list_pi_groups() -> list[str]:
     return db.list_pi_groups()
 
 
-_VALID_TECHNIQUES = {"", "Surf", "Xtal", "ASWAXS"}
+_VALID_TECHNIQUES = {"", "Surf", "Xtal", "ASWAXS", "Beamline"}
 
 
 @router.post("/esafs/{esaf_id}/set-technique", response_class=HTMLResponse)

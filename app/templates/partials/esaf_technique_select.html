@@ -1,5 +1,5 @@
 <select name="technique"
-        class="form-select form-select-sm technique-select{% if technique == 'Surf' %} technique-Surf{% elif technique == 'Xtal' %} technique-Xtal{% elif technique == 'ASWAXS' %} technique-ASWAXS{% endif %}"
+        class="form-select form-select-sm technique-select{% if technique == 'Surf' %} technique-Surf{% elif technique == 'Xtal' %} technique-Xtal{% elif technique == 'ASWAXS' %} technique-ASWAXS{% elif technique == 'Beamline' %} technique-Beamline{% endif %}"
         hx-post="/esafs/{{ esaf_id }}/set-technique"
         hx-trigger="change"
         hx-target="closest td"
@@ -10,4 +10,5 @@
   <option value="Surf"{% if technique == 'Surf' %} selected{% endif %}>Surf</option>
   <option value="Xtal"{% if technique == 'Xtal' %} selected{% endif %}>Xtal</option>
   <option value="ASWAXS"{% if technique == 'ASWAXS' %} selected{% endif %}>ASWAXS</option>
+  <option value="Beamline"{% if technique == 'Beamline' %} selected{% endif %}>Beamline</option>
 </select>
