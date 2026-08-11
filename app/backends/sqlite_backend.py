@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS esafs (
     pi_name       TEXT,
     pi_institution TEXT DEFAULT '',
     pi_group      TEXT DEFAULT '',
+    gup_id        TEXT DEFAULT '',
+    pdf_path      TEXT DEFAULT '',
     raw_json      TEXT,
     notes         TEXT DEFAULT '',
     custom_fields TEXT DEFAULT '{}',
@@ -130,7 +132,6 @@ CREATE TABLE IF NOT EXISTS gup_funding_sources (
 CREATE INDEX IF NOT EXISTS idx_esafs_year       ON esafs(year);
 CREATE INDEX IF NOT EXISTS idx_esafs_beamline   ON esafs(beamline);
 CREATE INDEX IF NOT EXISTS idx_esafs_status     ON esafs(status);
-CREATE INDEX IF NOT EXISTS idx_esafs_gup_id     ON esafs(gup_id);
 CREATE INDEX IF NOT EXISTS idx_esaf_users_badge ON esaf_users(badge);
 CREATE INDEX IF NOT EXISTS idx_gups_run_cycle   ON gups(run_cycle);
 CREATE INDEX IF NOT EXISTS idx_gup_fs_gup_id    ON gup_funding_sources(gup_id);
@@ -243,6 +244,14 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
+            # Index on gup_id — must come after the column exists
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_esafs_gup_id ON esafs(gup_id)"
+                )
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
             # GUP tables (already in _SCHEMA but ensure on old DBs)
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS gups (
