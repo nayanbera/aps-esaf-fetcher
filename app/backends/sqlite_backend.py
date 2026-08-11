@@ -234,6 +234,12 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
+            # technique column (user-assigned classification)
+            try:
+                conn.execute("ALTER TABLE esafs ADD COLUMN technique TEXT DEFAULT ''")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
             # GUP-related migrations for esafs table
             for col, defn in [
                 ("gup_id",   "TEXT DEFAULT ''"),
@@ -916,6 +922,13 @@ class SQLiteESAFRepository(ESAFRepository):
                 "SELECT DISTINCT run_cycle FROM gups WHERE run_cycle != '' ORDER BY run_cycle DESC"
             ).fetchall()
         return [r[0] for r in rows]
+
+    def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE esafs SET technique=?, updated_at=datetime('now') WHERE esaf_id=?",
+                (technique, esaf_id),
+            )
 
     def rename_pi_group(self, old_name: str, new_name: str) -> None:
         with self._db() as conn:

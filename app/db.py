@@ -96,6 +96,10 @@ def clear_pi_group_assignments(group_name: str) -> int:
     return _r().clear_pi_group_assignments(group_name)
 
 
+def set_esaf_technique(esaf_id: str, technique: str) -> None:
+    _r().set_esaf_technique(esaf_id, technique)
+
+
 def rename_pi_group(old_name: str, new_name: str) -> None:
     _r().rename_pi_group(old_name, new_name)
 

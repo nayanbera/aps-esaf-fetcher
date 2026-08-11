@@ -103,12 +103,15 @@
         <th>Beamline</th>
         <th>Year</th>
         <th>Status</th>
+        <th>Technique</th>
         <th class="text-center">Users</th>
       </tr>
     </thead>
     <tbody>
     {% for e in esafs %}
-      <tr class="cursor-pointer" onclick="window.location='/esafs/{{ e.esaf_id }}'">
+      {% set technique = e.technique or '' %}
+      <tr class="cursor-pointer{% if technique == 'Surf' %} table-primary{% elif technique == 'Xtal' %} table-success{% elif technique == 'ASWAXS' %} table-warning{% endif %}"
+          onclick="window.location='/esafs/{{ e.esaf_id }}'">
         <td><code>{{ e.esaf_id }}</code></td>
         <td class="text-truncate" style="max-width:280px" title="{{ e.title }}">{{ e.title }}</td>
         <td>{{ e.pi_name or '—' }}</td>
@@ -125,10 +128,14 @@
             <span class="badge bg-warning text-dark">{{ e.status or 'Unknown' }}</span>
           {% endif %}
         </td>
+        <td onclick="event.stopPropagation()">
+          {% set esaf_id = e.esaf_id %}
+          {% include "partials/esaf_technique_select.html" %}
+        </td>
         <td class="text-center">{{ e.user_count or 0 }}</td>
       </tr>
     {% else %}
-      <tr><td colspan="8" class="text-center text-muted py-4">No ESAFs found.</td></tr>
+      <tr><td colspan="10" class="text-center text-muted py-4">No ESAFs found.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -159,4 +166,40 @@
   </ul>
 </nav>
 {% endif %}
+
+<script>
+(function () {
+  var TECHNIQUE_ROW = {Surf: 'table-primary', Xtal: 'table-success', ASWAXS: 'table-warning'};
+  var TECHNIQUE_ROW_CLASSES = Object.values(TECHNIQUE_ROW);
+
+  function applyTechniqueRow(tr, technique) {
+    TECHNIQUE_ROW_CLASSES.forEach(function (c) { tr.classList.remove(c); });
+    if (TECHNIQUE_ROW[technique]) tr.classList.add(TECHNIQUE_ROW[technique]);
+  }
+
+  function applySelectStyle(sel, technique) {
+    ['technique-Surf', 'technique-Xtal', 'technique-ASWAXS'].forEach(function (c) {
+      sel.classList.remove(c);
+    });
+    if (technique) sel.classList.add('technique-' + technique);
+  }
+
+  // Immediate visual feedback on change (before HTMX response arrives).
+  document.addEventListener('change', function (e) {
+    var sel = e.target;
+    if (!sel.classList.contains('technique-select')) return;
+    var technique = sel.value;
+    applySelectStyle(sel, technique);
+    var tr = sel.closest('tr');
+    if (tr) applyTechniqueRow(tr, technique);
+  });
+
+  // After HTMX swaps in the new <select>, re-apply the style to the new element.
+  document.addEventListener('htmx:afterSwap', function (e) {
+    var sel = e.target.querySelector && e.target.querySelector('.technique-select');
+    if (!sel) return;
+    applySelectStyle(sel, sel.dataset.technique || '');
+  });
+})();
+</script>
 {% endblock %}

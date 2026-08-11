@@ -595,6 +595,12 @@ class MongoESAFRepository(ESAFRepository):
         )
         return cycles
 
+    def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
+        self._esafs().update_one(
+            {"esaf_id": esaf_id},
+            {"$set": {"technique": technique, "updated_at": _now_iso()}},
+        )
+
     def rename_pi_group(self, old_name: str, new_name: str) -> None:
         self._pi_groups().update_one(
             {"name": old_name}, {"$set": {"name": new_name, "updated_at": _now_iso()}}

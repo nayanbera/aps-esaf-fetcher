@@ -109,6 +109,25 @@ def api_list_pi_groups() -> list[str]:
     return db.list_pi_groups()
 
 
+_VALID_TECHNIQUES = {"", "Surf", "Xtal", "ASWAXS"}
+
+
+@router.post("/esafs/{esaf_id}/set-technique", response_class=HTMLResponse)
+def set_esaf_technique(
+    request: Request,
+    esaf_id: str,
+    technique: str = Form(""),
+):
+    technique = technique.strip()
+    if technique not in _VALID_TECHNIQUES:
+        raise HTTPException(400, f"Invalid technique '{technique}'")
+    db.set_esaf_technique(esaf_id, technique)
+    return templates.TemplateResponse(
+        "partials/esaf_technique_select.html",
+        {"request": request, "esaf_id": esaf_id, "technique": technique},
+    )
+
+
 @router.get("/esafs/{esaf_id}/edit", response_class=HTMLResponse)
 def esaf_edit_form(request: Request, esaf_id: str):
     """Return an HTMX partial: the edit form for notes + custom fields."""

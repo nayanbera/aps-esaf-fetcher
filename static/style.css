@@ -9,3 +9,9 @@ body { background-color: #f8f9fa; }
 
 /* Navbar brand */
 .navbar-brand { letter-spacing: .02em; }
+
+/* Technique classification select */
+.technique-select { min-width: 90px; font-size: .78rem; padding: .15rem .3rem; border: 1px solid #dee2e6; }
+.technique-select.technique-Surf   { background-color: #cfe2ff; color: #084298; border-color: #9ec5fe; }
+.technique-select.technique-Xtal   { background-color: #d1e7dd; color: #0f5132; border-color: #a3cfbb; }
+.technique-select.technique-ASWAXS { background-color: #fff3cd; color: #664d03; border-color: #ffe69c; }

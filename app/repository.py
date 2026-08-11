@@ -199,6 +199,11 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
+    def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
+        """Set the technique classification ('Surf', 'Xtal', 'ASWAXS', or '') on an ESAF."""
+        ...
+
+    @abstractmethod
     def rename_pi_group(self, old_name: str, new_name: str) -> None:
         """Rename a PI group and update pi_group references on all linked ESAFs."""
         ...
