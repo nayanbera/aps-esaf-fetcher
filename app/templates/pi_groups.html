@@ -123,6 +123,40 @@
     if (full) byName[full] = u;
   });
 
+  // Delegated save handler for edit rows.
+  // hx-include="closest tr" in HTMX 1.9.x only includes the <tr> itself,
+  // not its input descendants — so we collect values manually via fetch().
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-pg-save]');
+    if (!btn) return;
+
+    var tr = btn.closest('tr');
+    if (!tr) return;
+
+    var rowId  = btn.dataset.pgSaveRow;
+    var pgUrl  = btn.dataset.pgSaveUrl;
+    var params = new URLSearchParams();
+    tr.querySelectorAll('[name]').forEach(function (el) {
+      params.append(el.name, el.value);
+    });
+
+    fetch('/pi-groups/' + pgUrl, {
+      method:  'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body:    params.toString(),
+    }).then(function (r) { return r.text(); })
+      .then(function (html) {
+        var row  = document.getElementById(rowId);
+        var temp = document.createElement('tbody');
+        temp.innerHTML = html;
+        var newRow = temp.firstElementChild;
+        if (row && newRow) {
+          row.replaceWith(newRow);
+          htmx.process(newRow);
+        }
+      });
+  });
+
   // Delegated 'input' listener — fires for datalist selections AND free-typing.
   // Works for both the add form and any edit rows swapped in via HTMX.
   document.addEventListener('input', function (e) {

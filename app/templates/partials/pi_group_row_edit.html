@@ -34,10 +34,9 @@
   </td>
   <td class="text-end text-nowrap">
     <button type="button" class="btn btn-success btn-sm py-0 me-1"
-            hx-post="/pi-groups/{{ pg.name | urlencode }}"
-            hx-target="#pg-row-{{ pg.name | urlencode }}"
-            hx-swap="outerHTML"
-            hx-include="closest tr">
+            data-pg-save
+            data-pg-save-row="pg-row-{{ pg.name | urlencode }}"
+            data-pg-save-url="{{ pg.name | urlencode }}">
       <i class="bi bi-check-lg"></i>
     </button>
     <button type="button" class="btn btn-outline-secondary btn-sm py-0"
