@@ -20,6 +20,11 @@
     {% else %}
       <span class="badge bg-warning text-dark ms-2">{{ esaf.status or 'Unknown' }}</span>
     {% endif %}
+    {% set _t = esaf.technique or '' %}
+    <span id="esaf-technique-badge"
+          class="badge ms-2{% if _t == 'Surf' %} bg-primary{% elif _t == 'Xtal' %} bg-success{% elif _t == 'ASWAXS' %} bg-warning text-dark{% elif _t == 'Beamline' %} bg-info text-dark{% else %} d-none{% endif %}">
+      {{ _t }}
+    </span>
     {% if esaf.gup_id %}
       <a href="/gups/{{ esaf.gup_id }}" class="badge bg-info text-dark ms-2 text-decoration-none">
         <i class="bi bi-link-45deg"></i> GUP {{ esaf.gup_id }}
@@ -54,6 +59,14 @@
       <div class="card-body">
         <table class="table table-sm mb-0">
           <tbody>
+            <tr>
+              <th class="text-nowrap align-middle">Technique</th>
+              <td>
+                {% set esaf_id = esaf.esaf_id %}
+                {% set technique = esaf.technique or '' %}
+                {% include "partials/esaf_technique_select.html" %}
+              </td>
+            </tr>
             <tr><th class="text-nowrap">Beamline</th><td>{{ esaf.beamline or '—' }}</td></tr>
             <tr><th>Sector</th><td>{{ esaf.sector or '—' }}</td></tr>
             <tr><th>Year</th><td>{{ esaf.year or '—' }}</td></tr>
@@ -278,6 +291,32 @@ document.getElementById('affiliationModal').addEventListener('show.bs.modal', fu
     stateInput.removeAttribute('list');
   }
 });
+// Keep header technique badge in sync when the detail-page select changes.
+(function () {
+  var BADGE_CLS = {
+    Surf: 'badge ms-2 bg-primary',
+    Xtal: 'badge ms-2 bg-success',
+    ASWAXS: 'badge ms-2 bg-warning text-dark',
+    Beamline: 'badge ms-2 bg-info text-dark'
+  };
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    var target = e.detail && e.detail.target;
+    if (!target) return;
+    var sel = target.querySelector && target.querySelector('.technique-select');
+    if (!sel) return;
+    var t = sel.dataset.technique || '';
+    var badge = document.getElementById('esaf-technique-badge');
+    if (!badge) return;
+    if (t) {
+      badge.className = BADGE_CLS[t] || 'badge ms-2 bg-secondary';
+      badge.textContent = t;
+    } else {
+      badge.className = 'badge ms-2 d-none';
+      badge.textContent = '';
+    }
+  });
+})();
+
 document.getElementById('aff-save').addEventListener('click', function() {
   var domain = document.getElementById('aff-domain-val').value;
   var data = new URLSearchParams({
