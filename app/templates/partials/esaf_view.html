@@ -10,12 +10,16 @@
     </button>
   </div>
   <div class="card-body">
-    {% if esaf.pi_group %}
-      <div class="mb-3">
-        <span class="fw-semibold"><i class="bi bi-person-badge me-1"></i>PI Group:</span>
-        <span class="ms-1">{{ esaf.pi_group }}</span>
-      </div>
-    {% endif %}
+    <div class="mb-3 d-flex align-items-baseline gap-2">
+      <span class="fw-semibold text-nowrap">
+        <i class="bi bi-person-badge me-1"></i>PI Group:
+      </span>
+      {% if esaf.pi_group %}
+        <span>{{ esaf.pi_group }}</span>
+      {% else %}
+        <span class="text-muted fst-italic small">Not set — click Edit to assign</span>
+      {% endif %}
+    </div>
 
     {% if esaf.notes %}
       <p class="mb-{% if field_defs %}3{% else %}0{% endif %} white-space-pre-wrap">{{ esaf.notes }}</p>

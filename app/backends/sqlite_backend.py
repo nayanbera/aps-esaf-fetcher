@@ -166,6 +166,14 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
+            # Explicit create in case executescript didn't reach it on an existing DB
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS pi_groups (
+                    name       TEXT PRIMARY KEY,
+                    created_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            conn.commit()
 
     # ------------------------------------------------------------------
     # ESAFs
