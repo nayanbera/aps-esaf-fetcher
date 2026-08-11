@@ -90,6 +90,28 @@ class ESAFRepository(ABC):
     @abstractmethod
     def delete_field_definition(self, name: str) -> bool: ...
 
+    # ------------------------------------------------------------------
+    # Domain affiliation overrides
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def list_domain_overrides(self) -> list[dict]: ...
+
+    @abstractmethod
+    def set_domain_override(
+        self, domain: str, institution: str, country: str, state: str
+    ) -> None: ...
+
+    @abstractmethod
+    def delete_domain_override(self, domain: str) -> bool: ...
+
+    @abstractmethod
+    def apply_domain_override(
+        self, domain: str, institution: str, country: str, state: str
+    ) -> int:
+        """Update all users whose email matches @domain. Returns row count."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Factory

@@ -1,13 +1,14 @@
 """Institution, country, and state lookup from email domain.
 
-Two-layer lookup:
-  1. _DOMAIN_MAP  — curated entries for national labs, DOE facilities, and
-                    industry where the Hipo university DB has no entry.
-  2. University DB — Hipo/university-domains-list (~10 k universities worldwide),
-                    fetched once and cached at ~/.aps-esaf-fetcher/university_domains.json.
+Three-layer lookup:
+  1. _override_map — user-defined domain overrides stored in the DB (highest priority).
+  2. _DOMAIN_MAP   — curated entries for national labs, DOE facilities, and
+                     industry where the Hipo university DB has no entry.
+  3. University DB — Hipo/university-domains-list (~10 k universities worldwide),
+                     fetched once and cached at ~/.aps-esaf-fetcher/university_domains.json.
 
-lookup_by_email() checks the manual map first (strips leading subdomains),
-then falls back to the university DB.
+lookup_by_email() checks the override map first, then the manual map, then
+the university DB.
 """
 
 from __future__ import annotations
@@ -20,6 +21,32 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 _EMPTY: dict = {"institution": "", "country": "", "state": ""}
+
+# ---------- User-defined domain overrides (loaded from DB at startup) ----------
+_override_map: dict[str, dict] = {}
+
+
+def load_overrides(overrides: list[dict]) -> None:
+    """Rebuild _override_map from a list of dicts with keys domain/institution/country/state."""
+    global _override_map
+    _override_map = {
+        row["domain"]: {
+            "institution": row.get("institution", ""),
+            "country":     row.get("country", ""),
+            "state":       row.get("state", ""),
+        }
+        for row in overrides
+        if row.get("domain")
+    }
+
+
+def set_override(domain: str, inst: str, country: str, state: str) -> None:
+    """Update a single entry in the in-memory override map."""
+    _override_map[domain.lower().strip()] = {
+        "institution": inst,
+        "country":     country,
+        "state":       state,
+    }
 
 _HIPO_URL = (
     "https://raw.githubusercontent.com/Hipo/university-domains-list"
@@ -157,12 +184,17 @@ def _domain_lookup(db: dict, domain: str) -> dict | None:
 def lookup_by_email(email: str) -> dict:
     """Return {institution, country, state} for an email address.
 
-    Checks the manual map first (national labs, companies), then the
-    Hipo university database. Returns empty strings for unknown domains.
+    Check order: user-defined override map → manual map (national labs,
+    companies) → Hipo university database. Returns empty strings for
+    unknown domains.
     """
     if not email or "@" not in email:
         return _EMPTY.copy()
     domain = email.split("@", 1)[1].lower().strip()
+
+    entry = _domain_lookup(_override_map, domain)
+    if entry:
+        return entry.copy()
 
     entry = _domain_lookup(_DOMAIN_MAP, domain)
     if entry:

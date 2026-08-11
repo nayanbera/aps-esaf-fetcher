@@ -30,6 +30,9 @@ class MongoESAFRepository(ESAFRepository):
     def _field_defs(self) -> Collection:
         return self._client[self._db_name]["custom_field_definitions"]
 
+    def _domain_overrides(self) -> Collection:
+        return self._client[self._db_name]["domain_overrides"]
+
     @staticmethod
     def _clean(doc: dict) -> dict:
         doc.pop("_id", None)
@@ -46,6 +49,7 @@ class MongoESAFRepository(ESAFRepository):
         self._esafs().create_index([("status", ASCENDING)])
         self._esafs().create_index([("users.badge", ASCENDING)])
         self._field_defs().create_index([("name", ASCENDING)], unique=True)
+        self._domain_overrides().create_index([("domain", ASCENDING)], unique=True)
 
     # ------------------------------------------------------------------
     # ESAFs
@@ -306,3 +310,45 @@ class MongoESAFRepository(ESAFRepository):
 
     def delete_field_definition(self, name: str) -> bool:
         return self._field_defs().delete_one({"name": name}).deleted_count > 0
+
+    # ------------------------------------------------------------------
+    # Domain affiliation overrides
+    # ------------------------------------------------------------------
+
+    def list_domain_overrides(self) -> list[dict]:
+        return [
+            self._clean(d)
+            for d in self._domain_overrides().find().sort("domain", ASCENDING)
+        ]
+
+    def set_domain_override(
+        self, domain: str, institution: str, country: str, state: str
+    ) -> None:
+        self._domain_overrides().update_one(
+            {"domain": domain},
+            {"$set": {
+                "domain": domain,
+                "institution": institution,
+                "country": country,
+                "state": state,
+            }},
+            upsert=True,
+        )
+
+    def delete_domain_override(self, domain: str) -> bool:
+        return self._domain_overrides().delete_one({"domain": domain}).deleted_count > 0
+
+    def apply_domain_override(
+        self, domain: str, institution: str, country: str, state: str
+    ) -> int:
+        import re
+        result = self._esafs().update_many(
+            {"users.email": {"$regex": f"@{re.escape(domain)}$", "$options": "i"}},
+            {"$set": {
+                "users.$[u].institution": institution,
+                "users.$[u].country":     country,
+                "users.$[u].state":       state,
+            }},
+            array_filters=[{"u.email": {"$regex": f"@{re.escape(domain)}$", "$options": "i"}}],
+        )
+        return result.modified_count

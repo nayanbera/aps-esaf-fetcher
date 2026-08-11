@@ -10,8 +10,9 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from . import db, sync
-from .institution import _load_uni_db
+from .institution import _load_uni_db, load_overrides
 from .routers import esafs, stats, sync_router, fields
+from .routers import overrides as overrides_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +34,7 @@ _app_log.propagate = False
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    load_overrides(db.list_domain_overrides())
     threading.Thread(target=_load_uni_db, daemon=True, name="uni-db-loader").start()
     sync.start_scheduler()
     yield
@@ -53,6 +55,7 @@ app.include_router(esafs.router)
 app.include_router(stats.router)
 app.include_router(sync_router.router)
 app.include_router(fields.router)
+app.include_router(overrides_router.router)
 
 
 @app.get("/", include_in_schema=False)

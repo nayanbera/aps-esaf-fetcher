@@ -111,3 +111,27 @@ def upsert_field_definition(
 
 def delete_field_definition(name: str) -> bool:
     return _r().delete_field_definition(name)
+
+
+# ------------------------------------------------------------------
+# Domain affiliation overrides
+# ------------------------------------------------------------------
+
+def list_domain_overrides() -> list[dict]:
+    return _r().list_domain_overrides()
+
+
+def set_domain_override(
+    domain: str, institution: str, country: str, state: str
+) -> None:
+    _r().set_domain_override(domain, institution, country, state)
+
+
+def delete_domain_override(domain: str) -> bool:
+    return _r().delete_domain_override(domain)
+
+
+def apply_domain_override(
+    domain: str, institution: str, country: str, state: str
+) -> int:
+    return _r().apply_domain_override(domain, institution, country, state)

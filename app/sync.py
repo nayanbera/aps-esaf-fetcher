@@ -121,6 +121,10 @@ def _extract_esaf(raw: Any) -> dict:
 
 def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = None) -> dict:
     """Fetch ESAFs from DM API and upsert into local DB. Returns summary dict."""
+    from .institution import load_overrides as _load_overrides
+    from . import db as _db
+    _load_overrides(_db.list_domain_overrides())
+
     bl  = beamline_names or config.BEAMLINE_NAMES
     yrs = years or config.SYNC_YEARS
     now = datetime.now(timezone.utc).isoformat()

@@ -77,6 +77,14 @@ CREATE TABLE IF NOT EXISTS sync_log (
     error           TEXT
 );
 
+CREATE TABLE IF NOT EXISTS domain_overrides (
+    domain      TEXT PRIMARY KEY,
+    institution TEXT NOT NULL DEFAULT '',
+    country     TEXT NOT NULL DEFAULT '',
+    state       TEXT NOT NULL DEFAULT '',
+    created_at  TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_esafs_year     ON esafs(year);
 CREATE INDEX IF NOT EXISTS idx_esafs_beamline ON esafs(beamline);
 CREATE INDEX IF NOT EXISTS idx_esafs_status   ON esafs(status);
@@ -453,3 +461,46 @@ class SQLiteESAFRepository(ESAFRepository):
                 "DELETE FROM custom_field_definitions WHERE name=?", (name,)
             )
         return cur.rowcount > 0
+
+    # ------------------------------------------------------------------
+    # Domain affiliation overrides
+    # ------------------------------------------------------------------
+
+    def list_domain_overrides(self) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT domain, institution, country, state, created_at "
+                "FROM domain_overrides ORDER BY domain"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def set_domain_override(
+        self, domain: str, institution: str, country: str, state: str
+    ) -> None:
+        with self._db() as conn:
+            conn.execute(
+                """INSERT INTO domain_overrides (domain, institution, country, state)
+                   VALUES (?,?,?,?)
+                   ON CONFLICT(domain) DO UPDATE SET
+                       institution=excluded.institution,
+                       country=excluded.country,
+                       state=excluded.state""",
+                (domain, institution, country, state),
+            )
+
+    def delete_domain_override(self, domain: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute(
+                "DELETE FROM domain_overrides WHERE domain=?", (domain,)
+            )
+        return cur.rowcount > 0
+
+    def apply_domain_override(
+        self, domain: str, institution: str, country: str, state: str
+    ) -> int:
+        with self._db() as conn:
+            cur = conn.execute(
+                "UPDATE users SET institution=?, country=?, state=? WHERE email LIKE ?",
+                (institution, country, state, f"%@{domain}"),
+            )
+        return cur.rowcount
