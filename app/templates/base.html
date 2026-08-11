@@ -29,20 +29,8 @@
              href="/esafs"><i class="bi bi-list-ul me-1"></i>ESAFs</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.url.path == '/stats' %}active{% endif %}"
-             href="/stats"><i class="bi bi-bar-chart-fill me-1"></i>Statistics</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.url.path == '/fields' %}active{% endif %}"
-             href="/fields"><i class="bi bi-sliders me-1"></i>Custom Fields</a>
-        </li>
-        <li class="nav-item">
           <a class="nav-link {% if request.url.path == '/sync' %}active{% endif %}"
              href="/sync"><i class="bi bi-arrow-repeat me-1"></i>Sync</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.url.path == '/overrides' %}active{% endif %}"
-             href="/overrides"><i class="bi bi-patch-check me-1"></i>Affiliations</a>
         </li>
         <li class="nav-item">
           <a class="nav-link {% if request.url.path.startswith('/gups') %}active{% endif %}"
@@ -51,6 +39,18 @@
         <li class="nav-item">
           <a class="nav-link {% if request.url.path == '/pi-groups' %}active{% endif %}"
              href="/pi-groups"><i class="bi bi-person-badge me-1"></i>PI Groups</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.url.path == '/overrides' %}active{% endif %}"
+             href="/overrides"><i class="bi bi-patch-check me-1"></i>Affiliations</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.url.path == '/fields' %}active{% endif %}"
+             href="/fields"><i class="bi bi-sliders me-1"></i>Custom Fields</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.url.path == '/stats' %}active{% endif %}"
+             href="/stats"><i class="bi bi-bar-chart-fill me-1"></i>Statistics</a>
         </li>
       </ul>
     </div>
