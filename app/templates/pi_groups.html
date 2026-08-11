@@ -15,7 +15,7 @@
     <form hx-post="/pi-groups"
           hx-target="#pg-tbody"
           hx-swap="afterbegin"
-          hx-on::after-request="this.reset(); document.getElementById('user-fill-hint').textContent=''">
+          hx-on::after-request="this.reset(); this.querySelector('[data-pi-fill-hint]').textContent=''">
 
       <div class="row g-2 mb-2">
         <div class="col-md-4">
@@ -25,19 +25,21 @@
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold mb-1">PI Name</label>
-          <input type="text" name="pi_name" id="add-pi-name" class="form-control"
-                 list="add-users-list"
+          <input type="text" name="pi_name" class="form-control"
+                 list="pg-users-list"
+                 data-pi-name-input
                  placeholder="Type to search existing users or enter new">
-          <datalist id="add-users-list">
+          <datalist id="pg-users-list">
             {% for u in all_users %}
               <option value="{{ u.first_name }} {{ u.last_name }}">
             {% endfor %}
           </datalist>
-          <div class="form-text" id="user-fill-hint"></div>
+          <div class="form-text" data-pi-fill-hint></div>
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold mb-1">PI Email</label>
-          <input type="text" name="pi_email" id="add-pi-email" class="form-control"
+          <input type="text" name="pi_email" class="form-control"
+                 data-pi-field="pi_email"
                  placeholder="email@example.com">
         </div>
       </div>
@@ -45,22 +47,26 @@
       <div class="row g-2 mb-3">
         <div class="col-md-5">
           <label class="form-label fw-semibold mb-1">Institution</label>
-          <input type="text" name="institution" id="add-institution" class="form-control"
+          <input type="text" name="institution" class="form-control"
+                 data-pi-field="institution"
                  placeholder="University / Lab name">
         </div>
         <div class="col-md-2">
           <label class="form-label fw-semibold mb-1">Country</label>
-          <input type="text" name="country" id="add-country" class="form-control"
+          <input type="text" name="country" class="form-control"
+                 data-pi-field="country"
                  maxlength="2" placeholder="US">
         </div>
         <div class="col-md-2">
           <label class="form-label fw-semibold mb-1">State</label>
-          <input type="text" name="state" id="add-state" class="form-control"
+          <input type="text" name="state" class="form-control"
+                 data-pi-field="state"
                  placeholder="IL">
         </div>
         <div class="col-md-3">
           <label class="form-label fw-semibold mb-1">ORCID</label>
-          <input type="text" name="orcid_id" id="add-orcid" class="form-control"
+          <input type="text" name="orcid_id" class="form-control"
+                 data-pi-field="orcid_id"
                  placeholder="0000-0000-0000-0000">
         </div>
       </div>
@@ -75,7 +81,7 @@
 <!-- PI Groups table -->
 <div class="card">
   <div class="card-header fw-semibold">
-    <i class="bi bi-list-ul me-1"></i>Existing PI Groups ({{ pi_groups | length }})
+    <i class="bi bi-list-ul me-1"></i>Existing PI Groups (<span id="pg-count">{{ pi_groups | length }}</span>)
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -105,46 +111,48 @@
   </div>
 </div>
 
-<!-- User lookup data for auto-fill -->
+<!-- User lookup data for auto-fill (always present for edit rows too) -->
 <script id="users-json" type="application/json">{{ all_users | tojson }}</script>
 
 <script>
 (function () {
   const users = JSON.parse(document.getElementById('users-json').textContent);
   const byName = {};
-  users.forEach(u => {
-    const full = (u.first_name + ' ' + u.last_name).trim();
+  users.forEach(function (u) {
+    var full = (u.first_name + ' ' + u.last_name).trim();
     if (full) byName[full] = u;
   });
 
-  function wireAutoFill(nameInputId, emailId, instId, countryId, stateId, orcidId, hintId) {
-    const nameInput = document.getElementById(nameInputId);
-    if (!nameInput) return;
-    nameInput.addEventListener('change', function () {
-      const u = byName[this.value.trim()];
-      if (u) {
-        if (emailId)   setField(emailId,   u.email       || '');
-        if (instId)    setField(instId,    u.institution || '');
-        if (countryId) setField(countryId, u.country     || '');
-        if (stateId)   setField(stateId,   u.state       || '');
-        if (orcidId)   setField(orcidId,   u.orcid_id    || '');
-        if (hintId) {
-          const el = document.getElementById(hintId);
-          if (el) el.textContent = u.institution
-            ? 'Auto-filled from known user.'
-            : 'User found but no institution on record — fill manually.';
-        }
-      }
-    });
-  }
+  // Delegated 'input' listener — fires for datalist selections AND free-typing.
+  // Works for both the add form and any edit rows swapped in via HTMX.
+  document.addEventListener('input', function (e) {
+    var input = e.target;
+    if (!input.hasAttribute('data-pi-name-input')) return;
 
-  function setField(id, val) {
-    const el = document.getElementById(id);
-    if (el && !el.value) el.value = val;
-  }
+    var u = byName[input.value.trim()];
+    if (!u) return;
 
-  wireAutoFill('add-pi-name', 'add-pi-email', 'add-institution',
-               'add-country', 'add-state', 'add-orcid', 'user-fill-hint');
+    var container = input.closest('tr, form');
+    if (!container) return;
+
+    function fill(field, val) {
+      var el = container.querySelector('[data-pi-field="' + field + '"]');
+      if (el && !el.value) el.value = val;
+    }
+
+    fill('pi_email',    u.email        || '');
+    fill('institution', u.institution  || '');
+    fill('country',     u.country      || '');
+    fill('state',       u.state        || '');
+    fill('orcid_id',    u.orcid_id     || '');
+
+    var hintEl = container.querySelector('[data-pi-fill-hint]');
+    if (hintEl) {
+      hintEl.textContent = u.institution
+        ? 'Auto-filled from known user.'
+        : 'User found but no institution on record — fill manually.';
+    }
+  });
 })();
 </script>
 {% endblock %}

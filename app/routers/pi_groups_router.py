@@ -72,9 +72,8 @@ def pi_group_edit_form(request: Request, name: str):
     pg = groups.get(name) or {"name": name, "pi_name": "", "pi_email": "",
                                "institution": "", "country": "", "state": "",
                                "orcid_id": "", "created_at": ""}
-    users = db.list_users_for_lookup()
     return templates.TemplateResponse("partials/pi_group_row_edit.html",
-                                      {"request": request, "pg": pg, "all_users": users})
+                                      {"request": request, "pg": pg})
 
 
 @router.get("/pi-groups/{name}/view", response_class=HTMLResponse)

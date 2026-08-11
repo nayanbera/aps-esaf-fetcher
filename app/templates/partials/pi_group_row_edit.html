@@ -5,34 +5,34 @@
         hx-swap="outerHTML"
         style="display:contents">
     <td>
-      <input type="text" name="pi_name" id="edit-pi-name-{{ loop.index | default(0) }}"
+      <input type="text" name="pi_name"
              value="{{ pg.pi_name }}" class="form-control form-control-sm"
-             list="edit-users-list-{{ loop.index | default(0) }}"
+             list="pg-users-list"
+             data-pi-name-input
              placeholder="Type to search users or enter new">
-      <datalist id="edit-users-list-{{ loop.index | default(0) }}">
-        {% for u in all_users %}
-          <option value="{{ u.first_name }} {{ u.last_name }}">
-        {% endfor %}
-      </datalist>
     </td>
     <td>
-      <input type="text" name="institution" id="edit-institution-{{ loop.index | default(0) }}"
+      <input type="text" name="institution"
              value="{{ pg.institution }}" class="form-control form-control-sm"
+             data-pi-field="institution"
              placeholder="Institution">
     </td>
     <td>
       <input type="text" name="country"
              value="{{ pg.country }}" class="form-control form-control-sm"
+             data-pi-field="country"
              maxlength="2" placeholder="US">
     </td>
     <td>
       <input type="text" name="state"
              value="{{ pg.state }}" class="form-control form-control-sm"
+             data-pi-field="state"
              placeholder="IL">
     </td>
     <td>
-      <input type="text" name="orcid_id" id="edit-orcid-{{ loop.index | default(0) }}"
+      <input type="text" name="orcid_id"
              value="{{ pg.orcid_id }}" class="form-control form-control-sm"
+             data-pi-field="orcid_id"
              placeholder="0000-0000-0000-0000">
       <input type="hidden" name="pi_email" value="{{ pg.pi_email }}">
     </td>
@@ -49,24 +49,3 @@
     </td>
   </form>
 </tr>
-
-<script>
-(function () {
-  const idx = '{{ loop.index | default(0) }}';
-  const users = JSON.parse(document.getElementById('users-json').textContent);
-  const byName = {};
-  users.forEach(u => {
-    byName[(u.first_name + ' ' + u.last_name).trim()] = u;
-  });
-  const nameEl = document.getElementById('edit-pi-name-' + idx);
-  if (!nameEl) return;
-  nameEl.addEventListener('change', function () {
-    const u = byName[this.value.trim()];
-    if (!u) return;
-    const inst  = document.getElementById('edit-institution-' + idx);
-    const orcid = document.getElementById('edit-orcid-' + idx);
-    if (inst  && !inst.value)  inst.value  = u.institution || '';
-    if (orcid && !orcid.value) orcid.value = u.orcid_id    || '';
-  });
-})();
-</script>

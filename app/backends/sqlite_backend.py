@@ -357,13 +357,13 @@ class SQLiteESAFRepository(ESAFRepository):
             return cur.rowcount > 0
 
     def list_users_for_lookup(self, q: str = "") -> list[dict]:
+        fields = ("badge", "first_name", "last_name", "institution",
+                  "country", "state", "email", "orcid_id")
         with self._db() as conn:
             if q:
                 pat = f"%{q}%"
                 rows = conn.execute(
-                    """SELECT badge, first_name, last_name, institution,
-                              country, state, email, orcid_id
-                       FROM users
+                    """SELECT * FROM users
                        WHERE (first_name || ' ' || last_name) LIKE ?
                           OR last_name LIKE ? OR email LIKE ?
                        ORDER BY last_name, first_name LIMIT 50""",
@@ -371,11 +371,9 @@ class SQLiteESAFRepository(ESAFRepository):
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    """SELECT badge, first_name, last_name, institution,
-                              country, state, email, orcid_id
-                       FROM users ORDER BY last_name, first_name LIMIT 500""",
+                    "SELECT * FROM users ORDER BY last_name, first_name LIMIT 500",
                 ).fetchall()
-            return [dict(r) for r in rows]
+            return [{f: dict(r).get(f, "") for f in fields} for r in rows]
 
     def upsert_esaf(self, data: dict, now: str) -> str:
         with self._db() as conn:
