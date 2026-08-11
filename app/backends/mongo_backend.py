@@ -595,6 +595,14 @@ class MongoESAFRepository(ESAFRepository):
         )
         return cycles
 
+    def rename_pi_group(self, old_name: str, new_name: str) -> None:
+        self._pi_groups().update_one(
+            {"name": old_name}, {"$set": {"name": new_name, "updated_at": _now_iso()}}
+        )
+        self._esafs().update_many(
+            {"pi_group": old_name}, {"$set": {"pi_group": new_name, "updated_at": _now_iso()}}
+        )
+
     def list_distinct_institutions(self) -> list[str]:
         db = self._client[self._db_name]
         from_users = db["users"].distinct("institution")

@@ -1,5 +1,9 @@
 <tr id="pg-row-{{ pg.name | urlencode }}">
-  <td class="fw-semibold">{{ pg.name }}</td>
+  <td>
+    <input type="text" name="new_name"
+           value="{{ pg.name }}" class="form-control form-control-sm fw-semibold"
+           required placeholder="Group name">
+  </td>
   <td>
     <input type="text" name="pi_name"
            value="{{ pg.pi_name }}" class="form-control form-control-sm"

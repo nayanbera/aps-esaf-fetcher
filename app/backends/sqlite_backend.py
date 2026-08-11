@@ -917,6 +917,15 @@ class SQLiteESAFRepository(ESAFRepository):
             ).fetchall()
         return [r[0] for r in rows]
 
+    def rename_pi_group(self, old_name: str, new_name: str) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE pi_groups SET name = ? WHERE name = ?", (new_name, old_name)
+            )
+            conn.execute(
+                "UPDATE esafs SET pi_group = ? WHERE pi_group = ?", (new_name, old_name)
+            )
+
     def list_distinct_institutions(self) -> list[str]:
         with self._db() as conn:
             rows = conn.execute("""

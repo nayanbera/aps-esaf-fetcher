@@ -96,6 +96,10 @@ def clear_pi_group_assignments(group_name: str) -> int:
     return _r().clear_pi_group_assignments(group_name)
 
 
+def rename_pi_group(old_name: str, new_name: str) -> None:
+    _r().rename_pi_group(old_name, new_name)
+
+
 def upsert_esaf(data: dict, now: str) -> str:
     return _r().upsert_esaf(data, now)
 

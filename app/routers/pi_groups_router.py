@@ -125,7 +125,8 @@ def clear_pi_group_assignments(name: str):
 @router.post("/pi-groups/{name}", response_class=HTMLResponse)
 def update_pi_group(
     request:     Request,
-    name:        str,
+    name:        str,           # old name from URL path
+    new_name:    str = Form(""),
     pi_name:     str = Form(""),
     pi_email:    str = Form(""),
     institution: str = Form(""),
@@ -133,11 +134,19 @@ def update_pi_group(
     state:       str = Form(""),
     orcid_id:    str = Form(""),
 ):
+    new_name = new_name.strip() or name
+    if not new_name:
+        raise HTTPException(422, "PI Group name is required")
+    if new_name != name:
+        try:
+            db.rename_pi_group(name, new_name)
+        except Exception:
+            raise HTTPException(409, f"A PI Group named '{new_name}' already exists.")
     pi_name = pi_name.strip()
-    db.upsert_pi_group(name, pi_name, pi_email.strip(),
+    db.upsert_pi_group(new_name, pi_name, pi_email.strip(),
                        institution.strip(), country.strip().upper(),
                        state.strip(), orcid_id.strip())
-    pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email.strip(),
+    pg = {"name": new_name, "pi_name": pi_name, "pi_email": pi_email.strip(),
           "institution": institution.strip(), "country": country.strip().upper(),
           "state": state.strip(), "orcid_id": orcid_id.strip()}
     return templates.TemplateResponse("partials/pi_group_row_view.html",

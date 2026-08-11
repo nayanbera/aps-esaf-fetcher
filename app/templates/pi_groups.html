@@ -149,8 +149,15 @@
       method:  'POST',
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body:    params.toString(),
-    }).then(function (r) { return r.text(); })
-      .then(function (html) {
+    }).then(function (r) {
+      if (!r.ok) {
+        r.json().then(function (j) { alert(j.detail || 'Save failed.'); })
+               .catch(function () { alert('Save failed (' + r.status + ').'); });
+        return null;
+      }
+      return r.text();
+    }).then(function (html) {
+        if (!html) return;
         var row  = document.getElementById(rowId);
         var temp = document.createElement('tbody');
         temp.innerHTML = html;

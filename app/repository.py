@@ -199,6 +199,11 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
+    def rename_pi_group(self, old_name: str, new_name: str) -> None:
+        """Rename a PI group and update pi_group references on all linked ESAFs."""
+        ...
+
+    @abstractmethod
     def list_distinct_institutions(self) -> list[str]:
         """Return sorted distinct institution names from users, esafs, and pi_groups."""
         ...
