@@ -89,7 +89,7 @@
       <table class="table table-sm mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Badge</th><th>Name</th><th>Institution</th><th>Email</th><th>Role</th>
+            <th>Badge</th><th>Name</th><th>Institution</th><th>Country</th><th>State</th><th>Email</th><th>Role</th>
           </tr>
         </thead>
         <tbody>
@@ -98,6 +98,8 @@
             <td><code>{{ u.badge }}</code></td>
             <td>{{ u.first_name }} {{ u.last_name }}</td>
             <td>{{ u.institution or '—' }}</td>
+            <td>{{ u.country or '—' }}</td>
+            <td>{{ u.state or '—' }}</td>
             <td>{{ u.email or '—' }}</td>
             <td>
               {% if u.role == 'pi' %}

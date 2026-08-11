@@ -60,16 +60,17 @@ def _extract_esaf(raw: Any) -> dict:
         is_pi      = pi_flag in ("yes", "y", "true", "1")
         role       = "pi" if is_pi else "user"
 
-        institution = lookup_by_email(email)
+        affil = lookup_by_email(email)
         users.append({
             "badge": badge, "first_name": first_name, "last_name": last_name,
-            "institution": institution, "email": email, "role": role,
+            "institution": affil["institution"], "country": affil["country"],
+            "state": affil["state"], "email": email, "role": role,
             "raw_json": dict(u) if not isinstance(u, dict) else u,
         })
         if is_pi and not pi_badge:
-            pi_badge        = badge
-            pi_name         = f"{first_name} {last_name}".strip()
-            pi_institution  = institution
+            pi_badge       = badge
+            pi_name        = f"{first_name} {last_name}".strip()
+            pi_institution = affil["institution"]
 
     if not pi_badge:
         pi_institution = ""

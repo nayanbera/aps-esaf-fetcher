@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS users (
     first_name    TEXT,
     last_name     TEXT,
     institution   TEXT,
+    country       TEXT DEFAULT '',
+    state         TEXT DEFAULT '',
     email         TEXT,
     raw_json      TEXT
 );
@@ -137,6 +139,15 @@ class SQLiteESAFRepository(ESAFRepository):
             ]:
                 try:
                     conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+            for col, defn in [
+                ("country", "TEXT DEFAULT ''"),
+                ("state",   "TEXT DEFAULT ''"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE users ADD COLUMN {col} {defn}")
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
@@ -282,10 +293,11 @@ class SQLiteESAFRepository(ESAFRepository):
             for u in data.get("users", []):
                 conn.execute(
                     """INSERT OR REPLACE INTO users
-                       (badge, first_name, last_name, institution, email, raw_json)
-                       VALUES (?,?,?,?,?,?)""",
+                       (badge, first_name, last_name, institution, country, state, email, raw_json)
+                       VALUES (?,?,?,?,?,?,?,?)""",
                     (u["badge"], u["first_name"], u["last_name"],
-                     u["institution"], u["email"], json.dumps(u["raw_json"])),
+                     u["institution"], u.get("country", ""), u.get("state", ""),
+                     u["email"], json.dumps(u["raw_json"])),
                 )
                 conn.execute(
                     "INSERT OR IGNORE INTO esaf_users (esaf_id, badge, role) VALUES (?,?,?)",
