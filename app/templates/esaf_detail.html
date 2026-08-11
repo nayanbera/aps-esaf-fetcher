@@ -256,7 +256,14 @@
               hx-post="/esafs/{{ esaf.esaf_id }}/upload-pdf"
               hx-target="#pdf-upload-result"
               hx-swap="innerHTML"
-              hx-encoding="multipart/form-data">
+              hx-encoding="multipart/form-data"
+              hx-on::after-request="
+                if (event.detail.successful) {
+                  setTimeout(function() {
+                    bootstrap.Modal.getInstance(document.getElementById('pdfUploadModal')).hide();
+                    location.reload();
+                  }, 1400);
+                }">
           <div class="mb-3">
             <input type="file" name="pdf_file" accept=".pdf"
                    class="form-control" required>
