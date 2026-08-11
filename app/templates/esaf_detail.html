@@ -109,13 +109,16 @@
               {% endif %}
             </td>
             <td>
-              {% if not u.institution and u.email and '@' in u.email %}
+              {% if u.email and '@' in u.email and (not u.institution or not u.country or not u.state) %}
                 <button class="btn btn-outline-secondary btn-sm py-0"
-                        data-badge="{{ u.badge }}"
-                        data-email="{{ u.email }}"
                         data-domain="{{ u.email.split('@')[1] }}"
+                        data-institution="{{ u.institution or '' }}"
+                        data-country="{{ u.country or '' }}"
+                        data-state="{{ u.state or '' }}"
                         data-bs-toggle="modal"
-                        data-bs-target="#affiliationModal">Set</button>
+                        data-bs-target="#affiliationModal">
+                  {% if not u.institution %}Set{% else %}Complete{% endif %}
+                </button>
               {% else %}
                 &nbsp;
               {% endif %}
@@ -183,9 +186,9 @@ document.getElementById('affiliationModal').addEventListener('show.bs.modal', fu
   var btn = e.relatedTarget;
   document.getElementById('aff-domain').textContent = btn.dataset.domain;
   document.getElementById('aff-domain-val').value = btn.dataset.domain;
-  document.getElementById('aff-institution').value = '';
-  document.getElementById('aff-country').value = '';
-  document.getElementById('aff-state').value = '';
+  document.getElementById('aff-institution').value = btn.dataset.institution || '';
+  document.getElementById('aff-country').value = btn.dataset.country || '';
+  document.getElementById('aff-state').value = btn.dataset.state || '';
   document.getElementById('aff-result').textContent = '';
 });
 document.getElementById('aff-save').addEventListener('click', function() {
