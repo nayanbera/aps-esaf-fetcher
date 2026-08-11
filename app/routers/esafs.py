@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Request, Form, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from typing import Annotated
 
 from .. import config, db
@@ -165,6 +165,18 @@ async def esaf_save(request: Request, esaf_id: str):
 # ---------------------------------------------------------------------------
 # ESAF PDF upload
 # ---------------------------------------------------------------------------
+
+@router.get("/esafs/{esaf_id}/pdf")
+def view_esaf_pdf(esaf_id: str):
+    esaf = db.get_esaf(esaf_id)
+    if esaf is None:
+        raise HTTPException(404, "ESAF not found")
+    pdf_path = esaf.get("pdf_path", "")
+    if not pdf_path or not Path(pdf_path).is_file():
+        raise HTTPException(404, "No PDF stored for this ESAF")
+    return FileResponse(pdf_path, media_type="application/pdf",
+                        filename=f"ESAF-{esaf_id}.pdf")
+
 
 @router.post("/esafs/{esaf_id}/upload-pdf", response_class=HTMLResponse)
 async def upload_esaf_pdf(request: Request, esaf_id: str, pdf_file: UploadFile = File(...)):

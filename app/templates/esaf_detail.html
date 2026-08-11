@@ -26,9 +26,10 @@
       </a>
     {% endif %}
     {% if esaf.pdf_path %}
-      <span class="badge bg-light text-muted border ms-1" title="PDF stored">
+      <a href="/esafs/{{ esaf.esaf_id }}/pdf" target="_blank" rel="noopener"
+         class="badge bg-light text-muted border ms-1 text-decoration-none" title="View PDF">
         <i class="bi bi-file-earmark-pdf"></i> PDF
-      </span>
+      </a>
     {% endif %}
   </div>
   <button class="btn btn-outline-secondary btn-sm"

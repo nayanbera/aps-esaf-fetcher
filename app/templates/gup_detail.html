@@ -50,7 +50,15 @@
             <tr><th>Submitted</th><td>{{ gup.submitted_at or '—' }}</td></tr>
             <tr><th>Beamlines</th><td>{{ gup.beamlines or '—' }}</td></tr>
             {% if gup.pdf_path %}
-            <tr><th>PDF</th><td><span class="badge bg-success"><i class="bi bi-file-earmark-pdf me-1"></i>Stored</span></td></tr>
+            <tr>
+              <th>PDF</th>
+              <td>
+                <a href="/gups/{{ gup.gup_id }}/pdf" target="_blank" rel="noopener"
+                   class="btn btn-outline-secondary btn-sm py-0">
+                  <i class="bi bi-file-earmark-pdf me-1"></i>View PDF
+                </a>
+              </td>
+            </tr>
             {% endif %}
           </tbody>
         </table>

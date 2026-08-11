@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from .. import config, db
 from ..gup_pdf_parser import parse_gup_pdf
@@ -213,6 +213,22 @@ async def bulk_import_gups(request: Request, folder_path: str = Form(...)):
             f'<div class="alert alert-warning">{msg}<br>Errors:{err_html}</div>'
         )
     return HTMLResponse(f'<div class="alert alert-success">{msg}</div>')
+
+
+# ---------------------------------------------------------------------------
+# Serve stored GUP PDF
+# ---------------------------------------------------------------------------
+
+@router.get("/gups/{gup_id}/pdf")
+def view_gup_pdf(gup_id: str):
+    gup = db.get_gup(gup_id)
+    if gup is None:
+        raise HTTPException(404, f"GUP {gup_id} not found")
+    pdf_path = gup.get("pdf_path", "")
+    if not pdf_path or not Path(pdf_path).is_file():
+        raise HTTPException(404, "No PDF stored for this GUP")
+    return FileResponse(pdf_path, media_type="application/pdf",
+                        filename=f"GUP-{gup_id}.pdf")
 
 
 # ---------------------------------------------------------------------------
