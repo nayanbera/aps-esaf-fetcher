@@ -61,6 +61,7 @@
         <th>Title</th>
         <th>PI</th>
         <th>Institution</th>
+        <th>PI Group</th>
         <th>Beamline</th>
         <th>Year</th>
         <th>Status</th>
@@ -74,6 +75,7 @@
         <td class="text-truncate" style="max-width:280px" title="{{ e.title }}">{{ e.title }}</td>
         <td>{{ e.pi_name or '—' }}</td>
         <td class="text-truncate" style="max-width:160px">{{ e.pi_institution or '—' }}</td>
+        <td class="text-truncate" style="max-width:140px">{{ e.pi_group or '' }}</td>
         <td>{{ e.beamline or '—' }}</td>
         <td>{{ e.year or '—' }}</td>
         <td>

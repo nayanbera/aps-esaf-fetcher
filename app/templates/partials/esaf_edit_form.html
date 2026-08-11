@@ -9,6 +9,22 @@
           hx-swap="innerHTML">
 
       <div class="mb-3">
+        <label class="form-label fw-semibold">
+          <i class="bi bi-person-badge me-1"></i>PI Group
+        </label>
+        <input type="text" name="pi_group" class="form-control"
+               list="pi-groups-list"
+               placeholder="Enter or select the PI of this experimental group"
+               value="{{ esaf.pi_group or '' }}">
+        <datalist id="pi-groups-list">
+          {% for pg in pi_groups %}
+            <option value="{{ pg }}">
+          {% endfor %}
+        </datalist>
+        <div class="form-text">The actual PI of the experimental group (may not be listed in the ESAF). Saved entries appear as autocomplete options.</div>
+      </div>
+
+      <div class="mb-3">
         <label class="form-label fw-semibold">Notes</label>
         <textarea name="notes" class="form-control" rows="4">{{ esaf.notes or '' }}</textarea>
       </div>

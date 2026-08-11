@@ -44,7 +44,16 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
-    def update_esaf_fields(self, esaf_id: str, notes: str, custom_fields: dict) -> bool: ...
+    def update_esaf_fields(
+        self, esaf_id: str, notes: str, custom_fields: dict, pi_group: str = ""
+    ) -> bool: ...
+
+    # ------------------------------------------------------------------
+    # PI Groups
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def list_pi_groups(self) -> list[str]: ...
 
     @abstractmethod
     def upsert_esaf(self, data: dict, now: str) -> str:

@@ -95,6 +95,11 @@ def esaf_detail(request: Request, esaf_id: str):
 # Web UI — inline edit (HTMX)
 # ---------------------------------------------------------------------------
 
+@router.get("/api/pi-groups")
+def api_list_pi_groups() -> list[str]:
+    return db.list_pi_groups()
+
+
 @router.get("/esafs/{esaf_id}/edit", response_class=HTMLResponse)
 def esaf_edit_form(request: Request, esaf_id: str):
     """Return an HTMX partial: the edit form for notes + custom fields."""
@@ -102,8 +107,10 @@ def esaf_edit_form(request: Request, esaf_id: str):
     if esaf is None:
         raise HTTPException(404, "ESAF not found")
     field_defs = db.list_field_definitions()
+    pi_groups  = db.list_pi_groups()
     return templates.TemplateResponse("partials/esaf_edit_form.html", {
         "request": request, "esaf": esaf, "field_defs": field_defs,
+        "pi_groups": pi_groups,
     })
 
 
@@ -127,7 +134,8 @@ async def esaf_save(request: Request, esaf_id: str):
         raise HTTPException(404, "ESAF not found")
 
     form = await request.form()
-    notes = str(form.get("notes", ""))
+    notes    = str(form.get("notes", ""))
+    pi_group = str(form.get("pi_group", "")).strip()
 
     field_defs  = db.list_field_definitions()
     custom_fields = dict(esaf.get("custom_fields") or {})
@@ -136,7 +144,7 @@ async def esaf_save(request: Request, esaf_id: str):
         if key in form:
             custom_fields[key] = str(form[key])
 
-    db.update_esaf_fields(esaf_id, notes, custom_fields)
+    db.update_esaf_fields(esaf_id, notes, custom_fields, pi_group)
 
     # Return updated detail partial for HTMX swap
     esaf = db.get_esaf(esaf_id)

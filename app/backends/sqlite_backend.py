@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS esafs (
     pi_badge      TEXT,
     pi_name       TEXT,
     pi_institution TEXT DEFAULT '',
+    pi_group      TEXT DEFAULT '',
     raw_json      TEXT,
     notes         TEXT DEFAULT '',
     custom_fields TEXT DEFAULT '{}',
@@ -75,6 +76,11 @@ CREATE TABLE IF NOT EXISTS sync_log (
     records_added   INTEGER DEFAULT 0,
     records_updated INTEGER DEFAULT 0,
     error           TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pi_groups (
+    name       TEXT PRIMARY KEY,
+    created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS domain_overrides (
@@ -144,6 +150,7 @@ class SQLiteESAFRepository(ESAFRepository):
                 ("sector",         "TEXT DEFAULT ''"),
                 ("doi",            "TEXT DEFAULT ''"),
                 ("pi_institution", "TEXT DEFAULT ''"),
+                ("pi_group",       "TEXT DEFAULT ''"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
@@ -269,14 +276,29 @@ class SQLiteESAFRepository(ESAFRepository):
             ]
         return {"years": years, "beamlines": beamlines, "statuses": statuses}
 
-    def update_esaf_fields(self, esaf_id: str, notes: str, custom_fields: dict) -> bool:
+    def update_esaf_fields(
+        self, esaf_id: str, notes: str, custom_fields: dict, pi_group: str = ""
+    ) -> bool:
         with self._db() as conn:
             cur = conn.execute(
-                """UPDATE esafs SET notes=?, custom_fields=?, updated_at=datetime('now')
-                   WHERE esaf_id=?""",
-                (notes, json.dumps(custom_fields), esaf_id),
+                """UPDATE esafs SET notes=?, custom_fields=?, pi_group=?,
+                   updated_at=datetime('now') WHERE esaf_id=?""",
+                (notes, json.dumps(custom_fields), pi_group, esaf_id),
             )
+            if pi_group.strip():
+                conn.execute(
+                    "INSERT OR IGNORE INTO pi_groups (name) VALUES (?)",
+                    (pi_group.strip(),),
+                )
         return cur.rowcount > 0
+
+    def list_pi_groups(self) -> list[str]:
+        with self._db() as conn:
+            return [
+                r[0] for r in conn.execute(
+                    "SELECT name FROM pi_groups ORDER BY name"
+                ).fetchall()
+            ]
 
     def upsert_esaf(self, data: dict, now: str) -> str:
         with self._db() as conn:

@@ -33,6 +33,9 @@ class MongoESAFRepository(ESAFRepository):
     def _domain_overrides(self) -> Collection:
         return self._client[self._db_name]["domain_overrides"]
 
+    def _pi_groups(self) -> Collection:
+        return self._client[self._db_name]["pi_groups"]
+
     @staticmethod
     def _clean(doc: dict) -> dict:
         doc.pop("_id", None)
@@ -50,6 +53,7 @@ class MongoESAFRepository(ESAFRepository):
         self._esafs().create_index([("users.badge", ASCENDING)])
         self._field_defs().create_index([("name", ASCENDING)], unique=True)
         self._domain_overrides().create_index([("domain", ASCENDING)], unique=True)
+        self._pi_groups().create_index([("name", ASCENDING)], unique=True)
 
     # ------------------------------------------------------------------
     # ESAFs
@@ -125,16 +129,30 @@ class MongoESAFRepository(ESAFRepository):
         statuses  = sorted(s for s in self._esafs().distinct("status")   if s)
         return {"years": years, "beamlines": beamlines, "statuses": statuses}
 
-    def update_esaf_fields(self, esaf_id: str, notes: str, custom_fields: dict) -> bool:
+    def update_esaf_fields(
+        self, esaf_id: str, notes: str, custom_fields: dict, pi_group: str = ""
+    ) -> bool:
         result = self._esafs().update_one(
             {"esaf_id": esaf_id},
             {"$set": {
                 "notes": notes,
                 "custom_fields": custom_fields,
+                "pi_group": pi_group,
                 "updated_at": _now_iso(),
             }},
         )
+        if pi_group.strip():
+            self._pi_groups().update_one(
+                {"name": pi_group.strip()},
+                {"$setOnInsert": {"name": pi_group.strip()}},
+                upsert=True,
+            )
         return result.matched_count > 0
+
+    def list_pi_groups(self) -> list[str]:
+        return sorted(
+            d["name"] for d in self._pi_groups().find({}, {"name": 1})
+        )
 
     def upsert_esaf(self, data: dict, now: str) -> str:
         esaf_id = data["esaf_id"]
@@ -166,12 +184,14 @@ class MongoESAFRepository(ESAFRepository):
         if existing:
             doc["notes"]         = existing.get("notes", "")
             doc["custom_fields"] = existing.get("custom_fields", {})
+            doc["pi_group"]      = existing.get("pi_group", "")
             doc["created_at"]    = existing.get("created_at", now)
             self._esafs().replace_one({"esaf_id": esaf_id}, doc)
             return "updated"
         else:
             doc["notes"]         = ""
             doc["custom_fields"] = {}
+            doc["pi_group"]      = ""
             doc["created_at"]    = now
             self._esafs().insert_one(doc)
             return "added"

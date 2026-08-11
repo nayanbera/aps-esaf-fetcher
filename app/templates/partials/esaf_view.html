@@ -10,6 +10,13 @@
     </button>
   </div>
   <div class="card-body">
+    {% if esaf.pi_group %}
+      <div class="mb-3">
+        <span class="fw-semibold"><i class="bi bi-person-badge me-1"></i>PI Group:</span>
+        <span class="ms-1">{{ esaf.pi_group }}</span>
+      </div>
+    {% endif %}
+
     {% if esaf.notes %}
       <p class="mb-{% if field_defs %}3{% else %}0{% endif %} white-space-pre-wrap">{{ esaf.notes }}</p>
     {% else %}

@@ -61,8 +61,14 @@ def get_filter_options() -> dict:
     return _r().get_filter_options()
 
 
-def update_esaf_fields(esaf_id: str, notes: str, custom_fields: dict) -> bool:
-    return _r().update_esaf_fields(esaf_id, notes, custom_fields)
+def update_esaf_fields(
+    esaf_id: str, notes: str, custom_fields: dict, pi_group: str = ""
+) -> bool:
+    return _r().update_esaf_fields(esaf_id, notes, custom_fields, pi_group)
+
+
+def list_pi_groups() -> list[str]:
+    return _r().list_pi_groups()
 
 
 def upsert_esaf(data: dict, now: str) -> str:
