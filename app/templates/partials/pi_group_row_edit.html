@@ -45,12 +45,12 @@
     <button type="button" class="btn btn-success btn-sm py-0 me-1"
             data-pg-save
             data-pg-save-row="pg-row-{{ pg.name | urlencode }}"
-            data-pg-save-url="{{ pg.name | urlencode }}">
+            data-pg-save-url="{{ pg.name | urlencode | replace('+', '%20') }}">
       <i class="bi bi-check-lg"></i>
     </button>
     <button type="button" class="btn btn-outline-secondary btn-sm py-0"
-            hx-get="/pi-groups/{{ pg.name | urlencode }}/view"
-            hx-target="#pg-row-{{ pg.name | urlencode }}"
+            hx-get="/pi-groups/{{ pg.name | urlencode | replace('+', '%20') }}/view"
+            hx-target="closest tr"
             hx-swap="outerHTML">
       <i class="bi bi-x-lg"></i>
     </button>

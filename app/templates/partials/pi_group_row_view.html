@@ -11,21 +11,19 @@
       —
     {% endif %}
   </td>
-  <td>
-    <span id="pg-link-result-{{ pg.name | urlencode }}" class="small"></span>
-  </td>
   <td class="text-end text-nowrap">
+    <span class="small me-2 pg-row-result"></span>
     {% if pg.pi_name %}
     <button class="btn btn-outline-info btn-sm py-0 me-1"
-            hx-post="/pi-groups/{{ pg.name | urlencode }}/propagate"
-            hx-target="#pg-link-result-{{ pg.name | urlencode }}"
+            hx-post="/pi-groups/{{ pg.name | urlencode | replace('+', '%20') }}/propagate"
+            hx-target="previous span"
             hx-swap="innerHTML"
             title="Link unassigned ESAFs where PI name and institution match">
       <i class="bi bi-link-45deg"></i>
     </button>
     <button class="btn btn-outline-warning btn-sm py-0 me-1"
-            hx-post="/pi-groups/{{ pg.name | urlencode }}/clear-assignments"
-            hx-target="#pg-link-result-{{ pg.name | urlencode }}"
+            hx-post="/pi-groups/{{ pg.name | urlencode | replace('+', '%20') }}/clear-assignments"
+            hx-target="previous span"
             hx-swap="innerHTML"
             hx-confirm="Clear all ESAF assignments for '{{ pg.name }}'? This removes the PI Group from every ESAF currently linked to it."
             title="Remove this PI Group from all linked ESAFs">
@@ -33,14 +31,14 @@
     </button>
     {% endif %}
     <button class="btn btn-outline-secondary btn-sm py-0 me-1"
-            hx-get="/pi-groups/{{ pg.name | urlencode }}/edit"
-            hx-target="#pg-row-{{ pg.name | urlencode }}"
+            hx-get="/pi-groups/{{ pg.name | urlencode | replace('+', '%20') }}/edit"
+            hx-target="closest tr"
             hx-swap="outerHTML">
       <i class="bi bi-pencil"></i>
     </button>
     <button class="btn btn-outline-danger btn-sm py-0"
-            hx-delete="/pi-groups/{{ pg.name | urlencode }}"
-            hx-target="#pg-row-{{ pg.name | urlencode }}"
+            hx-delete="/pi-groups/{{ pg.name | urlencode | replace('+', '%20') }}"
+            hx-target="closest tr"
             hx-swap="outerHTML"
             hx-confirm="Delete PI Group '{{ pg.name }}'?">
       <i class="bi bi-trash"></i>
