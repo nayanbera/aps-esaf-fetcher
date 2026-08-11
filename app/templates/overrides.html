@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Domain Overrides — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<h4 class="mb-1"><i class="bi bi-patch-check me-1"></i>Domain Affiliation Overrides</h4>
+<p class="text-muted small mb-4">
+  Manually map email domains to institution, country, and state.
+  Overrides take precedence over the automatic lookup and are applied to all
+  existing user records immediately on save.
+</p>
+
+<!-- Add new override form -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Add override</div>
+  <div class="card-body">
+    <form hx-post="/api/domain-overrides"
+          hx-target="#overrides-tbody"
+          hx-swap="afterbegin"
+          hx-on::after-request="this.reset()"
+          class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label mb-1 small">Domain</label>
+        <input type="text" name="domain" class="form-control form-control-sm"
+               placeholder="e.g. somelab.org" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label mb-1 small">Institution</label>
+        <input type="text" name="institution" class="form-control form-control-sm"
+               placeholder="Full institution name">
+      </div>
+      <div class="col-md-1">
+        <label class="form-label mb-1 small">Country</label>
+        <input type="text" name="country" class="form-control form-control-sm"
+               placeholder="US" maxlength="2">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1 small">State / Province</label>
+        <input type="text" name="state" class="form-control form-control-sm"
+               placeholder="IL">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i>Add
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Overrides table -->
+<div class="card">
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <span>Saved overrides</span>
+    <span class="badge bg-secondary">{{ overrides | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:18%">Domain</th>
+            <th>Institution</th>
+            <th style="width:7%">Country</th>
+            <th style="width:9%">State</th>
+            <th style="width:10%">Added</th>
+            <th style="width:10%"></th>
+          </tr>
+        </thead>
+        <tbody id="overrides-tbody">
+          {% for o in overrides %}
+            {% include "partials/override_row_view.html" %}
+          {% else %}
+            <tr id="no-overrides-row">
+              <td colspan="6" class="text-center text-muted py-4">No overrides yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// After the Add form inserts a new row via HTMX, remove the "no overrides" placeholder if present
+document.body.addEventListener('htmx:afterSwap', function(e) {
+  var placeholder = document.getElementById('no-overrides-row');
+  if (placeholder) placeholder.remove();
+});
+</script>
+{% endblock %}

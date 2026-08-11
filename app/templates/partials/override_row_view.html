@@ -1,0 +1,22 @@
+<tr id="override-row-{{ o.domain }}">
+  <td><code>{{ o.domain }}</code></td>
+  <td>{{ o.institution or '—' }}</td>
+  <td>{{ o.country or '—' }}</td>
+  <td>{{ o.state or '—' }}</td>
+  <td class="text-muted small">{{ (o.created_at or '')[:10] }}</td>
+  <td class="text-end">
+    <button class="btn btn-outline-secondary btn-sm py-0 me-1"
+            hx-get="/overrides/{{ o.domain }}/edit"
+            hx-target="#override-row-{{ o.domain }}"
+            hx-swap="outerHTML">
+      <i class="bi bi-pencil"></i>
+    </button>
+    <button class="btn btn-outline-danger btn-sm py-0"
+            hx-delete="/overrides/{{ o.domain }}"
+            hx-target="#override-row-{{ o.domain }}"
+            hx-swap="outerHTML"
+            hx-confirm="Delete override for {{ o.domain }}?">
+      <i class="bi bi-trash"></i>
+    </button>
+  </td>
+</tr>
