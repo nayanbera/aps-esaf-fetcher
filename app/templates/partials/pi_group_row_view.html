@@ -5,12 +5,8 @@
   <td>{{ pg.country or '—' }}</td>
   <td>{{ pg.state or '—' }}</td>
   <td>
-    {% if pg.orcid_id %}
-      <a href="https://orcid.org/{{ pg.orcid_id }}" target="_blank" rel="noopener"
-         class="small font-monospace text-nowrap">
-        <img src="https://orcid.org/sites/default/files/images/orcid_16x16.png"
-             width="13" height="13" alt="ORCID" class="me-1">{{ pg.orcid_id }}
-      </a>
+    {% if pg.pi_email %}
+      <a href="mailto:{{ pg.pi_email }}" class="small">{{ pg.pi_email }}</a>
     {% else %}
       —
     {% endif %}
