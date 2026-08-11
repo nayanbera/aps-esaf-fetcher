@@ -41,10 +41,31 @@
   {% endif %}
 
   {% if not running %}
-    <form hx-post="/sync/trigger" hx-target="#sync-status" hx-swap="outerHTML">
-      <button type="submit" class="btn btn-primary">
-        <i class="bi bi-arrow-repeat me-1"></i>Sync Now
-      </button>
+    <form hx-post="/sync/trigger" hx-target="#sync-status" hx-swap="outerHTML"
+          class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label mb-1 small fw-semibold">From year</label>
+        <select name="from_year" class="form-select form-select-sm">
+          {% for y in year_choices %}
+            <option value="{{ y }}"
+              {% if y == (current_year - 1) %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label mb-1 small fw-semibold">To year</label>
+        <select name="to_year" class="form-select form-select-sm">
+          {% for y in year_choices %}
+            <option value="{{ y }}"
+              {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-arrow-repeat me-1"></i>Sync Now
+        </button>
+      </div>
     </form>
   {% endif %}
 </div>
