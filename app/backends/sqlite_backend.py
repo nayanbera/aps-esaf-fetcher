@@ -440,22 +440,40 @@ class SQLiteESAFRepository(ESAFRepository):
             cur = conn.execute("DELETE FROM pi_groups WHERE name = ?", (name,))
             return cur.rowcount > 0
 
-    def propagate_pi_group_by_pi_name(self, group_name: str, pi_name: str) -> int:
+    def propagate_pi_group_by_pi_name(
+        self, group_name: str, pi_name: str, institution: str = ""
+    ) -> int:
+        import re as _re
         if not pi_name.strip():
             return 0
-        # Extract last name to use as the matching token.
-        # Handles "Last, First" and "First Last" formats.
-        name = pi_name.strip()
-        last = name.split(",")[0].strip() if "," in name else name.split()[-1].strip()
-        if not last:
+        # Require ALL name tokens (≥2 chars) to appear in pi_name
+        tokens = [t for t in _re.split(r"[\s,\.]+", pi_name.strip()) if len(t) >= 2]
+        if not tokens:
             return 0
+        clauses = ["(pi_group = '' OR pi_group IS NULL)"]
+        params: list = []
+        for token in tokens:
+            clauses.append("pi_name LIKE ? COLLATE NOCASE")
+            params.append(f"%{token}%")
+        # Institution: match on first significant word (≥4 chars)
+        if institution.strip():
+            inst_words = [w for w in institution.strip().split() if len(w) >= 4]
+            if inst_words:
+                clauses.append("pi_institution LIKE ? COLLATE NOCASE")
+                params.append(f"%{inst_words[0]}%")
+        where = " AND ".join(clauses)
         with self._db() as conn:
             cur = conn.execute(
-                """UPDATE esafs
-                   SET pi_group = ?, updated_at = datetime('now')
-                   WHERE (pi_group = '' OR pi_group IS NULL)
-                     AND pi_name LIKE ? COLLATE NOCASE""",
-                (group_name, f"%{last}%"),
+                f"UPDATE esafs SET pi_group=?, updated_at=datetime('now') WHERE {where}",
+                [group_name] + params,
+            )
+        return cur.rowcount
+
+    def clear_pi_group_assignments(self, group_name: str) -> int:
+        with self._db() as conn:
+            cur = conn.execute(
+                "UPDATE esafs SET pi_group='', updated_at=datetime('now') WHERE pi_group=?",
+                (group_name,),
             )
         return cur.rowcount
 

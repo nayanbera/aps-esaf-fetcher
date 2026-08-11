@@ -176,20 +176,37 @@ class MongoESAFRepository(ESAFRepository):
     def delete_pi_group(self, name: str) -> bool:
         return self._pi_groups().delete_one({"name": name}).deleted_count > 0
 
-    def propagate_pi_group_by_pi_name(self, group_name: str, pi_name: str) -> int:
+    def propagate_pi_group_by_pi_name(
+        self, group_name: str, pi_name: str, institution: str = ""
+    ) -> int:
+        import re as _re
         if not pi_name.strip():
             return 0
-        name = pi_name.strip()
-        last = name.split(",")[0].strip() if "," in name else name.split()[-1].strip()
-        if not last:
+        tokens = [t for t in _re.split(r"[\s,\.]+", pi_name.strip()) if len(t) >= 2]
+        if not tokens:
             return 0
-        import re as _re
+        query: dict = {
+            "$or": [{"pi_group": {"$in": ["", None]}}, {"pi_group": {"$exists": False}}],
+            "$and": [
+                {"pi_name": {"$regex": _re.escape(t), "$options": "i"}} for t in tokens
+            ],
+        }
+        if institution.strip():
+            inst_words = [w for w in institution.strip().split() if len(w) >= 4]
+            if inst_words:
+                query["pi_institution"] = {
+                    "$regex": _re.escape(inst_words[0]), "$options": "i"
+                }
         result = self._esafs().update_many(
-            {
-                "$or": [{"pi_group": {"$in": ["", None]}}, {"pi_group": {"$exists": False}}],
-                "pi_name": {"$regex": _re.escape(last), "$options": "i"},
-            },
+            query,
             {"$set": {"pi_group": group_name, "updated_at": _now_iso()}},
+        )
+        return result.modified_count
+
+    def clear_pi_group_assignments(self, group_name: str) -> int:
+        result = self._esafs().update_many(
+            {"pi_group": group_name},
+            {"$set": {"pi_group": "", "updated_at": _now_iso()}},
         )
         return result.modified_count
 

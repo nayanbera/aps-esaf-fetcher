@@ -56,8 +56,6 @@ def create_pi_group(
     db.upsert_pi_group(name, pi_name, pi_email.strip(),
                        institution.strip(), country.strip().upper(),
                        state.strip(), orcid_id.strip())
-    if pi_name:
-        db.propagate_pi_group_by_pi_name(name, pi_name)
     pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email.strip(),
           "institution": institution.strip(), "country": country.strip().upper(),
           "state": state.strip(), "orcid_id": orcid_id.strip(), "created_at": ""}
@@ -97,7 +95,7 @@ def propagate_pi_group(name: str):
         return HTMLResponse(
             '<span class="text-warning">No PI name set — cannot match ESAFs.</span>'
         )
-    count = db.propagate_pi_group_by_pi_name(name, pg["pi_name"])
+    count = db.propagate_pi_group_by_pi_name(name, pg["pi_name"], pg.get("institution", ""))
     if count:
         return HTMLResponse(
             f'<span class="text-success">'
@@ -106,6 +104,17 @@ def propagate_pi_group(name: str):
     return HTMLResponse(
         '<span class="text-muted">No unassigned ESAFs matched.</span>'
     )
+
+
+@router.post("/pi-groups/{name}/clear-assignments", response_class=HTMLResponse)
+def clear_pi_group_assignments(name: str):
+    count = db.clear_pi_group_assignments(name)
+    if count:
+        return HTMLResponse(
+            f'<span class="text-warning">'
+            f'<i class="bi bi-x-lg me-1"></i>Cleared {count} ESAF(s).</span>'
+        )
+    return HTMLResponse('<span class="text-muted">No ESAFs were assigned to this group.</span>')
 
 
 @router.post("/pi-groups/{name}", response_class=HTMLResponse)
@@ -123,8 +132,6 @@ def update_pi_group(
     db.upsert_pi_group(name, pi_name, pi_email.strip(),
                        institution.strip(), country.strip().upper(),
                        state.strip(), orcid_id.strip())
-    if pi_name:
-        db.propagate_pi_group_by_pi_name(name, pi_name)
     pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email.strip(),
           "institution": institution.strip(), "country": country.strip().upper(),
           "state": state.strip(), "orcid_id": orcid_id.strip()}

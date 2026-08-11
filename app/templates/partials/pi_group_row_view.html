@@ -20,8 +20,16 @@
             hx-post="/pi-groups/{{ pg.name | urlencode }}/propagate"
             hx-target="#pg-link-result-{{ pg.name | urlencode }}"
             hx-swap="innerHTML"
-            title="Link ESAFs whose PI matches '{{ pg.pi_name }}'">
+            title="Link unassigned ESAFs where PI name and institution match">
       <i class="bi bi-link-45deg"></i>
+    </button>
+    <button class="btn btn-outline-warning btn-sm py-0 me-1"
+            hx-post="/pi-groups/{{ pg.name | urlencode }}/clear-assignments"
+            hx-target="#pg-link-result-{{ pg.name | urlencode }}"
+            hx-swap="innerHTML"
+            hx-confirm="Clear all ESAF assignments for '{{ pg.name }}'? This removes the PI Group from every ESAF currently linked to it."
+            title="Remove this PI Group from all linked ESAFs">
+      <i class="bi bi-x-circle"></i>
     </button>
     {% endif %}
     <button class="btn btn-outline-secondary btn-sm py-0 me-1"

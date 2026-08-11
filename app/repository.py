@@ -68,9 +68,19 @@ class ESAFRepository(ABC):
     def list_users_for_lookup(self, q: str = "") -> list[dict]: ...
 
     @abstractmethod
-    def propagate_pi_group_by_pi_name(self, group_name: str, pi_name: str) -> int:
-        """Set pi_group on ESAFs whose pi_name matches, where pi_group is not yet set.
+    def propagate_pi_group_by_pi_name(
+        self, group_name: str, pi_name: str, institution: str = ""
+    ) -> int:
+        """Set pi_group on ESAFs whose pi_name contains ALL tokens of pi_name
+        (case-insensitive) and whose pi_institution matches (if provided).
+        Only updates ESAFs where pi_group is not yet set.
         Returns the number of ESAFs updated."""
+        ...
+
+    @abstractmethod
+    def clear_pi_group_assignments(self, group_name: str) -> int:
+        """Clear pi_group on all ESAFs assigned to group_name.
+        Returns the number of ESAFs cleared."""
         ...
 
     @abstractmethod
