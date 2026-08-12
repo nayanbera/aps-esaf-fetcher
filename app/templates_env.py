@@ -35,7 +35,7 @@ def _replace_param(query_string, key: str, value) -> str:
     return urlencode(params, doseq=True)
 
 
-_env.globals["replace_param"] = _replace_param
+_env.filters["replace_param"] = _replace_param
 
 
 class _Templates:
