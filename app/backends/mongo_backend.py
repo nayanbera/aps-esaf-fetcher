@@ -326,21 +326,28 @@ class MongoESAFRepository(ESAFRepository):
     # ------------------------------------------------------------------
 
     def get_stats(self) -> dict:
-        total_esafs = self._esafs().count_documents({})
+        _approved = {"status": "Approved"}
+
+        total_esafs     = self._esafs().count_documents(_approved)
+        total_all_esafs = self._esafs().count_documents({})
 
         by_year = list(self._esafs().aggregate([
+            {"$match": _approved},
             {"$group": {"_id": "$year", "count": {"$sum": 1}}},
             {"$sort":  {"_id": -1}},
             {"$project": {"year": "$_id", "count": 1, "_id": 0}},
         ]))
 
-        tu = list(self._esafs().aggregate([
+        # participation_slots: total (user, ESAF) assignments in Approved ESAFs
+        ps = list(self._esafs().aggregate([
+            {"$match": _approved},
             {"$project": {"n": {"$size": {"$ifNull": ["$users", []]}}}},
             {"$group": {"_id": None, "total": {"$sum": "$n"}}},
         ]))
-        total_users = tu[0]["total"] if tu else 0
+        participation_slots = ps[0]["total"] if ps else 0
 
         uu = list(self._esafs().aggregate([
+            {"$match": _approved},
             {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
             {"$group": {"_id": "$users.badge"}},
             {"$count": "count"},
@@ -348,11 +355,13 @@ class MongoESAFRepository(ESAFRepository):
         unique_users = uu[0]["count"] if uu else 0
 
         by_beamline = list(self._esafs().aggregate([
+            {"$match": _approved},
             {"$group": {"_id": "$beamline", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$project": {"beamline": "$_id", "count": 1, "_id": 0}},
         ]))
 
+        # Status breakdown includes ALL ESAFs (it is itself the status summary)
         by_status = list(self._esafs().aggregate([
             {"$group": {"_id": "$status", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
@@ -360,10 +369,11 @@ class MongoESAFRepository(ESAFRepository):
         ]))
 
         by_institution = list(self._esafs().aggregate([
+            {"$match": _approved},
             {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
             {"$match": {"users.institution": {"$nin": [None, ""]}}},
             {"$group": {
-                "_id": "$users.institution",
+                "_id":         "$users.institution",
                 "unique_users": {"$addToSet": "$users.badge"},
                 "esaf_slots":   {"$sum": 1},
             }},
@@ -378,6 +388,7 @@ class MongoESAFRepository(ESAFRepository):
         ]))
 
         by_funding = list(self._esafs().aggregate([
+            {"$match": _approved},
             {"$unwind": {"path": "$funding_sources", "preserveNullAndEmptyArrays": False}},
             {"$group": {"_id": "$funding_sources", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
@@ -385,6 +396,7 @@ class MongoESAFRepository(ESAFRepository):
         ]))
 
         top_users = list(self._esafs().aggregate([
+            {"$match": _approved},
             {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
             {"$group": {
                 "_id":         "$users.badge",
@@ -398,15 +410,16 @@ class MongoESAFRepository(ESAFRepository):
         ]))
 
         return {
-            "total_esafs":    total_esafs,
-            "total_users":    total_users,
-            "unique_users":   unique_users,
-            "by_year":        by_year,
-            "by_beamline":    by_beamline,
-            "by_status":      by_status,
-            "by_institution": by_institution,
-            "by_funding":     by_funding,
-            "top_users":      top_users,
+            "total_esafs":         total_esafs,
+            "total_all_esafs":     total_all_esafs,
+            "participation_slots": participation_slots,
+            "unique_users":        unique_users,
+            "by_year":             by_year,
+            "by_beamline":         by_beamline,
+            "by_status":           by_status,
+            "by_institution":      by_institution,
+            "by_funding":          by_funding,
+            "top_users":           top_users,
         }
 
     # ------------------------------------------------------------------

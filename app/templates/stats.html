@@ -2,44 +2,64 @@
 {% block title %}Statistics — APS ESAF Fetcher{% endblock %}
 
 {% block content %}
-<h4 class="mb-4"><i class="bi bi-bar-chart-fill me-1"></i>Statistics</h4>
+<div class="d-flex align-items-baseline gap-3 mb-1">
+  <h4 class="mb-0"><i class="bi bi-bar-chart-fill me-1"></i>Statistics</h4>
+</div>
+<p class="text-muted small mb-4">
+  All counts below are restricted to <strong>Approved</strong> ESAFs
+  ({{ stats.total_all_esafs }} total in database, {{ stats.total_all_esafs - stats.total_esafs }} non-Approved excluded).
+</p>
 
 <!-- Summary cards -->
 <div class="row g-3 mb-4">
   <div class="col-sm-4 col-lg-3">
-    <div class="card text-center border-primary">
+    <div class="card text-center border-primary h-100">
       <div class="card-body">
         <div class="display-5 fw-bold text-primary">{{ stats.total_esafs }}</div>
-        <div class="text-muted">Total ESAFs</div>
+        <div class="fw-semibold">Approved ESAFs</div>
+        <div class="text-muted small mt-1">
+          Distinct experiment safety forms with status&nbsp;"Approved"
+        </div>
       </div>
     </div>
   </div>
   <div class="col-sm-4 col-lg-3">
-    <div class="card text-center border-success">
+    <div class="card text-center border-success h-100">
       <div class="card-body">
         <div class="display-5 fw-bold text-success">{{ stats.unique_users }}</div>
-        <div class="text-muted">Unique Users</div>
+        <div class="fw-semibold">Unique Users</div>
+        <div class="text-muted small mt-1">
+          Distinct individuals listed on at least one Approved ESAF
+        </div>
       </div>
     </div>
   </div>
   <div class="col-sm-4 col-lg-3">
-    <div class="card text-center border-info">
+    <div class="card text-center border-info h-100">
       <div class="card-body">
-        <div class="display-5 fw-bold text-info">{{ stats.total_users }}</div>
-        <div class="text-muted">User–ESAF slots</div>
+        <div class="display-5 fw-bold text-info">{{ stats.participation_slots }}</div>
+        <div class="fw-semibold">Participation Slots</div>
+        <div class="text-muted small mt-1">
+          Total (user, ESAF) assignments — one user on 5 ESAFs counts as&nbsp;5
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <div class="row g-4">
+
   <!-- ESAFs by year -->
   <div class="col-md-4">
     <div class="card h-100">
-      <div class="card-header fw-semibold">ESAFs by Year</div>
+      <div class="card-header fw-semibold">
+        Approved ESAFs by Year
+      </div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
-          <thead class="table-light"><tr><th>Year</th><th class="text-end">ESAFs</th></tr></thead>
+          <thead class="table-light">
+            <tr><th>Year</th><th class="text-end">Approved ESAFs</th></tr>
+          </thead>
           <tbody>
           {% for row in stats.by_year %}
             <tr><td>{{ row.year }}</td><td class="text-end">{{ row.count }}</td></tr>
@@ -52,21 +72,37 @@
     </div>
   </div>
 
-  <!-- ESAFs by status -->
+  <!-- ESAFs by status (all ESAFs) -->
   <div class="col-md-4">
     <div class="card h-100">
-      <div class="card-header fw-semibold">ESAFs by Status</div>
+      <div class="card-header fw-semibold">
+        All ESAFs by Status
+        <span class="text-muted fw-normal small ms-1">(entire database)</span>
+      </div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
-          <thead class="table-light"><tr><th>Status</th><th class="text-end">ESAFs</th></tr></thead>
+          <thead class="table-light">
+            <tr><th>Status</th><th class="text-end">ESAFs</th></tr>
+          </thead>
           <tbody>
           {% for row in stats.by_status %}
-            <tr><td>{{ row.status or 'Unknown' }}</td><td class="text-end">{{ row.count }}</td></tr>
+            <tr>
+              <td>
+                {% if row.status == 'Approved' %}
+                  <span class="badge bg-success me-1">✓</span>
+                {% endif %}
+                {{ row.status or 'Unknown' }}
+              </td>
+              <td class="text-end">{{ row.count }}</td>
+            </tr>
           {% else %}
             <tr><td colspan="2" class="text-muted text-center py-2">No data</td></tr>
           {% endfor %}
           </tbody>
         </table>
+      </div>
+      <div class="card-footer text-muted small">
+        Status breakdown includes all records regardless of approval.
       </div>
     </div>
   </div>
@@ -74,31 +110,56 @@
   <!-- Funding sources -->
   <div class="col-md-4">
     <div class="card h-100">
-      <div class="card-header fw-semibold">Funding Sources</div>
+      <div class="card-header fw-semibold">
+        Funding Sources
+      </div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
-          <thead class="table-light"><tr><th>Source</th><th class="text-end">ESAFs</th></tr></thead>
+          <thead class="table-light">
+            <tr>
+              <th>Source</th>
+              <th class="text-end" title="Number of Approved ESAFs carrying this funding source">ESAFs</th>
+            </tr>
+          </thead>
           <tbody>
           {% for row in stats.by_funding %}
             <tr><td>{{ row.source }}</td><td class="text-end">{{ row.count }}</td></tr>
           {% else %}
-            <tr><td colspan="2" class="text-muted text-center py-2">No data</td></tr>
+            <tr><td colspan="2" class="text-muted text-center py-2">No funding sources recorded.</td></tr>
           {% endfor %}
           </tbody>
         </table>
       </div>
+      {% if stats.by_funding %}
+      <div class="card-footer text-muted small">
+        Counts Approved ESAFs carrying each funding label.
+      </div>
+      {% endif %}
     </div>
   </div>
 
   <!-- Top institutions -->
   <div class="col-lg-7">
     <div class="card h-100">
-      <div class="card-header fw-semibold">Institutions (top 30 by unique users)</div>
+      <div class="card-header fw-semibold">
+        Institutions
+        <span class="text-muted fw-normal small ms-1">top 30 by unique users</span>
+      </div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm mb-0">
+          <table id="stats-inst-table" class="table table-sm mb-0">
             <thead class="table-light">
-              <tr><th>Institution</th><th class="text-end">Unique users</th><th class="text-end">ESAF slots</th></tr>
+              <tr>
+                <th>Institution</th>
+                <th class="text-end"
+                    title="Distinct individuals from this institution who appear on at least one Approved ESAF">
+                  Unique Users
+                </th>
+                <th class="text-end"
+                    title="Total (user, ESAF) assignments for users from this institution across all Approved ESAFs. One user on 5 ESAFs counts as 5.">
+                  Participation Slots
+                </th>
+              </tr>
             </thead>
             <tbody>
             {% for row in stats.by_institution %}
@@ -114,18 +175,32 @@
           </table>
         </div>
       </div>
+      <div class="card-footer text-muted small">
+        <strong>Unique Users:</strong> distinct individuals from that institution on Approved ESAFs.<br>
+        <strong>Participation Slots:</strong> total user-experiment assignments (sum over all users × ESAFs).
+      </div>
     </div>
   </div>
 
   <!-- Top users -->
   <div class="col-lg-5">
     <div class="card h-100">
-      <div class="card-header fw-semibold">Most Active Users (top 20)</div>
+      <div class="card-header fw-semibold">
+        Most Active Users
+        <span class="text-muted fw-normal small ms-1">top 20</span>
+      </div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm mb-0">
+          <table id="stats-users-table" class="table table-sm mb-0">
             <thead class="table-light">
-              <tr><th>Name</th><th>Institution</th><th class="text-end">ESAFs</th></tr>
+              <tr>
+                <th>Name</th>
+                <th>Institution</th>
+                <th class="text-end"
+                    title="Number of Approved ESAFs this person is listed on">
+                  Approved ESAFs
+                </th>
+              </tr>
             </thead>
             <tbody>
             {% for row in stats.top_users %}
@@ -141,7 +216,11 @@
           </table>
         </div>
       </div>
+      <div class="card-footer text-muted small">
+        Count of Approved ESAFs each person is listed on as PI or team member.
+      </div>
     </div>
   </div>
+
 </div>
 {% endblock %}

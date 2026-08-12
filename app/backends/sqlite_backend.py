@@ -679,20 +679,36 @@ class SQLiteESAFRepository(ESAFRepository):
             def scalar(sql, params=()):
                 return conn.execute(sql, params).fetchone()[0]
 
-            total_esafs  = scalar("SELECT COUNT(*) FROM esafs")
-            total_users  = scalar("SELECT COUNT(*) FROM esaf_users")
-            unique_users = scalar("SELECT COUNT(DISTINCT badge) FROM esaf_users")
+            total_esafs     = scalar("SELECT COUNT(*) FROM esafs WHERE status = 'Approved'")
+            total_all_esafs = scalar("SELECT COUNT(*) FROM esafs")
+            # participation_slots: total (user, ESAF) assignments across Approved ESAFs
+            # one user listed on N experiments counts as N slots
+            participation_slots = scalar(
+                """SELECT COUNT(*) FROM esaf_users eu
+                   JOIN esafs e ON eu.esaf_id = e.esaf_id
+                   WHERE e.status = 'Approved'"""
+            )
+            unique_users = scalar(
+                """SELECT COUNT(DISTINCT eu.badge) FROM esaf_users eu
+                   JOIN esafs e ON eu.esaf_id = e.esaf_id
+                   WHERE e.status = 'Approved'"""
+            )
 
             by_year = [
                 dict(r) for r in conn.execute(
-                    "SELECT year, COUNT(*) AS count FROM esafs GROUP BY year ORDER BY year DESC"
+                    """SELECT year, COUNT(*) AS count FROM esafs
+                       WHERE status = 'Approved'
+                       GROUP BY year ORDER BY year DESC"""
                 ).fetchall()
             ]
             by_beamline = [
                 dict(r) for r in conn.execute(
-                    "SELECT beamline, COUNT(*) AS count FROM esafs GROUP BY beamline ORDER BY count DESC"
+                    """SELECT beamline, COUNT(*) AS count FROM esafs
+                       WHERE status = 'Approved'
+                       GROUP BY beamline ORDER BY count DESC"""
                 ).fetchall()
             ]
+            # Status breakdown always includes all ESAFs — it is itself the status summary
             by_status = [
                 dict(r) for r in conn.execute(
                     "SELECT status, COUNT(*) AS count FROM esafs GROUP BY status ORDER BY count DESC"
@@ -700,37 +716,50 @@ class SQLiteESAFRepository(ESAFRepository):
             ]
             by_institution = [
                 dict(r) for r in conn.execute(
-                    """SELECT u.institution, COUNT(DISTINCT u.badge) AS unique_users,
-                              COUNT(eu.esaf_id) AS esaf_slots
-                       FROM users u JOIN esaf_users eu ON u.badge = eu.badge
+                    """SELECT u.institution,
+                              COUNT(DISTINCT u.badge)  AS unique_users,
+                              COUNT(eu.esaf_id)        AS esaf_slots
+                       FROM users u
+                       JOIN esaf_users eu ON u.badge      = eu.badge
+                       JOIN esafs e       ON eu.esaf_id   = e.esaf_id
                        WHERE u.institution IS NOT NULL AND u.institution != ''
-                       GROUP BY u.institution ORDER BY unique_users DESC LIMIT 30"""
+                         AND e.status = 'Approved'
+                       GROUP BY u.institution
+                       ORDER BY unique_users DESC LIMIT 30"""
                 ).fetchall()
             ]
             by_funding = [
                 dict(r) for r in conn.execute(
-                    "SELECT source, COUNT(*) AS count FROM funding_sources GROUP BY source ORDER BY count DESC"
+                    """SELECT fs.source, COUNT(*) AS count
+                       FROM funding_sources fs
+                       JOIN esafs e ON fs.esaf_id = e.esaf_id
+                       WHERE e.status = 'Approved'
+                       GROUP BY fs.source ORDER BY count DESC"""
                 ).fetchall()
             ]
             top_users = [
                 dict(r) for r in conn.execute(
                     """SELECT u.first_name || ' ' || u.last_name AS name,
                               u.institution, COUNT(eu.esaf_id) AS experiments
-                       FROM users u JOIN esaf_users eu ON u.badge = eu.badge
+                       FROM users u
+                       JOIN esaf_users eu ON u.badge    = eu.badge
+                       JOIN esafs e       ON eu.esaf_id = e.esaf_id
+                       WHERE e.status = 'Approved'
                        GROUP BY u.badge ORDER BY experiments DESC LIMIT 20"""
                 ).fetchall()
             ]
 
         return {
-            "total_esafs": total_esafs,
-            "total_users": total_users,
-            "unique_users": unique_users,
-            "by_year": by_year,
-            "by_beamline": by_beamline,
-            "by_status": by_status,
-            "by_institution": by_institution,
-            "by_funding": by_funding,
-            "top_users": top_users,
+            "total_esafs":          total_esafs,
+            "total_all_esafs":      total_all_esafs,
+            "participation_slots":  participation_slots,
+            "unique_users":         unique_users,
+            "by_year":              by_year,
+            "by_beamline":          by_beamline,
+            "by_status":            by_status,
+            "by_institution":       by_institution,
+            "by_funding":           by_funding,
+            "top_users":            top_users,
         }
 
     # ------------------------------------------------------------------
