@@ -4,12 +4,13 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from starlette.middleware.sessions import SessionMiddleware
 
-from . import db, sync
+from . import db, sync, config
 from .institution import _load_uni_db, load_overrides
 from .routers import esafs, stats, sync_router, fields
 from .routers import overrides as overrides_router
@@ -18,6 +19,8 @@ from .routers import gups as gups_router
 from .routers import institutions as institutions_router
 from .routers import users_router
 from .routers import beamline_scientists_router
+from .routers import admin_router
+from .routers import upload_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,9 +56,47 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET_KEY,
+    session_cookie="esaf_admin_session",
+    max_age=86400 * 7,  # 7 days
+    https_only=False,
+)
+
+
+# ---------------------------------------------------------------------------
+# Auth middleware — protect all write operations
+# ---------------------------------------------------------------------------
+
+_PUBLIC_WRITE_PATHS = {"/admin/login", "/admin/setup"}
+
+
+@app.middleware("http")
+async def require_login_for_writes(request: Request, call_next):
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        path = request.url.path
+        if path not in _PUBLIC_WRITE_PATHS:
+            user = request.session.get("admin_user")
+            if not user:
+                from fastapi.responses import JSONResponse
+                # Return JSON for HTMX, redirect for browser
+                is_htmx = request.headers.get("HX-Request") == "true"
+                if is_htmx:
+                    return JSONResponse(
+                        {"error": "Login required"},
+                        status_code=401,
+                        headers={"HX-Redirect": "/admin/login"},
+                    )
+                return RedirectResponse("/admin/login", status_code=303)
+    return await call_next(request)
+
+
 _static = Path(__file__).parent.parent / "static"
 app.mount("/static", StaticFiles(directory=str(_static)), name="static")
 
+app.include_router(admin_router.router)
+app.include_router(upload_router.router)
 app.include_router(esafs.router)
 app.include_router(gups_router.router)
 app.include_router(stats.router)

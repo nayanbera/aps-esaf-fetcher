@@ -301,6 +301,67 @@ class ESAFRepository(ABC):
         """Set the manual org-type override for an institution."""
         ...
 
+    # ------------------------------------------------------------------
+    # Admin users
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def count_admin_users(self) -> int: ...
+
+    @abstractmethod
+    def list_admin_users(self) -> list[dict]: ...
+
+    @abstractmethod
+    def get_admin_user_by_email(self, email: str) -> Optional[dict]: ...
+
+    @abstractmethod
+    def add_admin_user(self, email: str, name: str, password_hash: str) -> bool: ...
+
+    @abstractmethod
+    def remove_admin_user(self, email: str) -> bool: ...
+
+    # ------------------------------------------------------------------
+    # Audit log
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def add_audit_log(
+        self,
+        user_email: str,
+        action: str,
+        table_name: str = "",
+        record_id: str = "",
+        description: str = "",
+        changes: dict = {},
+    ) -> None: ...
+
+    @abstractmethod
+    def list_audit_log(
+        self,
+        limit: int = 200,
+        offset: int = 0,
+        user_email: str = "",
+        action: str = "",
+        from_date: str = "",
+        to_date: str = "",
+    ) -> tuple[list[dict], int]: ...
+
+    # ------------------------------------------------------------------
+    # Master file import
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def preview_user_import(self, records: list[dict]) -> list[dict]: ...
+
+    @abstractmethod
+    def apply_user_import(self, records: list[dict]) -> int: ...
+
+    @abstractmethod
+    def preview_esaf_import(self, records: list[dict]) -> list[dict]: ...
+
+    @abstractmethod
+    def apply_esaf_import(self, records: list[dict]) -> int: ...
+
 
 # ---------------------------------------------------------------------------
 # Factory

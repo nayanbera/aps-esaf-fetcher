@@ -134,8 +134,16 @@ def _extract_esaf(raw: Any) -> dict:
 # Sync logic
 # ---------------------------------------------------------------------------
 
-def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = None) -> dict:
-    """Fetch ESAFs from DM API and upsert into local DB. Returns summary dict."""
+def run_sync(
+    beamline_names: list[str] | None = None,
+    years: list[str] | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """Fetch ESAFs from DM API and upsert into local DB. Returns summary dict.
+
+    When dry_run=True, fetches from API and computes what would change but
+    does not write to the database. Returns the same dict plus 'preview' list.
+    """
     global _osti_cache
     _osti_cache = {}
 
@@ -149,6 +157,7 @@ def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = 
 
     added = updated = 0
     error_msg = None
+    preview: list[dict] = []
 
     try:
         from dm.aps_db_web_service.api.esafApsDbApi import EsafApsDbApi
@@ -164,7 +173,7 @@ def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = 
 
         for beamline in bl:
             for year in yrs:
-                log.info("Syncing beamline=%s year=%s", beamline, year)
+                log.info("%sSyncing beamline=%s year=%s", "[DRY RUN] " if dry_run else "", beamline, year)
                 try:
                     records = api.listStationEsafs(
                         config.STATION_ID,
@@ -179,14 +188,30 @@ def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = 
                 log.info("API returned %d records for beamline=%s year=%s", len(records), beamline, year)
                 for raw in records:
                     try:
-                        data   = _extract_esaf(raw)
-                        action = db.upsert_esaf(data, now)
-                        if action == "added":
-                            added += 1
+                        data = _extract_esaf(raw)
+                        if dry_run:
+                            existing = db.get_esaf(data["esaf_id"])
+                            action = "add" if existing is None else "update"
+                            if action == "add":
+                                added += 1
+                            else:
+                                updated += 1
+                            preview.append({
+                                "esaf_id": data["esaf_id"],
+                                "title": data["title"],
+                                "beamline": data["beamline"],
+                                "year": data["year"],
+                                "status": data["status"],
+                                "action": action,
+                            })
                         else:
-                            updated += 1
+                            action = db.upsert_esaf(data, now)
+                            if action == "added":
+                                added += 1
+                            else:
+                                updated += 1
                     except Exception as exc:
-                        log.warning("Failed to upsert ESAF %s: %s", raw, exc)
+                        log.warning("Failed to process ESAF %s: %s", raw, exc)
 
     except ImportError:
         error_msg = "dm library not installed — install from APS DM package source"
@@ -195,14 +220,15 @@ def run_sync(beamline_names: list[str] | None = None, years: list[str] | None = 
         error_msg = str(exc)
         log.error("Sync failed: %s", exc)
 
-    db.log_sync(
-        beamlines="|".join(bl),
-        years=",".join(str(y) for y in yrs),
-        added=added,
-        updated=updated,
-        error=error_msg,
-    )
-    return {"added": added, "updated": updated, "error": error_msg}
+    if not dry_run:
+        db.log_sync(
+            beamlines="|".join(bl),
+            years=",".join(str(y) for y in yrs),
+            added=added,
+            updated=updated,
+            error=error_msg,
+        )
+    return {"added": added, "updated": updated, "error": error_msg, "preview": preview, "dry_run": dry_run}
 
 
 # ---------------------------------------------------------------------------

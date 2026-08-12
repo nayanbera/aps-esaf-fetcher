@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Admin — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <h4 class="mb-0"><i class="bi bi-shield-fill-gear me-1"></i>Admin Dashboard</h4>
+</div>
+
+<div class="row g-3 align-items-start">
+
+  <!-- ── Section A: Admin Users ──────────────────────────────────── -->
+  <div class="col-xl-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-people-fill me-1"></i>Admin Users
+      </div>
+      <div class="card-body p-0">
+        <div id="admins-wrap">
+          {% include "partials/admins_table.html" %}
+        </div>
+
+        <!-- Add admin form -->
+        <div class="p-3 border-top">
+          <p class="mb-2 fw-semibold small text-muted text-uppercase">Add admin</p>
+          <div>
+            <div class="mb-2">
+              <input type="text" id="new-admin-name" name="name" class="form-control form-control-sm"
+                     placeholder="Full name" required>
+            </div>
+            <div class="mb-2">
+              <input type="email" id="new-admin-email" name="email" class="form-control form-control-sm"
+                     placeholder="Email" required>
+            </div>
+            <div class="mb-2">
+              <input type="password" id="new-admin-pw" name="password" class="form-control form-control-sm"
+                     placeholder="Password (min 8 chars)" autocomplete="new-password" required>
+            </div>
+            <button class="btn btn-sm btn-primary w-100"
+                    hx-post="/admin/users"
+                    hx-target="#admins-wrap"
+                    hx-swap="innerHTML"
+                    hx-include="#new-admin-name, #new-admin-email, #new-admin-pw">
+              <i class="bi bi-person-plus me-1"></i>Add Admin
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /col -->
+
+  <!-- ── Section B: Audit Log ───────────────────────────────────── -->
+  <div class="col-xl-8">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span><i class="bi bi-journal-text me-1"></i>Audit Log</span>
+        <span class="badge bg-secondary">{{ audit_total }} entries</span>
+      </div>
+      <div class="card-body pb-2">
+
+        <!-- Server-side filters (GET) -->
+        <form method="get" action="/admin" class="row g-2 mb-3 align-items-end">
+          <div class="col-auto">
+            <label class="form-label form-label-sm mb-1 fw-semibold">User email</label>
+            <input type="text" name="log_email" class="form-control form-control-sm"
+                   placeholder="Filter by email…"
+                   value="{{ log_email or '' }}" style="min-width:160px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label form-label-sm mb-1 fw-semibold">Action</label>
+            <select name="log_action_filter" class="form-select form-select-sm">
+              <option value="">All</option>
+              {% for a in ['sync','edit','import','add','delete'] %}
+              <option value="{{ a }}"
+                      {% if log_action_filter == a %}selected{% endif %}>{{ a }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="form-label form-label-sm mb-1 fw-semibold">From</label>
+            <input type="date" name="log_from" class="form-control form-control-sm"
+                   value="{{ log_from or '' }}">
+          </div>
+          <div class="col-auto">
+            <label class="form-label form-label-sm mb-1 fw-semibold">To</label>
+            <input type="date" name="log_to" class="form-control form-control-sm"
+                   value="{{ log_to or '' }}">
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            <a href="/admin" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+          </div>
+        </form>
+
+        <!-- Client-side regex filter -->
+        <div class="filter-wrap mb-2 d-flex align-items-center gap-2">
+          <input type="text" class="form-control form-control-sm table-regex-filter"
+                 data-target="audit-table"
+                 placeholder="Regex filter rows…"
+                 style="max-width:300px">
+          <button class="btn btn-sm btn-outline-secondary filter-clear" style="display:none">
+            <i class="bi bi-x"></i> Clear
+          </button>
+          <span class="filter-count text-muted small"></span>
+        </div>
+
+        <div class="table-responsive">
+          <table id="audit-table" class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th class="text-nowrap">Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Table</th>
+                <th>Record</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for entry in audit_rows %}
+              <tr>
+                <td class="text-nowrap small text-muted">{{ entry.created_at[:19] if entry.created_at else '—' }}</td>
+                <td class="small">{{ entry.user_email or '—' }}</td>
+                <td>
+                  {% if entry.action == 'delete' %}
+                    <span class="badge bg-danger">{{ entry.action }}</span>
+                  {% elif entry.action == 'add' %}
+                    <span class="badge bg-success">{{ entry.action }}</span>
+                  {% elif entry.action == 'edit' %}
+                    <span class="badge bg-primary">{{ entry.action }}</span>
+                  {% elif entry.action == 'sync' %}
+                    <span class="badge bg-info text-dark">{{ entry.action }}</span>
+                  {% elif entry.action == 'import' %}
+                    <span class="badge bg-warning text-dark">{{ entry.action }}</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ entry.action }}</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">{{ entry.table_name or '—' }}</td>
+                <td class="small"><code>{{ entry.record_id or '—' }}</code></td>
+                <td class="small">{{ entry.description or '—' }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="6" class="text-muted text-center py-4">No audit log entries.</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <nav class="mt-2" aria-label="Audit log pagination">
+          <ul class="pagination pagination-sm mb-0 flex-wrap">
+            <li class="page-item {% if log_page <= 1 %}disabled{% endif %}">
+              <a class="page-link"
+                 href="?{{ request.query_params | replace_param('log_page', log_page - 1) }}">
+                &laquo; Prev
+              </a>
+            </li>
+            {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if p == log_page %}active{% endif %}">
+              <a class="page-link"
+                 href="?{{ request.query_params | replace_param('log_page', p) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+            <li class="page-item {% if log_page >= total_pages %}disabled{% endif %}">
+              <a class="page-link"
+                 href="?{{ request.query_params | replace_param('log_page', log_page + 1) }}">
+                Next &raquo;
+              </a>
+            </li>
+          </ul>
+        </nav>
+        {% endif %}
+
+      </div>
+    </div>
+  </div><!-- /col -->
+
+</div><!-- /row -->
+{% endblock %}

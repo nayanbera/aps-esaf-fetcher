@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import db
+from ..auth import log_action
 from ..templates_env import templates
 
 router = APIRouter()
@@ -51,6 +52,7 @@ async def add_scientist(request: Request):
     ok = db.add_beamline_scientist(badge)
     if not ok:
         return JSONResponse({"error": f"Badge '{badge}' not found in users"}, status_code=404)
+    log_action(request, "add", "beamline_scientists", badge, f"Added beamline scientist {badge}")
     scientists = db.list_beamline_scientists()
     return templates.TemplateResponse("partials/scientists_table.html", {
         "request":    request,
@@ -63,6 +65,7 @@ async def update_scientist(badge: str, request: Request):
     form = await request.form()
     start_date = (form.get("start_date") or "").strip()
     db.update_beamline_scientist(badge, start_date)
+    log_action(request, "edit", "beamline_scientists", badge, f"Updated scientist start_date={start_date!r}")
     scientists = db.list_beamline_scientists()
     return templates.TemplateResponse("partials/scientists_table.html", {
         "request":    request,
@@ -73,6 +76,7 @@ async def update_scientist(badge: str, request: Request):
 @router.delete("/api/beamline-scientists/{badge}")
 def remove_scientist(badge: str, request: Request):
     db.remove_beamline_scientist(badge)
+    log_action(request, "delete", "beamline_scientists", badge, f"Removed beamline scientist {badge}")
     scientists = db.list_beamline_scientists()
     return templates.TemplateResponse("partials/scientists_table.html", {
         "request":    request,

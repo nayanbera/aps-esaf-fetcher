@@ -1,0 +1,62 @@
+{% if preview_result %}
+{% set pr = preview_result %}
+<div class="card mt-3 border-warning">
+  <div class="card-header fw-semibold text-warning-emphasis bg-warning-subtle d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-eye me-1"></i>Sync Preview (dry run)</span>
+    <span>
+      <span class="badge bg-success me-1">{{ pr.added }} to add</span>
+      <span class="badge bg-primary">{{ pr.updated }} to update</span>
+    </span>
+  </div>
+  <div class="card-body pb-2">
+
+    {% if pr.error %}
+    <div class="alert alert-danger py-2 small mb-2">{{ pr.error }}</div>
+    {% endif %}
+
+    {% set items = pr.preview %}
+    {% if items %}
+    <div class="table-responsive mb-3" style="max-height:360px;overflow-y:auto">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light sticky-top">
+          <tr>
+            <th>Action</th>
+            <th>ESAF ID</th>
+            <th>Title</th>
+            <th>Beamline</th>
+            <th>Year</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr class="{{ 'table-success' if item.action == 'add' else '' }}">
+            <td>
+              <span class="badge {{ 'bg-success' if item.action == 'add' else 'bg-primary' }}">
+                {{ item.action }}
+              </span>
+            </td>
+            <td class="font-monospace small">{{ item.esaf_id }}</td>
+            <td class="small">{{ item.title[:60] }}{% if item.title|length > 60 %}…{% endif %}</td>
+            <td class="small">{{ item.beamline }}</td>
+            <td class="small">{{ item.year }}</td>
+            <td class="small text-muted">{{ item.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted small">No changes — database is already up to date.</p>
+    {% endif %}
+
+    <form method="post" action="/sync/trigger" class="d-inline">
+      <button type="submit" class="btn btn-success btn-sm"
+              {% if running or pr.error %}disabled{% endif %}>
+        <i class="bi bi-check-lg me-1"></i>Apply Sync
+      </button>
+    </form>
+    <a href="/sync" class="btn btn-outline-secondary btn-sm ms-2">Discard</a>
+  </div>
+</div>
+{% endif %}

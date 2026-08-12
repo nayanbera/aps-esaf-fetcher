@@ -1,0 +1,40 @@
+{% if add_error %}
+<div class="alert alert-danger py-1 px-2 small mb-2">{{ add_error }}</div>
+{% endif %}
+{% if add_msg %}
+<div class="alert alert-success py-1 px-2 small mb-2">{{ add_msg }}</div>
+{% endif %}
+<table class="table table-sm table-hover mb-0">
+  <thead class="table-light">
+    <tr>
+      <th>Email</th>
+      <th>Name</th>
+      <th>Created</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in admins %}
+    <tr>
+      <td>{{ a.email }}</td>
+      <td>{{ a.name }}</td>
+      <td class="text-muted small">{{ a.created_at[:10] if a.created_at else '—' }}</td>
+      <td>
+        {% if current_admin and current_admin.email != a.email %}
+        <button class="btn btn-outline-danger btn-sm py-0 px-1"
+                hx-delete="/admin/users/{{ a.email }}"
+                hx-target="#admins-wrap"
+                hx-swap="innerHTML"
+                hx-confirm="Remove admin '{{ a.name }}'?">
+          <i class="bi bi-trash3"></i>
+        </button>
+        {% else %}
+        <span class="text-muted small">(you)</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="text-muted fst-italic text-center py-3">No admin users yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

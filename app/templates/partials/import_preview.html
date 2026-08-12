@@ -1,0 +1,53 @@
+{% set changes = diffs | selectattr('action', 'ne', 'unchanged') | list %}
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <span class="fw-semibold">Preview — {{ total }} record(s)</span>
+  <span class="badge bg-secondary">{{ changes | length }} change(s)</span>
+</div>
+
+{% if not changes %}
+<div class="alert alert-info py-2">No changes detected — all records already match the database.</div>
+{% else %}
+<div class="table-responsive mb-3" style="max-height:400px;overflow-y:auto">
+  <table class="table table-sm table-hover mb-0">
+    <thead class="table-light sticky-top">
+      <tr>
+        <th>Action</th>
+        <th>ID</th>
+        <th>Field</th>
+        <th>Old value</th>
+        <th>New value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in changes %}
+      <tr class="{{ 'table-success' if d.action == 'add' else 'table-warning' }}">
+        <td>
+          <span class="badge {{ 'bg-success' if d.action == 'add' else 'bg-warning text-dark' }}">
+            {{ d.action }}
+          </span>
+        </td>
+        <td class="font-monospace small">{{ d.id }}</td>
+        <td class="small">{{ d.field }}</td>
+        <td class="text-muted small">{{ d.old_value or '—' }}</td>
+        <td class="small fw-semibold">{{ d.new_value }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="d-flex gap-2">
+  <button class="btn btn-success btn-sm"
+          hx-post="/upload/apply/{{ import_type }}"
+          hx-target="#preview-{{ import_type }}"
+          hx-swap="innerHTML">
+    <i class="bi bi-check-lg me-1"></i>Apply {{ changes | length }} change(s)
+  </button>
+  <button class="btn btn-outline-secondary btn-sm"
+          hx-post="/upload/cancel/{{ import_type }}"
+          hx-target="#preview-{{ import_type }}"
+          hx-swap="innerHTML">
+    Cancel
+  </button>
+</div>
+{% endif %}

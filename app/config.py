@@ -1,9 +1,23 @@
 import os
+import secrets
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _load_secret_key() -> str:
+    key = os.getenv("APP_SECRET_KEY", "").strip()
+    if key:
+        return key
+    _key_file = Path(os.getenv("DB_PATH", str(Path.home() / ".aps-esaf-fetcher" / "esaf.db"))).parent / ".session_secret"
+    if _key_file.exists():
+        return _key_file.read_text().strip()
+    key = secrets.token_hex(32)
+    _key_file.parent.mkdir(parents=True, exist_ok=True)
+    _key_file.write_text(key)
+    return key
 
 DM_USERNAME: str = os.getenv("DM_USERNAME", "").strip()
 DM_PASSWORD: str = os.getenv("DM_PASSWORD", "").strip()
@@ -40,3 +54,5 @@ MONGODB_DB: str  = os.getenv("MONGODB_DB", "aps_esaf")
 
 HOST: str = os.getenv("HOST", "0.0.0.0")
 PORT: int = int(os.getenv("PORT", "8088"))
+
+SESSION_SECRET_KEY: str = _load_secret_key()

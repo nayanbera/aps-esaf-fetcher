@@ -154,6 +154,28 @@ CREATE TABLE IF NOT EXISTS beamline_scientists (
     start_date  TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS admin_users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT UNIQUE NOT NULL,
+    name          TEXT NOT NULL DEFAULT '',
+    password_hash TEXT NOT NULL,
+    created_at    TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp   TEXT DEFAULT (datetime('now')),
+    user_email  TEXT NOT NULL DEFAULT 'system',
+    action      TEXT NOT NULL DEFAULT '',
+    table_name  TEXT NOT NULL DEFAULT '',
+    record_id   TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    changes     TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp  ON audit_log(timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_user_email ON audit_log(user_email);
+
 CREATE INDEX IF NOT EXISTS idx_esafs_year       ON esafs(year);
 CREATE INDEX IF NOT EXISTS idx_esafs_beamline   ON esafs(beamline);
 CREATE INDEX IF NOT EXISTS idx_esafs_status     ON esafs(status);
@@ -376,6 +398,34 @@ class SQLiteESAFRepository(ESAFRepository):
                 CREATE INDEX IF NOT EXISTS idx_gups_run_cycle ON gups(run_cycle);
                 CREATE INDEX IF NOT EXISTS idx_gup_fs_gup_id ON gup_funding_sources(gup_id);
             """)
+            # Admin + audit tables (migration-safe)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email         TEXT UNIQUE NOT NULL,
+                    name          TEXT NOT NULL DEFAULT '',
+                    password_hash TEXT NOT NULL,
+                    created_at    TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp   TEXT DEFAULT (datetime('now')),
+                    user_email  TEXT NOT NULL DEFAULT 'system',
+                    action      TEXT NOT NULL DEFAULT '',
+                    table_name  TEXT NOT NULL DEFAULT '',
+                    record_id   TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '',
+                    changes     TEXT NOT NULL DEFAULT '{}'
+                )
+            """)
+            try:
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp  ON audit_log(timestamp)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_user_email ON audit_log(user_email)")
+            except sqlite3.OperationalError:
+                pass
+            conn.commit()
 
     # ------------------------------------------------------------------
     # ESAFs
@@ -1376,3 +1426,208 @@ class SQLiteESAFRepository(ESAFRepository):
                 )
                 count += cur.rowcount
         return count
+
+    # ------------------------------------------------------------------
+    # Admin users
+    # ------------------------------------------------------------------
+
+    def count_admin_users(self) -> int:
+        with self._db() as conn:
+            return conn.execute("SELECT COUNT(*) FROM admin_users").fetchone()[0]
+
+    def list_admin_users(self) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT id, email, name, created_at FROM admin_users ORDER BY created_at"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_admin_user_by_email(self, email: str) -> Optional[dict]:
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT id, email, name, password_hash FROM admin_users WHERE email = ?",
+                (email,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def add_admin_user(self, email: str, name: str, password_hash: str) -> bool:
+        try:
+            with self._db() as conn:
+                conn.execute(
+                    "INSERT INTO admin_users (email, name, password_hash) VALUES (?,?,?)",
+                    (email, name, password_hash),
+                )
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def remove_admin_user(self, email: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute("DELETE FROM admin_users WHERE email = ?", (email,))
+        return cur.rowcount > 0
+
+    # ------------------------------------------------------------------
+    # Audit log
+    # ------------------------------------------------------------------
+
+    def add_audit_log(
+        self,
+        user_email: str,
+        action: str,
+        table_name: str = "",
+        record_id: str = "",
+        description: str = "",
+        changes: dict = {},
+    ) -> None:
+        with self._db() as conn:
+            conn.execute(
+                """INSERT INTO audit_log
+                   (user_email, action, table_name, record_id, description, changes)
+                   VALUES (?,?,?,?,?,?)""",
+                (user_email, action, table_name, record_id, description,
+                 json.dumps(changes)),
+            )
+
+    def list_audit_log(
+        self,
+        limit: int = 200,
+        offset: int = 0,
+        user_email: str = "",
+        action: str = "",
+        from_date: str = "",
+        to_date: str = "",
+    ) -> list[dict]:
+        clauses, params = [], []
+        if user_email:
+            clauses.append("user_email LIKE ?"); params.append(f"%{user_email}%")
+        if action:
+            clauses.append("action = ?"); params.append(action)
+        if from_date:
+            clauses.append("timestamp >= ?"); params.append(from_date)
+        if to_date:
+            clauses.append("timestamp <= ?"); params.append(to_date + "T23:59:59")
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self._db() as conn:
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM audit_log {where}", params
+            ).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT * FROM audit_log {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                params + [limit, offset],
+            ).fetchall()
+        result = [dict(r) for r in rows]
+        for r in result:
+            try:
+                r["changes"] = json.loads(r.get("changes") or "{}")
+            except (ValueError, TypeError):
+                r["changes"] = {}
+        return result, total
+
+    def count_audit_log(self, **kwargs) -> int:
+        _, total = self.list_audit_log(limit=1, **kwargs)
+        return total
+
+    # ------------------------------------------------------------------
+    # Master file import (users)
+    # ------------------------------------------------------------------
+
+    def preview_user_import(self, records: list[dict]) -> list[dict]:
+        """Compare imported user records against DB. Returns per-field diff rows."""
+        FIELDS = ("institution", "country", "state", "email", "orcid_id")
+        changes = []
+        with self._db() as conn:
+            for rec in records:
+                badge = str(rec.get("badge") or "").strip()
+                if not badge:
+                    continue
+                row = conn.execute(
+                    "SELECT * FROM users WHERE badge = ?", (badge,)
+                ).fetchone()
+                if row is None:
+                    continue
+                current = dict(row)
+                for field in FIELDS:
+                    new_val = str(rec.get(field) or "").strip()
+                    if not new_val:
+                        continue
+                    old_val = str(current.get(field) or "")
+                    changes.append({
+                        "badge": badge,
+                        "name": f"{current.get('first_name','')} {current.get('last_name','')}".strip(),
+                        "field": field,
+                        "old_val": old_val,
+                        "new_val": new_val,
+                        "will_change": old_val != new_val,
+                    })
+        return changes
+
+    def apply_user_import(self, records: list[dict]) -> int:
+        """Apply user field updates. Returns count of rows updated."""
+        FIELDS = ("institution", "country", "state", "email", "orcid_id")
+        updated = 0
+        with self._db() as conn:
+            for rec in records:
+                badge = str(rec.get("badge") or "").strip()
+                if not badge:
+                    continue
+                for field in FIELDS:
+                    new_val = str(rec.get(field) or "").strip()
+                    if not new_val:
+                        continue
+                    conn.execute(
+                        f"UPDATE users SET {field} = ? WHERE badge = ?",
+                        (new_val, badge),
+                    )
+                    updated += 1
+        return updated
+
+    def preview_esaf_import(self, records: list[dict]) -> list[dict]:
+        """Compare imported ESAF records against DB. Returns per-field diff rows."""
+        FIELDS = ("technique", "notes", "pi_group")
+        changes = []
+        with self._db() as conn:
+            for rec in records:
+                esaf_id = str(rec.get("esaf_id") or "").strip()
+                if not esaf_id:
+                    continue
+                row = conn.execute(
+                    "SELECT esaf_id, title, technique, notes, pi_group FROM esafs WHERE esaf_id = ?",
+                    (esaf_id,),
+                ).fetchone()
+                if row is None:
+                    continue
+                current = dict(row)
+                for field in FIELDS:
+                    new_val = str(rec.get(field) or "").strip()
+                    if not new_val:
+                        continue
+                    old_val = str(current.get(field) or "")
+                    changes.append({
+                        "esaf_id": esaf_id,
+                        "title": current.get("title", ""),
+                        "field": field,
+                        "old_val": old_val,
+                        "new_val": new_val,
+                        "will_change": old_val != new_val,
+                    })
+        return changes
+
+    def apply_esaf_import(self, records: list[dict]) -> int:
+        """Apply ESAF field updates. Returns count of rows updated."""
+        FIELDS = ("technique", "notes", "pi_group")
+        updated = 0
+        with self._db() as conn:
+            for rec in records:
+                esaf_id = str(rec.get("esaf_id") or "").strip()
+                if not esaf_id:
+                    continue
+                for field in FIELDS:
+                    new_val = str(rec.get(field) or "").strip()
+                    if not new_val:
+                        continue
+                    conn.execute(
+                        f"UPDATE esafs SET {field} = ? WHERE esaf_id = ?",
+                        (new_val, esaf_id),
+                    )
+                    updated += 1
+        return updated

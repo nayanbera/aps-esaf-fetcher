@@ -869,3 +869,94 @@ class MongoESAFRepository(ESAFRepository):
                  for n in new_names]
             )
         return len(new_names)
+
+    # ------------------------------------------------------------------
+    # Admin users (stubs — MongoDB backend uses separate auth store)
+    # ------------------------------------------------------------------
+
+    def count_admin_users(self) -> int:
+        return self._db()["admin_users"].count_documents({})
+
+    def list_admin_users(self) -> list[dict]:
+        return list(self._db()["admin_users"].find({}, {"_id": 0}))
+
+    def get_admin_user_by_email(self, email: str) -> dict | None:
+        return self._db()["admin_users"].find_one({"email": email}, {"_id": 0})
+
+    def add_admin_user(self, email: str, name: str, password_hash: str) -> bool:
+        from pymongo.errors import DuplicateKeyError
+        try:
+            self._db()["admin_users"].insert_one(
+                {"email": email, "name": name, "password_hash": password_hash, "created_at": ""}
+            )
+            return True
+        except DuplicateKeyError:
+            return False
+
+    def remove_admin_user(self, email: str) -> bool:
+        result = self._db()["admin_users"].delete_one({"email": email})
+        return result.deleted_count > 0
+
+    # ------------------------------------------------------------------
+    # Audit log (stubs)
+    # ------------------------------------------------------------------
+
+    def add_audit_log(
+        self,
+        user_email: str,
+        action: str,
+        table_name: str = "",
+        record_id: str = "",
+        description: str = "",
+        changes: dict = {},
+    ) -> None:
+        import json
+        self._db()["audit_log"].insert_one({
+            "user_email": user_email,
+            "action": action,
+            "table_name": table_name,
+            "record_id": record_id,
+            "description": description,
+            "changes": json.dumps(changes),
+            "created_at": "",
+        })
+
+    def list_audit_log(
+        self,
+        limit: int = 200,
+        offset: int = 0,
+        user_email: str = "",
+        action: str = "",
+        from_date: str = "",
+        to_date: str = "",
+    ) -> tuple[list[dict], int]:
+        filt: dict = {}
+        if user_email:
+            filt["user_email"] = user_email
+        if action:
+            filt["action"] = action
+        total = self._db()["audit_log"].count_documents(filt)
+        rows = list(
+            self._db()["audit_log"]
+            .find(filt, {"_id": 0})
+            .sort("created_at", -1)
+            .skip(offset)
+            .limit(limit)
+        )
+        return rows, total
+
+    # ------------------------------------------------------------------
+    # Master file import (stubs)
+    # ------------------------------------------------------------------
+
+    def preview_user_import(self, records: list[dict]) -> list[dict]:
+        return []
+
+    def apply_user_import(self, records: list[dict]) -> int:
+        return 0
+
+    def preview_esaf_import(self, records: list[dict]) -> list[dict]:
+        return []
+
+    def apply_esaf_import(self, records: list[dict]) -> int:
+        return 0

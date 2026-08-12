@@ -302,3 +302,84 @@ def rename_institution(old_name: str, new_name: str) -> dict:
 
 def set_institution_manual_types(name: str, types: list[str]) -> None:
     _r().set_institution_manual_types(name, types)
+
+
+# ------------------------------------------------------------------
+# Admin users
+# ------------------------------------------------------------------
+
+def count_admin_users() -> int:
+    return _r().count_admin_users()
+
+
+def list_admin_users() -> list[dict]:
+    return _r().list_admin_users()
+
+
+def get_admin_user_by_email(email: str) -> Optional[dict]:
+    return _r().get_admin_user_by_email(email)
+
+
+def add_admin_user(email: str, name: str, password_hash: str) -> bool:
+    return _r().add_admin_user(email, name, password_hash)
+
+
+def remove_admin_user(email: str) -> bool:
+    return _r().remove_admin_user(email)
+
+
+# ------------------------------------------------------------------
+# Audit log
+# ------------------------------------------------------------------
+
+def add_audit_log(
+    user_email: str,
+    action: str,
+    table_name: str = "",
+    record_id: str = "",
+    description: str = "",
+    changes: dict = {},
+) -> None:
+    _r().add_audit_log(
+        user_email=user_email,
+        action=action,
+        table_name=table_name,
+        record_id=record_id,
+        description=description,
+        changes=changes,
+    )
+
+
+def list_audit_log(
+    limit: int = 200,
+    offset: int = 0,
+    user_email: str = "",
+    action: str = "",
+    from_date: str = "",
+    to_date: str = "",
+) -> tuple[list[dict], int]:
+    return _r().list_audit_log(
+        limit=limit, offset=offset,
+        user_email=user_email, action=action,
+        from_date=from_date, to_date=to_date,
+    )
+
+
+# ------------------------------------------------------------------
+# Master file import
+# ------------------------------------------------------------------
+
+def preview_user_import(records: list[dict]) -> list[dict]:
+    return _r().preview_user_import(records)
+
+
+def apply_user_import(records: list[dict]) -> int:
+    return _r().apply_user_import(records)
+
+
+def preview_esaf_import(records: list[dict]) -> list[dict]:
+    return _r().preview_esaf_import(records)
+
+
+def apply_esaf_import(records: list[dict]) -> int:
+    return _r().apply_esaf_import(records)
