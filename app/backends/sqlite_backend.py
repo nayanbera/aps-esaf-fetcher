@@ -289,6 +289,26 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
+            # Extended user / esaf_users / esafs columns from master file import
+            for col, defn in [
+                ("gender",           "TEXT DEFAULT ''"),
+                ("employment_level", "TEXT DEFAULT ''"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE users ADD COLUMN {col} {defn}")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+            try:
+                conn.execute("ALTER TABLE esaf_users ADD COLUMN user_type TEXT DEFAULT ''")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE esafs ADD COLUMN local_id TEXT DEFAULT ''")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
             # GUP-related migrations for esafs table
             for col, defn in [
                 ("gup_id",   "TEXT DEFAULT ''"),
@@ -1531,103 +1551,437 @@ class SQLiteESAFRepository(ESAFRepository):
     # Master file import (users)
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Import helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _norm_import_record(rec: dict) -> dict:
+        """Normalise a CSV row's keys to internal field names.
+
+        Handles both the simple format (lowercase column names already matching
+        the DB) and the combined ChemMatCARS master-file format with human-
+        readable column headers.
+        """
+        MAP = {
+            # Combined master-file headers → internal names
+            "exp fy":           "year",
+            "experiment id":    "esaf_id",
+            "badge":            "badge",
+            "last name":        "last_name",
+            "first name":       "first_name",
+            "gender":           "gender",
+            "email":            "email",
+            "user type":        "user_type",
+            "spokesperson":     "spokesperson",
+            "employment level": "employment_level",
+            "inst name":        "institution",
+            "institution type": "institution_type",
+            "posted date":      "posted_date",
+            "pen":              "local_id",
+            "beamline name":    "beamline",
+            "funding source":   "funding_source",
+            "research subject": "technique",
+            # Pass-through names already in internal form
+            "first_name": "first_name", "last_name": "last_name",
+            "institution": "institution", "country": "country",
+            "state": "state", "orcid_id": "orcid_id",
+            "esaf_id": "esaf_id", "notes": "notes",
+            "pi_group": "pi_group", "local_id": "local_id",
+            "employment_level": "employment_level",
+            "institution_type": "institution_type",
+        }
+        out: dict = {}
+        for k, v in rec.items():
+            key = MAP.get(k.strip().lower(), k.strip().lower())
+            out[key] = str(v).strip() if v is not None else ""
+        return out
+
+    @staticmethod
+    def _is_combined_format(records: list[dict]) -> bool:
+        """True when records look like the combined user-per-ESAF master file."""
+        if not records:
+            return False
+        sample = {k.strip().lower() for k in records[0].keys()}
+        return bool({"experiment id", "badge"} & sample or
+                    {"esaf_id", "badge", "last_name"} <= sample)
+
     def preview_user_import(self, records: list[dict]) -> list[dict]:
         """Compare imported user records against DB. Returns per-field diff rows."""
-        FIELDS = ("institution", "country", "state", "email", "orcid_id")
-        changes = []
+        USER_FIELDS = (
+            "first_name", "last_name", "institution", "country",
+            "state", "email", "orcid_id", "gender", "employment_level",
+        )
+        normed = [self._norm_import_record(r) for r in records]
+        # Deduplicate: last occurrence of each badge wins
+        by_badge: dict[str, dict] = {}
+        for r in normed:
+            badge = r.get("badge", "")
+            if badge:
+                by_badge[badge] = r
+
+        changes: list[dict] = []
         with self._db() as conn:
-            for rec in records:
-                badge = str(rec.get("badge") or "").strip()
-                if not badge:
-                    continue
+            for badge, rec in by_badge.items():
                 row = conn.execute(
                     "SELECT * FROM users WHERE badge = ?", (badge,)
                 ).fetchone()
                 if row is None:
-                    continue
-                current = dict(row)
-                for field in FIELDS:
-                    new_val = str(rec.get(field) or "").strip()
-                    if not new_val:
-                        continue
-                    old_val = str(current.get(field) or "")
-                    changes.append({
-                        "badge": badge,
-                        "name": f"{current.get('first_name','')} {current.get('last_name','')}".strip(),
-                        "field": field,
-                        "old_val": old_val,
-                        "new_val": new_val,
-                        "will_change": old_val != new_val,
-                    })
+                    # New user — show all non-empty fields as adds
+                    name = f"{rec.get('first_name','')} {rec.get('last_name','')}".strip()
+                    for field in USER_FIELDS:
+                        new_val = rec.get(field, "")
+                        if new_val:
+                            changes.append({
+                                "id": badge, "field": field,
+                                "old_value": "", "new_value": new_val,
+                                "action": "add",
+                                "name": name,
+                            })
+                else:
+                    current = dict(row)
+                    name = f"{current.get('first_name','')} {current.get('last_name','')}".strip()
+                    for field in USER_FIELDS:
+                        new_val = rec.get(field, "")
+                        if not new_val:
+                            continue
+                        old_val = str(current.get(field) or "")
+                        if new_val != old_val:
+                            changes.append({
+                                "id": badge, "field": field,
+                                "old_value": old_val, "new_value": new_val,
+                                "action": "update",
+                                "name": name,
+                            })
         return changes
 
     def apply_user_import(self, records: list[dict]) -> int:
-        """Apply user field updates. Returns count of rows updated."""
-        FIELDS = ("institution", "country", "state", "email", "orcid_id")
-        updated = 0
+        """Apply user field updates. Inserts new users; updates existing ones.
+        Returns total number of records touched."""
+        USER_FIELDS = (
+            "first_name", "last_name", "institution", "country",
+            "state", "email", "orcid_id", "gender", "employment_level",
+        )
+        normed = [self._norm_import_record(r) for r in records]
+        by_badge: dict[str, dict] = {}
+        for r in normed:
+            badge = r.get("badge", "")
+            if badge:
+                by_badge[badge] = r
+
+        touched = 0
         with self._db() as conn:
-            for rec in records:
-                badge = str(rec.get("badge") or "").strip()
-                if not badge:
-                    continue
-                for field in FIELDS:
-                    new_val = str(rec.get(field) or "").strip()
-                    if not new_val:
-                        continue
+            for badge, rec in by_badge.items():
+                row = conn.execute(
+                    "SELECT badge FROM users WHERE badge = ?", (badge,)
+                ).fetchone()
+                if row is None:
+                    # Insert new user record
                     conn.execute(
-                        f"UPDATE users SET {field} = ? WHERE badge = ?",
-                        (new_val, badge),
+                        """INSERT INTO users
+                           (badge, first_name, last_name, institution, country,
+                            state, email, orcid_id, gender, employment_level)
+                           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            badge,
+                            rec.get("first_name", ""), rec.get("last_name", ""),
+                            rec.get("institution", ""), rec.get("country", ""),
+                            rec.get("state", ""), rec.get("email", ""),
+                            rec.get("orcid_id", ""), rec.get("gender", ""),
+                            rec.get("employment_level", ""),
+                        ),
                     )
-                    updated += 1
-        return updated
+                    touched += 1
+                else:
+                    updates = {
+                        f: rec[f] for f in USER_FIELDS
+                        if rec.get(f) and rec[f] != str(conn.execute(
+                            f"SELECT {f} FROM users WHERE badge=?", (badge,)
+                        ).fetchone()[0] or "")
+                    }
+                    for field, val in updates.items():
+                        conn.execute(
+                            f"UPDATE users SET {field}=? WHERE badge=?", (val, badge)
+                        )
+                    if updates:
+                        touched += 1
+        return touched
 
     def preview_esaf_import(self, records: list[dict]) -> list[dict]:
-        """Compare imported ESAF records against DB. Returns per-field diff rows."""
-        FIELDS = ("technique", "notes", "pi_group")
-        changes = []
+        """Compare imported ESAF/user records against DB. Returns per-field diff rows."""
+        normed = [self._norm_import_record(r) for r in records]
+
+        if self._is_combined_format(records):
+            return self._preview_combined_import(normed)
+
+        # Simple format: one row per ESAF with esaf_id + editable fields
+        FIELDS = ("technique", "notes", "pi_group", "local_id")
+        changes: list[dict] = []
         with self._db() as conn:
-            for rec in records:
-                esaf_id = str(rec.get("esaf_id") or "").strip()
+            for rec in normed:
+                esaf_id = rec.get("esaf_id", "")
                 if not esaf_id:
                     continue
                 row = conn.execute(
-                    "SELECT esaf_id, title, technique, notes, pi_group FROM esafs WHERE esaf_id = ?",
-                    (esaf_id,),
+                    "SELECT esaf_id, title, technique, notes, pi_group, local_id "
+                    "FROM esafs WHERE esaf_id = ?", (esaf_id,)
                 ).fetchone()
                 if row is None:
                     continue
                 current = dict(row)
                 for field in FIELDS:
-                    new_val = str(rec.get(field) or "").strip()
+                    new_val = rec.get(field, "")
                     if not new_val:
                         continue
                     old_val = str(current.get(field) or "")
-                    changes.append({
-                        "esaf_id": esaf_id,
-                        "title": current.get("title", ""),
-                        "field": field,
-                        "old_val": old_val,
-                        "new_val": new_val,
-                        "will_change": old_val != new_val,
-                    })
+                    if new_val != old_val:
+                        changes.append({
+                            "id": esaf_id, "field": field,
+                            "old_value": old_val, "new_value": new_val,
+                            "action": "update",
+                        })
+        return changes
+
+    def _preview_combined_import(self, normed: list[dict]) -> list[dict]:
+        """Preview for the combined per-user-per-ESAF master file format."""
+        changes: list[dict] = []
+        # Group rows by esaf_id
+        esaf_rows: dict[str, list[dict]] = {}
+        for r in normed:
+            eid = r.get("esaf_id", "")
+            if eid:
+                esaf_rows.setdefault(eid, []).append(r)
+
+        with self._db() as conn:
+            # ESAF-level changes
+            for esaf_id, rows in esaf_rows.items():
+                first = rows[0]
+                existing = conn.execute(
+                    "SELECT esaf_id, title, beamline, year, start_date, local_id, technique "
+                    "FROM esafs WHERE esaf_id = ?", (esaf_id,)
+                ).fetchone()
+                action = "update" if existing else "add"
+                cur = dict(existing) if existing else {}
+                title = cur.get("title") or f"ESAF {esaf_id}"
+                for field, csv_key in [
+                    ("beamline",   "beamline"),
+                    ("year",       "year"),
+                    ("start_date", "posted_date"),
+                    ("local_id",   "local_id"),
+                    ("technique",  "technique"),
+                ]:
+                    new_val = first.get(csv_key, "")
+                    if not new_val:
+                        continue
+                    old_val = str(cur.get(field) or "")
+                    if new_val != old_val:
+                        changes.append({
+                            "id": esaf_id, "field": f"esaf.{field}",
+                            "old_value": old_val, "new_value": new_val,
+                            "action": action,
+                        })
+                # Funding sources
+                fs_new = {s.strip() for s in first.get("funding_source", "").split(",") if s.strip()}
+                if fs_new and existing:
+                    fs_cur = {r[0] for r in conn.execute(
+                        "SELECT source FROM funding_sources WHERE esaf_id=?", (esaf_id,)
+                    ).fetchall()}
+                    for s in fs_new - fs_cur:
+                        changes.append({
+                            "id": esaf_id, "field": "funding_source",
+                            "old_value": "", "new_value": s, "action": "add",
+                        })
+                elif fs_new and not existing:
+                    for s in fs_new:
+                        changes.append({
+                            "id": esaf_id, "field": "funding_source",
+                            "old_value": "", "new_value": s, "action": "add",
+                        })
+
+            # User-level changes (deduplicated by badge)
+            by_badge: dict[str, dict] = {}
+            for r in normed:
+                badge = r.get("badge", "")
+                if badge:
+                    by_badge[badge] = r
+            USER_FIELDS = (
+                "first_name", "last_name", "institution",
+                "email", "gender", "employment_level",
+            )
+            for badge, rec in by_badge.items():
+                row = conn.execute(
+                    "SELECT * FROM users WHERE badge=?", (badge,)
+                ).fetchone()
+                cur = dict(row) if row else {}
+                action = "update" if row else "add"
+                name = f"{rec.get('first_name','')} {rec.get('last_name','')}".strip()
+                for field in USER_FIELDS:
+                    new_val = rec.get(field, "")
+                    if not new_val:
+                        continue
+                    old_val = str(cur.get(field) or "")
+                    if new_val != old_val:
+                        changes.append({
+                            "id": badge, "field": f"user.{field}",
+                            "old_value": old_val, "new_value": new_val,
+                            "action": action,
+                            "name": name,
+                        })
+
         return changes
 
     def apply_esaf_import(self, records: list[dict]) -> int:
-        """Apply ESAF field updates. Returns count of rows updated."""
-        FIELDS = ("technique", "notes", "pi_group")
+        """Apply ESAF/user import. Returns total records touched."""
+        normed = [self._norm_import_record(r) for r in records]
+
+        if self._is_combined_format(records):
+            return self._apply_combined_import(normed)
+
+        # Simple format
+        FIELDS = ("technique", "notes", "pi_group", "local_id")
         updated = 0
         with self._db() as conn:
-            for rec in records:
-                esaf_id = str(rec.get("esaf_id") or "").strip()
+            for rec in normed:
+                esaf_id = rec.get("esaf_id", "")
                 if not esaf_id:
                     continue
                 for field in FIELDS:
-                    new_val = str(rec.get(field) or "").strip()
+                    new_val = rec.get(field, "")
                     if not new_val:
                         continue
                     conn.execute(
-                        f"UPDATE esafs SET {field} = ? WHERE esaf_id = ?",
+                        f"UPDATE esafs SET {field}=? WHERE esaf_id=?",
                         (new_val, esaf_id),
                     )
                     updated += 1
         return updated
+
+    def _apply_combined_import(self, normed: list[dict]) -> int:
+        """Apply the combined per-user-per-ESAF master file."""
+        now = datetime.now(timezone.utc).isoformat()
+        touched = 0
+
+        esaf_rows: dict[str, list[dict]] = {}
+        for r in normed:
+            eid = r.get("esaf_id", "")
+            if eid:
+                esaf_rows.setdefault(eid, []).append(r)
+
+        with self._db() as conn:
+            # --- ESAFs ---
+            for esaf_id, rows in esaf_rows.items():
+                first = rows[0]
+                existing = conn.execute(
+                    "SELECT esaf_id FROM esafs WHERE esaf_id=?", (esaf_id,)
+                ).fetchone()
+
+                year_str = first.get("year", "")
+                try:
+                    year = int(year_str)
+                except (ValueError, TypeError):
+                    year = None
+
+                # Spokesperson row → PI
+                pi_row = next((r for r in rows if r.get("spokesperson", "").upper() == "Y"), rows[0])
+                pi_badge = pi_row.get("badge", "")
+                pi_name = f"{pi_row.get('first_name','')} {pi_row.get('last_name','')}".strip()
+                pi_inst  = pi_row.get("institution", "")
+
+                if existing:
+                    updates = {}
+                    if first.get("beamline"):   updates["beamline"]   = first["beamline"]
+                    if year:                    updates["year"]       = year
+                    if first.get("posted_date"):updates["start_date"] = first["posted_date"]
+                    if first.get("local_id"):   updates["local_id"]   = first["local_id"]
+                    if first.get("technique"):  updates["technique"]  = first["technique"]
+                    if pi_badge:
+                        updates["pi_badge"] = pi_badge
+                        updates["pi_name"]  = pi_name
+                        updates["pi_institution"] = pi_inst
+                    if updates:
+                        sets = ", ".join(f"{k}=?" for k in updates)
+                        conn.execute(
+                            f"UPDATE esafs SET {sets}, updated_at=? WHERE esaf_id=?",
+                            list(updates.values()) + [now, esaf_id],
+                        )
+                        touched += 1
+                else:
+                    # Insert stub ESAF (no title/description from API, but all we have)
+                    conn.execute(
+                        """INSERT OR IGNORE INTO esafs
+                           (esaf_id, title, beamline, year, start_date, local_id,
+                            technique, pi_badge, pi_name, pi_institution,
+                            status, last_synced, created_at, updated_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            esaf_id,
+                            f"ESAF {esaf_id} (imported)",
+                            first.get("beamline", ""),
+                            year, first.get("posted_date", ""),
+                            first.get("local_id", ""),
+                            first.get("technique", ""),
+                            pi_badge, pi_name, pi_inst,
+                            "Approved", now, now, now,
+                        ),
+                    )
+                    touched += 1
+
+                # Funding sources
+                fs = {s.strip() for s in first.get("funding_source", "").split(",") if s.strip()}
+                for s in fs:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO funding_sources (esaf_id, source) VALUES (?,?)",
+                        (esaf_id, s),
+                    )
+
+            # --- Users ---
+            by_badge: dict[str, dict] = {}
+            for r in normed:
+                badge = r.get("badge", "")
+                if badge:
+                    by_badge[badge] = r
+
+            for badge, rec in by_badge.items():
+                row = conn.execute(
+                    "SELECT badge FROM users WHERE badge=?", (badge,)
+                ).fetchone()
+                if row is None:
+                    conn.execute(
+                        """INSERT INTO users
+                           (badge, first_name, last_name, institution,
+                            email, gender, employment_level)
+                           VALUES (?,?,?,?,?,?,?)""",
+                        (
+                            badge,
+                            rec.get("first_name", ""), rec.get("last_name", ""),
+                            rec.get("institution", ""), rec.get("email", ""),
+                            rec.get("gender", ""), rec.get("employment_level", ""),
+                        ),
+                    )
+                    touched += 1
+                else:
+                    for field in ("first_name", "last_name", "institution",
+                                  "email", "gender", "employment_level"):
+                        val = rec.get(field, "")
+                        if val:
+                            conn.execute(
+                                f"UPDATE users SET {field}=? WHERE badge=?", (val, badge)
+                            )
+
+            # --- esaf_users linkage ---
+            for r in normed:
+                esaf_id = r.get("esaf_id", "")
+                badge   = r.get("badge", "")
+                if not esaf_id or not badge:
+                    continue
+                role = "pi" if r.get("spokesperson", "").upper() == "Y" else "user"
+                user_type = r.get("user_type", "")
+                conn.execute(
+                    """INSERT INTO esaf_users (esaf_id, badge, role, user_type)
+                       VALUES (?,?,?,?)
+                       ON CONFLICT(esaf_id, badge) DO UPDATE SET
+                           role=excluded.role, user_type=excluded.user_type""",
+                    (esaf_id, badge, role, user_type),
+                )
+
+        return touched

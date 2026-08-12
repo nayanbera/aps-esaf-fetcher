@@ -15,14 +15,26 @@
         <i class="bi bi-people me-1"></i>Import Users
       </div>
       <div class="card-body">
-        <p class="text-muted small mb-1">Supported columns:</p>
-        <p class="mb-3">
-          <code>badge</code>, <code>email</code>, <code>institution</code>,
-          <code>country</code>, <code>state</code>, <code>orcid_id</code>
-        </p>
+        <p class="text-muted small mb-1">Supported columns (case-insensitive):</p>
+        <table class="table table-sm table-bordered small mb-3">
+          <thead class="table-light"><tr><th>Column name</th><th>Field</th></tr></thead>
+          <tbody>
+            <tr><td><code>Badge</code> / <code>badge</code></td><td>Badge number <span class="text-danger">*key*</span></td></tr>
+            <tr><td><code>First Name</code></td><td>First name</td></tr>
+            <tr><td><code>Last Name</code></td><td>Last name</td></tr>
+            <tr><td><code>Email</code></td><td>Email</td></tr>
+            <tr><td><code>Inst Name</code> / <code>institution</code></td><td>Institution</td></tr>
+            <tr><td><code>country</code></td><td>Country</td></tr>
+            <tr><td><code>state</code></td><td>State</td></tr>
+            <tr><td><code>orcid_id</code></td><td>ORCID</td></tr>
+            <tr><td><code>Gender</code></td><td>Gender</td></tr>
+            <tr><td><code>Employment Level</code></td><td>Career stage</td></tr>
+          </tbody>
+        </table>
         <p class="text-muted small">
           Accepts <strong>.csv</strong> or <strong>.xlsx</strong>.
-          Existing records are updated; new records are inserted.
+          New badges are inserted; existing records are updated field-by-field.
+          Empty cells are skipped.
         </p>
 
         <form id="users-upload-form"
@@ -42,29 +54,60 @@
           <span id="users-spinner" class="htmx-indicator ms-2 spinner-border spinner-border-sm text-primary" role="status"></span>
         </form>
 
-        <div id="preview-users" class="mt-3">
-          <!-- HTMX preview result injected here -->
-        </div>
+        <div id="preview-users" class="mt-3"></div>
       </div>
     </div>
   </div><!-- /col -->
 
-  <!-- ── ESAFs Import ─────────────────────────────────────────────── -->
+  <!-- ── ESAFs / Combined Import ──────────────────────────────────── -->
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-header fw-semibold">
-        <i class="bi bi-journal-bookmark me-1"></i>Import ESAFs
+        <i class="bi bi-journal-bookmark me-1"></i>Import ESAFs &amp; Users (combined)
       </div>
       <div class="card-body">
-        <p class="text-muted small mb-1">Supported columns:</p>
-        <p class="mb-3">
-          <code>esaf_id</code>, <code>technique</code>,
-          <code>notes</code>, <code>pi_group</code>
+
+        <p class="text-muted small mb-2">
+          Accepts two formats:
         </p>
-        <p class="text-muted small">
-          Accepts <strong>.csv</strong> or <strong>.xlsx</strong>.
-          Only editable fields are updated; core ESAF data is not overwritten.
-        </p>
+
+        <div class="mb-3">
+          <p class="fw-semibold small mb-1">A — Combined master file (one row per user per ESAF)</p>
+          <p class="text-muted small mb-1">Recognised column headers:</p>
+          <table class="table table-sm table-bordered small mb-0">
+            <thead class="table-light"><tr><th>Column</th><th>Destination</th></tr></thead>
+            <tbody>
+              <tr><td><code>Experiment Id</code></td><td>ESAF ID <span class="text-danger">*key*</span></td></tr>
+              <tr><td><code>Exp FY</code></td><td>Year</td></tr>
+              <tr><td><code>Posted Date</code></td><td>Start date</td></tr>
+              <tr><td><code>Pen</code></td><td>Local ID</td></tr>
+              <tr><td><code>Beamline Name</code></td><td>Beamline</td></tr>
+              <tr><td><code>Funding Source</code></td><td>Funding sources</td></tr>
+              <tr><td><code>Research Subject</code></td><td>Technique</td></tr>
+              <tr><td><code>Badge</code></td><td>User badge <span class="text-danger">*key*</span></td></tr>
+              <tr><td><code>First / Last Name</code></td><td>User name</td></tr>
+              <tr><td><code>Email</code></td><td>User email</td></tr>
+              <tr><td><code>Inst Name</code></td><td>User institution</td></tr>
+              <tr><td><code>Gender</code></td><td>User gender</td></tr>
+              <tr><td><code>Employment Level</code></td><td>Career stage</td></tr>
+              <tr><td><code>User Type</code></td><td>ON-SITE / OFF-SITE</td></tr>
+              <tr><td><code>Spokesperson</code></td><td>Y → PI role</td></tr>
+            </tbody>
+          </table>
+          <p class="text-muted small mt-1 mb-0">
+            Updates ESAFs, upserts users, and rebuilds ESAF↔user links in one pass.
+            ESAFs not in the DB are inserted as stubs.
+          </p>
+        </div>
+
+        <div class="mb-3">
+          <p class="fw-semibold small mb-1">B — Simple ESAF-only file</p>
+          <p class="text-muted small mb-0">
+            Columns: <code>esaf_id</code>, <code>technique</code>, <code>notes</code>,
+            <code>pi_group</code>, <code>local_id</code>.
+            Only editable fields — no user rows.
+          </p>
+        </div>
 
         <form id="esafs-upload-form"
               hx-post="/upload/preview/esafs"
@@ -83,9 +126,7 @@
           <span id="esafs-spinner" class="htmx-indicator ms-2 spinner-border spinner-border-sm text-primary" role="status"></span>
         </form>
 
-        <div id="preview-esafs" class="mt-3">
-          <!-- HTMX preview result injected here -->
-        </div>
+        <div id="preview-esafs" class="mt-3"></div>
       </div>
     </div>
   </div><!-- /col -->
