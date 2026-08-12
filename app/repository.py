@@ -225,7 +225,27 @@ class ESAFRepository(ABC):
 
     @abstractmethod
     def list_distinct_institutions(self) -> list[str]:
-        """Return sorted distinct institution names from users, esafs, and pi_groups."""
+        """Return sorted distinct institution names from users, esafs, pi_groups, and gups."""
+        ...
+
+    # ------------------------------------------------------------------
+    # Institution ROR classification
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def list_institution_ror(self) -> list[dict]:
+        """Return all rows from institution_ror, sorted by name."""
+        ...
+
+    @abstractmethod
+    def upsert_institution_ror(self, name: str, data: dict) -> None:
+        """Insert or update a ROR lookup result for a given institution name."""
+        ...
+
+    @abstractmethod
+    def sync_institution_names(self) -> int:
+        """Ensure all distinct institution names have a pending row in institution_ror.
+        Returns the number of new rows inserted."""
         ...
 
 

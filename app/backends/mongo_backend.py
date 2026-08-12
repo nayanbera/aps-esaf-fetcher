@@ -637,10 +637,54 @@ class MongoESAFRepository(ESAFRepository):
         )
 
     def list_distinct_institutions(self) -> list[str]:
-        db = self._client[self._db_name]
-        from_users = db["users"].distinct("institution")
-        from_esafs = self._esafs().distinct("pi_institution")
+        _db = self._client[self._db_name]
+        from_users  = _db["users"].distinct("institution")
+        from_esafs  = self._esafs().distinct("pi_institution")
         from_groups = self._pi_groups().distinct("institution")
+        from_gups   = self._gups().distinct("pi_institution")
         return sorted(set(
-            i for i in (from_users + from_esafs + from_groups) if i
+            i for i in (from_users + from_esafs + from_groups + from_gups) if i
         ))
+
+    # ------------------------------------------------------------------
+    # Institution ROR classification
+    # ------------------------------------------------------------------
+
+    def _institution_ror(self):
+        return self._client[self._db_name]["institution_ror"]
+
+    def list_institution_ror(self) -> list[dict]:
+        docs = list(self._institution_ror().find({}, {"_id": 0}).sort("name", 1))
+        for d in docs:
+            if not isinstance(d.get("org_types"), list):
+                d["org_types"] = []
+        return docs
+
+    def upsert_institution_ror(self, name: str, data: dict) -> None:
+        self._institution_ror().update_one(
+            {"name": name},
+            {"$set": {
+                "ror_id":       data.get("ror_id", ""),
+                "ror_name":     data.get("ror_name", ""),
+                "org_types":    data.get("org_types", []),
+                "country":      data.get("country", ""),
+                "website":      data.get("website", ""),
+                "score":        data.get("score", 0.0),
+                "status":       data.get("status", "pending"),
+                "looked_up_at": _now_iso(),
+            }},
+            upsert=True,
+        )
+
+    def sync_institution_names(self) -> int:
+        names = self.list_distinct_institutions()
+        existing = {d["name"] for d in self._institution_ror().find({}, {"name": 1, "_id": 0})}
+        new_names = [n for n in names if n not in existing]
+        if new_names:
+            self._institution_ror().insert_many(
+                [{"name": n, "status": "pending", "ror_id": "", "ror_name": "",
+                  "org_types": [], "country": "", "website": "", "score": 0.0,
+                  "looked_up_at": ""}
+                 for n in new_names]
+            )
+        return len(new_names)

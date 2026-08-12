@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Institutions — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0"><i class="bi bi-building me-2"></i>Institution Classification (ROR)</h4>
+  <form hx-post="/institutions/lookup-ror"
+        hx-target="#lookup-result"
+        hx-swap="innerHTML">
+    <button type="submit" class="btn btn-primary btn-sm"
+            {% if progress.running %}disabled{% endif %}>
+      <i class="bi bi-search me-1"></i>
+      {% if progress.running %}Lookup Running ({{ progress.done }}/{{ progress.total }})…
+      {% else %}Lookup All via ROR{% endif %}
+    </button>
+  </form>
+</div>
+
+<div id="lookup-result" class="mb-3"></div>
+
+{% if progress.running %}
+<div class="alert alert-info mb-3"
+     hx-get="/institutions/progress"
+     hx-trigger="every 3s"
+     hx-swap="none"
+     id="progress-poll">
+  <i class="bi bi-hourglass-split me-1"></i>
+  Lookup in progress: <strong>{{ progress.done }}</strong>/{{ progress.total }}
+  {% if progress.errors %}<span class="text-danger ms-2">{{ progress.errors }} errors</span>{% endif %}
+</div>
+{% endif %}
+
+<!-- Summary cards -->
+{% set found_rows     = rows | selectattr("status", "equalto", "found")     | list %}
+{% set not_found_rows = rows | selectattr("status", "equalto", "not_found") | list %}
+{% set pending_rows   = rows | selectattr("status", "equalto", "pending")   | list %}
+{% set error_rows     = rows | selectattr("status", "equalto", "error")     | list %}
+
+<div class="row g-3 mb-4">
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2">
+      <div class="fs-4 fw-bold">{{ rows | length }}</div>
+      <div class="text-muted small">Total</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2 border-success">
+      <div class="fs-4 fw-bold text-success">{{ found_rows | length }}</div>
+      <div class="text-muted small">Found</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2">
+      <div class="fs-4 fw-bold text-secondary">{{ not_found_rows | length }}</div>
+      <div class="text-muted small">Not Found</div>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2">
+      <div class="fs-4 fw-bold text-muted">{{ pending_rows | length }}</div>
+      <div class="text-muted small">Pending</div>
+    </div>
+  </div>
+  {% if error_rows %}
+  <div class="col-auto">
+    <div class="card text-center px-4 py-2 border-danger">
+      <div class="fs-4 fw-bold text-danger">{{ error_rows | length }}</div>
+      <div class="text-muted small">Errors</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Type breakdown (only when we have ROR data) -->
+{% if found_rows %}
+<div class="card mb-4">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-pie-chart me-1"></i>By Organization Type
+  </div>
+  <div class="card-body">
+    <div class="d-flex flex-wrap gap-2">
+    {%- set all_types = found_rows | map(attribute='org_types') | sum(start=[]) | list -%}
+    {%- set unique_types = all_types | unique | list -%}
+    {%- for t in unique_types | sort -%}
+      {%- set cnt = all_types | select("equalto", t) | list | length -%}
+      <span class="badge bg-{{ type_badge_class(t) }} fs-6 px-3 py-2">{{ t }}: {{ cnt }}</span>
+    {%- endfor -%}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Main table -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Institution Name</th>
+            <th>ROR Canonical Name</th>
+            <th>Type(s)</th>
+            <th>Country</th>
+            <th class="text-end">Score</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for row in rows %}
+          {% include "partials/ror_row.html" %}
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">
+            No institutions found. Sync some ESAFs first, then click "Lookup All via ROR".
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

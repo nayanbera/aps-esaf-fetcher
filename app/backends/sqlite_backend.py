@@ -134,12 +134,25 @@ CREATE TABLE IF NOT EXISTS gup_funding_sources (
     percentage   INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS institution_ror (
+    name         TEXT PRIMARY KEY,
+    ror_id       TEXT DEFAULT '',
+    ror_name     TEXT DEFAULT '',
+    org_types    TEXT DEFAULT '[]',
+    country      TEXT DEFAULT '',
+    website      TEXT DEFAULT '',
+    score        REAL DEFAULT 0.0,
+    status       TEXT DEFAULT 'pending',
+    looked_up_at TEXT DEFAULT ''
+);
+
 CREATE INDEX IF NOT EXISTS idx_esafs_year       ON esafs(year);
 CREATE INDEX IF NOT EXISTS idx_esafs_beamline   ON esafs(beamline);
 CREATE INDEX IF NOT EXISTS idx_esafs_status     ON esafs(status);
 CREATE INDEX IF NOT EXISTS idx_esaf_users_badge ON esaf_users(badge);
 CREATE INDEX IF NOT EXISTS idx_gups_run_cycle   ON gups(run_cycle);
 CREATE INDEX IF NOT EXISTS idx_gup_fs_gup_id    ON gup_funding_sources(gup_id);
+CREATE INDEX IF NOT EXISTS idx_ror_status        ON institution_ror(status);
 """
 
 
@@ -278,6 +291,28 @@ class SQLiteESAFRepository(ESAFRepository):
                 except sqlite3.OperationalError:
                     pass
             # GUP tables (already in _SCHEMA but ensure on old DBs)
+            # institution_ror table (migration-safe)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS institution_ror (
+                    name         TEXT PRIMARY KEY,
+                    ror_id       TEXT DEFAULT '',
+                    ror_name     TEXT DEFAULT '',
+                    org_types    TEXT DEFAULT '[]',
+                    country      TEXT DEFAULT '',
+                    website      TEXT DEFAULT '',
+                    score        REAL DEFAULT 0.0,
+                    status       TEXT DEFAULT 'pending',
+                    looked_up_at TEXT DEFAULT ''
+                )
+            """)
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_ror_status ON institution_ror(status)"
+                )
+            except sqlite3.OperationalError:
+                pass
+            conn.commit()
+
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS gups (
                     gup_id         TEXT PRIMARY KEY,
@@ -1002,6 +1037,59 @@ class SQLiteESAFRepository(ESAFRepository):
                 SELECT pi_institution FROM esafs WHERE pi_institution != ''
                 UNION
                 SELECT institution FROM pi_groups WHERE institution != ''
+                UNION
+                SELECT pi_institution FROM gups WHERE pi_institution != ''
                 ORDER BY institution
             """).fetchall()
         return [r[0] for r in rows]
+
+    # ------------------------------------------------------------------
+    # Institution ROR classification
+    # ------------------------------------------------------------------
+
+    def list_institution_ror(self) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM institution_ror ORDER BY name"
+            ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["org_types"] = json.loads(d.get("org_types") or "[]")
+            except (ValueError, TypeError):
+                d["org_types"] = []
+            result.append(d)
+        return result
+
+    def upsert_institution_ror(self, name: str, data: dict) -> None:
+        with self._db() as conn:
+            conn.execute(
+                """INSERT INTO institution_ror
+                   (name, ror_id, ror_name, org_types, country, website, score, status, looked_up_at)
+                   VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+                   ON CONFLICT(name) DO UPDATE SET
+                       ror_id=excluded.ror_id, ror_name=excluded.ror_name,
+                       org_types=excluded.org_types, country=excluded.country,
+                       website=excluded.website, score=excluded.score,
+                       status=excluded.status, looked_up_at=excluded.looked_up_at""",
+                (
+                    name, data.get("ror_id", ""), data.get("ror_name", ""),
+                    json.dumps(data.get("org_types", [])),
+                    data.get("country", ""), data.get("website", ""),
+                    data.get("score", 0.0), data.get("status", "pending"),
+                ),
+            )
+
+    def sync_institution_names(self) -> int:
+        """Insert pending rows for any institution not yet in institution_ror."""
+        names = self.list_distinct_institutions()
+        count = 0
+        with self._db() as conn:
+            for name in names:
+                cur = conn.execute(
+                    "INSERT OR IGNORE INTO institution_ror (name, status) VALUES (?, 'pending')",
+                    (name,),
+                )
+                count += cur.rowcount
+        return count

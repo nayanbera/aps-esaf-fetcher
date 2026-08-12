@@ -238,3 +238,19 @@ def get_gup_run_cycles() -> list[str]:
 
 def list_distinct_institutions() -> list[str]:
     return _r().list_distinct_institutions()
+
+
+# ------------------------------------------------------------------
+# Institution ROR classification
+# ------------------------------------------------------------------
+
+def list_institution_ror() -> list[dict]:
+    return _r().list_institution_ror()
+
+
+def upsert_institution_ror(name: str, data: dict) -> None:
+    _r().upsert_institution_ror(name, data)
+
+
+def sync_institution_names() -> int:
+    return _r().sync_institution_names()
