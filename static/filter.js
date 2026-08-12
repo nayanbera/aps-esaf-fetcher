@@ -34,6 +34,9 @@
     var total   = 0;
 
     rows.forEach(function (row) {
+      /* Rows marked data-follow-prev are synced to their parent later, not filtered independently */
+      if (row.hasAttribute('data-follow-prev')) return;
+
       /* Skip placeholder rows (single cell spanning all columns) */
       if (row.cells.length <= 1) {
         row.style.display = (!re || visible === 0) ? '' : 'none';
@@ -50,9 +53,17 @@
 
     /* Update placeholder visibility: show only when no real rows are visible */
     rows.forEach(function (row) {
+      if (row.hasAttribute('data-follow-prev')) return;
       if (row.cells.length <= 1) {
         row.style.display = (re && visible === 0) ? '' : (re ? 'none' : '');
       }
+    });
+
+    /* Sync data-follow-prev rows to their preceding sibling's visibility */
+    rows.forEach(function (row) {
+      if (!row.hasAttribute('data-follow-prev')) return;
+      var prev = row.previousElementSibling;
+      row.style.display = (prev && prev.style.display === 'none') ? 'none' : '';
     });
 
     if (countEl) {
