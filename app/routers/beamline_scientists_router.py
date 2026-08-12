@@ -9,6 +9,30 @@ from ..templates_env import templates
 router = APIRouter()
 
 
+@router.get("/api/beamline-scientists/search", response_class=HTMLResponse)
+def search_users(q: str = "", request: Request = None):
+    """Return an HTML suggestion list for the user-search autocomplete."""
+    if not q or len(q) < 2:
+        return HTMLResponse("")
+    users = db.list_users_for_lookup(q)
+    # Build a simple <ul> of matches
+    items = ""
+    for u in users[:20]:
+        name = f"{u['first_name']} {u['last_name']}".strip()
+        items += (
+            f'<li class="list-group-item list-group-item-action py-1 px-2 suggestion-item" '
+            f'data-badge="{u["badge"]}" data-name="{name}" '
+            f'style="cursor:pointer">'
+            f'<span class="fw-semibold">{name}</span> '
+            f'<span class="text-muted small">#{u["badge"]}</span>'
+            f'{(" — " + u["institution"]) if u.get("institution") else ""}'
+            f'</li>'
+        )
+    if not items:
+        items = '<li class="list-group-item py-1 px-2 text-muted fst-italic small">No matches</li>'
+    return HTMLResponse(f'<ul class="list-group shadow-sm">{items}</ul>')
+
+
 @router.get("/beamline-scientists", response_class=HTMLResponse)
 def scientists_page(request: Request):
     scientists = db.list_beamline_scientists()

@@ -18,19 +18,27 @@
   <div class="card-header fw-semibold">Add Beamline Scientist</div>
   <div class="card-body">
     <div class="d-flex gap-2 align-items-end flex-wrap">
-      <div>
-        <label class="form-label mb-1 small fw-semibold">Badge / User ID</label>
-        <input type="text" id="add-badge" class="form-control form-control-sm"
-               placeholder="e.g. 12345" style="width:160px">
+      <div style="position:relative; min-width:300px">
+        <label class="form-label mb-1 small fw-semibold">Search by name or badge</label>
+        <input type="text" id="user-search" class="form-control form-control-sm"
+               placeholder="Type a name…" autocomplete="off"
+               hx-get="/api/beamline-scientists/search"
+               hx-trigger="input changed delay:200ms"
+               hx-target="#user-suggestions"
+               hx-include="[name='q']"
+               name="q">
+        <div id="user-suggestions"
+             style="position:absolute;z-index:1000;width:100%;top:100%;left:0"></div>
       </div>
-      <button class="btn btn-primary btn-sm" id="add-btn">
+      <div>
+        <label class="form-label mb-1 small fw-semibold">Selected badge</label>
+        <input type="text" id="selected-badge" class="form-control form-control-sm"
+               placeholder="—" readonly style="width:110px;background:#f8f9fa">
+      </div>
+      <button class="btn btn-primary btn-sm" id="add-btn" disabled>
         <i class="bi bi-plus-lg me-1"></i>Add
       </button>
       <span id="add-result" class="text-muted small align-self-center"></span>
-    </div>
-    <div class="text-muted small mt-2">
-      Enter the APS badge number of the beamline scientist. The name and institution
-      will be pulled from the users table automatically.
     </div>
   </div>
 </div>
@@ -47,34 +55,104 @@
 </div>
 
 <script>
-document.getElementById('add-btn').addEventListener('click', function () {
-  var badge = document.getElementById('add-badge').value.trim();
-  var result = document.getElementById('add-result');
-  if (!badge) { result.className = 'text-danger small align-self-center'; result.textContent = 'Enter a badge number.'; return; }
-  result.className = 'text-muted small align-self-center';
-  result.textContent = 'Adding…';
-  var form = new URLSearchParams({ badge: badge });
-  fetch('/api/beamline-scientists', { method: 'POST', body: form })
-    .then(function (r) {
-      if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'Error ' + r.status); });
-      return r.text();
-    })
-    .then(function (html) {
-      document.getElementById('scientists-wrap').innerHTML = html;
-      document.getElementById('add-badge').value = '';
-      result.className = 'text-success small align-self-center';
-      result.textContent = 'Added.';
-      setTimeout(function () { result.textContent = ''; }, 2000);
-      // re-attach HTMX on new content
-      htmx.process(document.getElementById('scientists-wrap'));
-    })
-    .catch(function (err) {
-      result.className = 'text-danger small align-self-center';
-      result.textContent = err.message;
+(function () {
+  var searchInput  = document.getElementById('user-search');
+  var badgeDisplay = document.getElementById('selected-badge');
+  var addBtn       = document.getElementById('add-btn');
+  var result       = document.getElementById('add-result');
+  var suggestions  = document.getElementById('user-suggestions');
+
+  // Select a suggestion
+  function selectUser(badge, name) {
+    badgeDisplay.value   = badge;
+    searchInput.value    = name;
+    suggestions.innerHTML = '';
+    addBtn.disabled      = false;
+    addBtn.dataset.badge = badge;
+    result.textContent   = '';
+  }
+
+  // Delegate clicks on suggestion items (populated by HTMX)
+  suggestions.addEventListener('click', function (e) {
+    var item = e.target.closest('.suggestion-item');
+    if (!item) return;
+    selectUser(item.dataset.badge, item.dataset.name);
+  });
+
+  // Keyboard navigation in suggestions
+  searchInput.addEventListener('keydown', function (e) {
+    var items = suggestions.querySelectorAll('.suggestion-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      (items[0]).focus();
+    }
+  });
+  suggestions.addEventListener('keydown', function (e) {
+    var items = Array.from(suggestions.querySelectorAll('.suggestion-item'));
+    var idx   = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (idx < items.length - 1) items[idx + 1].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (idx > 0) items[idx - 1].focus(); else searchInput.focus();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (idx >= 0) items[idx].click();
+    }
+  });
+
+  // Make list items focusable
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    if (e.detail.target !== suggestions) return;
+    suggestions.querySelectorAll('.suggestion-item').forEach(function (li) {
+      li.setAttribute('tabindex', '0');
     });
-});
-document.getElementById('add-badge').addEventListener('keydown', function (e) {
-  if (e.key === 'Enter') document.getElementById('add-btn').click();
-});
+  });
+
+  // Close suggestions when clicking outside
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#user-search') && !e.target.closest('#user-suggestions')) {
+      suggestions.innerHTML = '';
+    }
+  });
+
+  // Clear badge selection when user edits the search field
+  searchInput.addEventListener('input', function () {
+    badgeDisplay.value   = '';
+    addBtn.disabled      = true;
+    addBtn.dataset.badge = '';
+  });
+
+  // Add button
+  addBtn.addEventListener('click', function () {
+    var badge = addBtn.dataset.badge;
+    if (!badge) return;
+    result.className  = 'text-muted small align-self-center';
+    result.textContent = 'Adding…';
+    var form = new URLSearchParams({ badge: badge });
+    fetch('/api/beamline-scientists', { method: 'POST', body: form })
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'Error ' + r.status); });
+        return r.text();
+      })
+      .then(function (html) {
+        document.getElementById('scientists-wrap').innerHTML = html;
+        searchInput.value    = '';
+        badgeDisplay.value   = '';
+        addBtn.disabled      = true;
+        addBtn.dataset.badge = '';
+        result.className     = 'text-success small align-self-center';
+        result.textContent   = 'Added.';
+        setTimeout(function () { result.textContent = ''; }, 2000);
+        htmx.process(document.getElementById('scientists-wrap'));
+      })
+      .catch(function (err) {
+        result.className  = 'text-danger small align-self-center';
+        result.textContent = err.message;
+      });
+  });
+})();
 </script>
 {% endblock %}
