@@ -152,21 +152,38 @@ _ADDITIONAL_AREA_PAT = re.compile(
 )
 
 
+def _p1_heading_match(ls: str, headings: set) -> bool:
+    """True when ls equals or starts with a heading — handles merged-column lines.
+
+    pdfplumber sometimes collapses two side-by-side headings onto one line,
+    e.g. "Primary Area of Research Co-Proposers".  A plain ``in`` check fails
+    for such lines; this prefix check catches them.
+    """
+    return any(ls == h or ls.startswith(h + " ") for h in headings)
+
+
 def _page1_field(text: str, heading: str, stop_headings: set) -> str:
     """Return content after *heading*, collecting lines until a stop heading.
+
+    The heading search allows trailing content on the same line so that merged
+    headers like "Primary Area of Research Co-Proposers\\n" are still found
+    when searching for "Primary Area of Research".
 
     Lines that are themselves P1 headings (but not stop headings) are skipped
     — they are right-column headings interleaved by pdfplumber's column order.
     """
-    m = re.search(r"(?:^|\n)" + re.escape(heading) + r"\n", text, re.MULTILINE)
+    m = re.search(
+        r"(?:^|\n)" + re.escape(heading) + r"(?:[^\S\n][^\n]*)?\n",
+        text, re.MULTILINE,
+    )
     if not m:
         return ""
     lines = []
     for line in text[m.end():].split("\n"):
         ls = line.strip()
-        if ls in stop_headings:
+        if _p1_heading_match(ls, stop_headings):
             break
-        if ls in _P1_HEADINGS:
+        if _p1_heading_match(ls, _P1_HEADINGS):
             continue  # interleaved heading — skip
         lines.append(ls)
     return " ".join(filter(None, lines)).strip()
@@ -271,13 +288,16 @@ def _parse_page1_into(raw_text: str, extracted: dict, confidence: dict) -> None:
     # else → keywords.
     kw_lines: list[str] = []
     add_lines: list[str] = []
-    m = re.search(r"(?:^|\n)Keywords\n", p1, re.MULTILINE)
+    _kw_stop = {"Review Panel", "Abstract", "Funding Sources"}
+    m = re.search(
+        r"(?:^|\n)Keywords(?:[^\S\n][^\n]*)?\n", p1, re.MULTILINE
+    )
     if m:
         for line in p1[m.end():].split("\n"):
             ls = line.strip()
-            if ls in {"Review Panel", "Abstract", "Funding Sources"}:
+            if _p1_heading_match(ls, _kw_stop):
                 break
-            if ls in _P1_HEADINGS:
+            if _p1_heading_match(ls, _P1_HEADINGS):
                 continue
             if not ls:
                 continue
@@ -311,8 +331,10 @@ _ETR_SKIP = re.compile(
 
 # Matches a grant/award number at the end of a merged source cell, e.g.:
 # "R01 HL136734", "CBET 2309886", "EFRI E3P2132178", "2215190"
+# The body part only needs at least one digit (to distinguish it from pure-
+# text agency suffixes) and allows fully alphanumeric patterns like "E3P2132178".
 _GRANT_PAT = re.compile(
-    r"\s+((?:[A-Z][A-Z0-9]{0,4}\s+)?[A-Z]*\d{5,}\w*)\s*$"
+    r"\s+((?:[A-Z][A-Z0-9]{0,5}\s+)?[A-Z0-9]*\d+[A-Z0-9]*)\s*$"
 )
 
 
