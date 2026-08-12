@@ -248,6 +248,17 @@ class ESAFRepository(ABC):
         Returns the number of new rows inserted."""
         ...
 
+    @abstractmethod
+    def rename_institution(self, old_name: str, new_name: str) -> dict:
+        """Rename an institution across users, esafs, pi_groups, gups, and institution_ror.
+        Returns dict of per-table update counts."""
+        ...
+
+    @abstractmethod
+    def set_institution_manual_types(self, name: str, types: list[str]) -> None:
+        """Set the manual org-type override for an institution."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Factory

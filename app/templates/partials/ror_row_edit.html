@@ -1,0 +1,59 @@
+{% set _all_types = ['education', 'government', 'facility', 'company', 'nonprofit', 'healthcare', 'funder', 'archive', 'other'] %}
+{% set _active_types = row.manual_types if row.manual_types else (row.org_types | reject("equalto", "funder") | list) %}
+<tr class="table-warning">
+  <input type="hidden" name="original_name" value="{{ row.name }}">
+  <td>
+    <input type="text" name="new_name" value="{{ row.name }}"
+           class="form-control form-control-sm" style="min-width:16rem;">
+  </td>
+  <td class="small text-muted">
+    {% if row.ror_name %}{{ row.ror_name }}{% else %}—{% endif %}
+  </td>
+  <td colspan="2">
+    <div class="d-flex flex-wrap gap-1">
+      {% for t in _all_types %}
+      {% set _checked = t in _active_types %}
+      <input type="checkbox" class="btn-check"
+             id="mt-{{ loop.index }}-{{ row.name | replace(' ','-') | replace(',','') | replace("'","") }}"
+             name="manual_types" value="{{ t }}"
+             {% if _checked %}checked{% endif %}
+             autocomplete="off">
+      <label class="btn btn-sm btn-outline-secondary py-0"
+             for="mt-{{ loop.index }}-{{ row.name | replace(' ','-') | replace(',','') | replace("'","") }}">
+        {{ t }}
+      </label>
+      {% endfor %}
+    </div>
+    <div class="text-muted" style="font-size:0.75rem; margin-top:0.25rem;">
+      Check types to override ROR (leave all unchecked to use ROR data).
+    </div>
+  </td>
+  <td class="text-end small text-muted">
+    {% if row.score %}{{ "%.2f" | format(row.score) }}{% else %}—{% endif %}
+  </td>
+  <td>
+    {% if row.status == 'found' %}<span class="badge bg-success">found</span>
+    {% elif row.status == 'not_found' %}<span class="badge bg-secondary">not found</span>
+    {% elif row.status == 'error' %}<span class="badge bg-danger">error</span>
+    {% else %}<span class="badge bg-light text-dark border">pending</span>{% endif %}
+  </td>
+  <td>
+    <div class="d-flex gap-1">
+      <button type="button"
+              hx-post="/institutions/save-edit"
+              hx-include="closest tr"
+              hx-target="closest tr"
+              hx-swap="outerHTML"
+              class="btn btn-success btn-sm py-0">
+        Save
+      </button>
+      <button type="button"
+              hx-get="/institutions/view-row?name={{ url_quote(row.name) }}"
+              hx-target="closest tr"
+              hx-swap="outerHTML"
+              class="btn btn-outline-secondary btn-sm py-0">
+        Cancel
+      </button>
+    </div>
+  </td>
+</tr>

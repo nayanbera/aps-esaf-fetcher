@@ -1,5 +1,6 @@
+{% set display_types = row.manual_types if row.manual_types else (row.org_types | reject("equalto", "funder") | list) %}
 <tr>
-  <td class="text-nowrap small">{{ row.name }}</td>
+  <td class="small">{{ row.name }}</td>
   <td>
     {% if row.ror_id %}
     <a href="{{ row.ror_id }}" target="_blank" rel="noopener" class="text-decoration-none small">
@@ -10,9 +11,15 @@
     {% endif %}
   </td>
   <td>
-    {% for t in row.org_types %}
+    {% for t in display_types %}
     <span class="badge bg-{{ type_badge_class(t) }} me-1">{{ t }}</span>
     {% endfor %}
+    {% if row.manual_types %}
+    <span class="badge bg-light text-dark border ms-1" title="Manually set">✎</span>
+    {% endif %}
+    {% if not display_types and row.status == 'found' %}
+    <span class="text-muted small">funder only</span>
+    {% endif %}
   </td>
   <td class="small">{{ row.country or '—' }}</td>
   <td class="text-end small">
@@ -30,14 +37,23 @@
     {% endif %}
   </td>
   <td>
-    <form hx-post="/institutions/lookup-one"
-          hx-target="closest tr"
-          hx-swap="outerHTML">
-      <input type="hidden" name="name" value="{{ row.name }}">
-      <button type="submit" class="btn btn-outline-secondary btn-sm py-0"
-              title="Re-lookup via ROR">
-        <i class="bi bi-arrow-clockwise"></i>
+    <div class="d-flex gap-1">
+      <button class="btn btn-outline-primary btn-sm py-0"
+              hx-get="/institutions/edit-form?name={{ url_quote(row.name) }}"
+              hx-target="closest tr"
+              hx-swap="outerHTML"
+              title="Edit name / set type">
+        <i class="bi bi-pencil"></i>
       </button>
-    </form>
+      <form hx-post="/institutions/lookup-one"
+            hx-target="closest tr"
+            hx-swap="outerHTML">
+        <input type="hidden" name="name" value="{{ row.name }}">
+        <button type="submit" class="btn btn-outline-secondary btn-sm py-0"
+                title="Re-lookup via ROR">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </form>
+    </div>
   </td>
 </tr>

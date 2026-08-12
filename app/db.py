@@ -254,3 +254,11 @@ def upsert_institution_ror(name: str, data: dict) -> None:
 
 def sync_institution_names() -> int:
     return _r().sync_institution_names()
+
+
+def rename_institution(old_name: str, new_name: str) -> dict:
+    return _r().rename_institution(old_name, new_name)
+
+
+def set_institution_manual_types(name: str, types: list[str]) -> None:
+    _r().set_institution_manual_types(name, types)

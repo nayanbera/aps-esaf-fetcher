@@ -656,24 +656,50 @@ class MongoESAFRepository(ESAFRepository):
     def list_institution_ror(self) -> list[dict]:
         docs = list(self._institution_ror().find({}, {"_id": 0}).sort("name", 1))
         for d in docs:
-            if not isinstance(d.get("org_types"), list):
-                d["org_types"] = []
+            for field in ("org_types", "manual_types"):
+                if not isinstance(d.get(field), list):
+                    d[field] = []
         return docs
 
     def upsert_institution_ror(self, name: str, data: dict) -> None:
         self._institution_ror().update_one(
             {"name": name},
             {"$set": {
-                "ror_id":       data.get("ror_id", ""),
-                "ror_name":     data.get("ror_name", ""),
-                "org_types":    data.get("org_types", []),
-                "country":      data.get("country", ""),
-                "website":      data.get("website", ""),
-                "score":        data.get("score", 0.0),
-                "status":       data.get("status", "pending"),
-                "looked_up_at": _now_iso(),
+                "ror_id":        data.get("ror_id", ""),
+                "ror_name":      data.get("ror_name", ""),
+                "org_types":     data.get("org_types", []),
+                "manual_types":  data.get("manual_types", []),
+                "country":       data.get("country", ""),
+                "website":       data.get("website", ""),
+                "score":         data.get("score", 0.0),
+                "status":        data.get("status", "pending"),
+                "looked_up_at":  _now_iso(),
             }},
             upsert=True,
+        )
+
+    def rename_institution(self, old_name: str, new_name: str) -> dict:
+        _db = self._client[self._db_name]
+        r_users  = _db["users"].update_many(
+            {"institution": old_name}, {"$set": {"institution": new_name}}
+        ).modified_count
+        r_esafs  = self._esafs().update_many(
+            {"pi_institution": old_name}, {"$set": {"pi_institution": new_name}}
+        ).modified_count
+        r_groups = self._pi_groups().update_many(
+            {"institution": old_name}, {"$set": {"institution": new_name}}
+        ).modified_count
+        r_gups   = self._gups().update_many(
+            {"pi_institution": old_name}, {"$set": {"pi_institution": new_name}}
+        ).modified_count
+        self._institution_ror().update_one(
+            {"name": old_name}, {"$set": {"name": new_name}}
+        )
+        return {"users": r_users, "esafs": r_esafs, "pi_groups": r_groups, "gups": r_gups}
+
+    def set_institution_manual_types(self, name: str, types: list[str]) -> None:
+        self._institution_ror().update_one(
+            {"name": name}, {"$set": {"manual_types": types}}
         )
 
     def sync_institution_names(self) -> int:

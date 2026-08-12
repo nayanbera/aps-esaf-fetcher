@@ -7,6 +7,7 @@ combinations corrupts the LRU cache key tuple.
 """
 
 from pathlib import Path
+from urllib.parse import quote
 
 from jinja2 import Environment, FileSystemLoader
 from fastapi.responses import HTMLResponse
@@ -17,6 +18,7 @@ _env = Environment(
     loader=FileSystemLoader(str(_templates_dir)),
     autoescape=True,
 )
+_env.globals["url_quote"] = quote
 
 
 class _Templates:

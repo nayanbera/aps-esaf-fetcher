@@ -139,6 +139,7 @@ CREATE TABLE IF NOT EXISTS institution_ror (
     ror_id       TEXT DEFAULT '',
     ror_name     TEXT DEFAULT '',
     org_types    TEXT DEFAULT '[]',
+    manual_types TEXT DEFAULT '[]',
     country      TEXT DEFAULT '',
     website      TEXT DEFAULT '',
     score        REAL DEFAULT 0.0,
@@ -298,6 +299,7 @@ class SQLiteESAFRepository(ESAFRepository):
                     ror_id       TEXT DEFAULT '',
                     ror_name     TEXT DEFAULT '',
                     org_types    TEXT DEFAULT '[]',
+                    manual_types TEXT DEFAULT '[]',
                     country      TEXT DEFAULT '',
                     website      TEXT DEFAULT '',
                     score        REAL DEFAULT 0.0,
@@ -305,6 +307,13 @@ class SQLiteESAFRepository(ESAFRepository):
                     looked_up_at TEXT DEFAULT ''
                 )
             """)
+            try:
+                conn.execute(
+                    "ALTER TABLE institution_ror ADD COLUMN manual_types TEXT DEFAULT '[]'"
+                )
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
             try:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_ror_status ON institution_ror(status)"
@@ -1055,10 +1064,11 @@ class SQLiteESAFRepository(ESAFRepository):
         result = []
         for r in rows:
             d = dict(r)
-            try:
-                d["org_types"] = json.loads(d.get("org_types") or "[]")
-            except (ValueError, TypeError):
-                d["org_types"] = []
+            for field in ("org_types", "manual_types"):
+                try:
+                    d[field] = json.loads(d.get(field) or "[]")
+                except (ValueError, TypeError):
+                    d[field] = []
             result.append(d)
         return result
 
@@ -1066,19 +1076,49 @@ class SQLiteESAFRepository(ESAFRepository):
         with self._db() as conn:
             conn.execute(
                 """INSERT INTO institution_ror
-                   (name, ror_id, ror_name, org_types, country, website, score, status, looked_up_at)
-                   VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+                   (name, ror_id, ror_name, org_types, manual_types,
+                    country, website, score, status, looked_up_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))
                    ON CONFLICT(name) DO UPDATE SET
                        ror_id=excluded.ror_id, ror_name=excluded.ror_name,
-                       org_types=excluded.org_types, country=excluded.country,
-                       website=excluded.website, score=excluded.score,
-                       status=excluded.status, looked_up_at=excluded.looked_up_at""",
+                       org_types=excluded.org_types, manual_types=excluded.manual_types,
+                       country=excluded.country, website=excluded.website,
+                       score=excluded.score, status=excluded.status,
+                       looked_up_at=excluded.looked_up_at""",
                 (
                     name, data.get("ror_id", ""), data.get("ror_name", ""),
                     json.dumps(data.get("org_types", [])),
+                    json.dumps(data.get("manual_types", [])),
                     data.get("country", ""), data.get("website", ""),
                     data.get("score", 0.0), data.get("status", "pending"),
                 ),
+            )
+
+    def rename_institution(self, old_name: str, new_name: str) -> dict:
+        """Rename an institution across all tables. Returns per-table update counts."""
+        with self._db() as conn:
+            r_users = conn.execute(
+                "UPDATE users SET institution=? WHERE institution=?", (new_name, old_name)
+            ).rowcount
+            r_esafs = conn.execute(
+                "UPDATE esafs SET pi_institution=? WHERE pi_institution=?", (new_name, old_name)
+            ).rowcount
+            r_groups = conn.execute(
+                "UPDATE pi_groups SET institution=? WHERE institution=?", (new_name, old_name)
+            ).rowcount
+            r_gups = conn.execute(
+                "UPDATE gups SET pi_institution=? WHERE pi_institution=?", (new_name, old_name)
+            ).rowcount
+            conn.execute(
+                "UPDATE institution_ror SET name=? WHERE name=?", (new_name, old_name)
+            )
+        return {"users": r_users, "esafs": r_esafs, "pi_groups": r_groups, "gups": r_gups}
+
+    def set_institution_manual_types(self, name: str, types: list[str]) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE institution_ror SET manual_types=? WHERE name=?",
+                (json.dumps(types), name),
             )
 
     def sync_institution_names(self) -> int:
