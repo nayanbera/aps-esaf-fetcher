@@ -110,7 +110,11 @@ class ESAFRepository(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def get_stats(self) -> dict: ...
+    def get_stats(
+        self,
+        year_from: Optional[int] = None,
+        year_to:   Optional[int] = None,
+    ) -> dict: ...
 
     # ------------------------------------------------------------------
     # Custom field definitions

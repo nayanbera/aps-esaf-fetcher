@@ -2,12 +2,43 @@
 {% block title %}Statistics — APS ESAF Fetcher{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-baseline gap-3 mb-1">
+<div class="d-flex align-items-center justify-content-between mb-3">
   <h4 class="mb-0"><i class="bi bi-bar-chart-fill me-1"></i>Statistics</h4>
+
+  <!-- Year range filter -->
+  <form method="get" action="/stats" class="d-flex align-items-center gap-2">
+    <label class="form-label mb-0 small fw-semibold text-nowrap">Year range:</label>
+    <select name="from_year" class="form-select form-select-sm" style="width:auto">
+      <option value="">All years</option>
+      {% for y in stats.all_years %}
+        <option value="{{ y }}" {% if from_year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    <span class="text-muted small">to</span>
+    <select name="to_year" class="form-select form-select-sm" style="width:auto">
+      <option value="">Present</option>
+      {% for y in stats.all_years %}
+        <option value="{{ y }}" {% if to_year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a href="/stats" class="btn btn-outline-secondary btn-sm">Reset</a>
+  </form>
 </div>
+
 <p class="text-muted small mb-4">
-  All counts below are restricted to <strong>Approved</strong> ESAFs
-  ({{ stats.total_all_esafs }} total in database, {{ stats.total_all_esafs - stats.total_esafs }} non-Approved excluded).
+  Showing <strong>Approved</strong> ESAFs
+  {% if from_year and to_year %}
+    from <strong>{{ from_year }}</strong> to <strong>{{ to_year }}</strong>
+  {% elif from_year %}
+    from <strong>{{ from_year }}</strong> to present
+  {% elif to_year %}
+    up to <strong>{{ to_year }}</strong>
+  {% else %}
+    across all years
+  {% endif %}
+  — {{ stats.total_esafs }} matched
+  ({{ stats.total_all_esafs - stats.total_esafs }} non-Approved excluded in this range).
 </p>
 
 <!-- Summary cards -->

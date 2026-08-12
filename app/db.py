@@ -142,8 +142,11 @@ def get_last_sync() -> Optional[dict]:
 # Statistics
 # ------------------------------------------------------------------
 
-def get_stats() -> dict:
-    return _r().get_stats()
+def get_stats(
+    year_from: Optional[int] = None,
+    year_to:   Optional[int] = None,
+) -> dict:
+    return _r().get_stats(year_from=year_from, year_to=year_to)
 
 
 # ------------------------------------------------------------------

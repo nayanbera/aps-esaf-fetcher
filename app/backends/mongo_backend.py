@@ -325,11 +325,24 @@ class MongoESAFRepository(ESAFRepository):
     # Statistics
     # ------------------------------------------------------------------
 
-    def get_stats(self) -> dict:
-        _approved = {"status": "Approved"}
+    def get_stats(
+        self,
+        year_from: Optional[int] = None,
+        year_to:   Optional[int] = None,
+    ) -> dict:
+        yr: dict = {}
+        if year_from is not None:
+            yr.setdefault("year", {})["$gte"] = year_from
+        if year_to is not None:
+            yr.setdefault("year", {})["$lte"] = year_to
+
+        _approved     = {"status": "Approved", **yr}
+        _any_status   = {**yr}
+
+        all_years = sorted(y for y in self._esafs().distinct("year") if y is not None)
 
         total_esafs     = self._esafs().count_documents(_approved)
-        total_all_esafs = self._esafs().count_documents({})
+        total_all_esafs = self._esafs().count_documents(_any_status)
 
         by_year = list(self._esafs().aggregate([
             {"$match": _approved},
@@ -361,8 +374,9 @@ class MongoESAFRepository(ESAFRepository):
             {"$project": {"beamline": "$_id", "count": 1, "_id": 0}},
         ]))
 
-        # Status breakdown includes ALL ESAFs (it is itself the status summary)
+        # Status breakdown uses the same year filter but shows all statuses
         by_status = list(self._esafs().aggregate([
+            {"$match": _any_status},
             {"$group": {"_id": "$status", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$project": {"status": "$_id", "count": 1, "_id": 0}},
@@ -420,6 +434,9 @@ class MongoESAFRepository(ESAFRepository):
             "by_institution":      by_institution,
             "by_funding":          by_funding,
             "top_users":           top_users,
+            "all_years":           all_years,
+            "year_from":           year_from,
+            "year_to":             year_to,
         }
 
     # ------------------------------------------------------------------

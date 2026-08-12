@@ -674,92 +674,138 @@ class SQLiteESAFRepository(ESAFRepository):
     # Statistics
     # ------------------------------------------------------------------
 
-    def get_stats(self) -> dict:
+    def get_stats(
+        self,
+        year_from: Optional[int] = None,
+        year_to:   Optional[int] = None,
+    ) -> dict:
+        # Build year-range clause fragments
+        yr_clause   = ""  # added after "WHERE status = 'Approved'"
+        yr_params   = []
+        if year_from is not None:
+            yr_clause  += " AND e.year >= ?"
+            yr_params.append(year_from)
+        if year_to is not None:
+            yr_clause  += " AND e.year <= ?"
+            yr_params.append(year_to)
+
+        # Same for queries directly on esafs (no alias)
+        yr_direct   = ""
+        yr_direct_p = []
+        if year_from is not None:
+            yr_direct  += " AND year >= ?"
+            yr_direct_p.append(year_from)
+        if year_to is not None:
+            yr_direct  += " AND year <= ?"
+            yr_direct_p.append(year_to)
+
         with self._db() as conn:
             def scalar(sql, params=()):
                 return conn.execute(sql, params).fetchone()[0]
 
-            total_esafs     = scalar("SELECT COUNT(*) FROM esafs WHERE status = 'Approved'")
-            total_all_esafs = scalar("SELECT COUNT(*) FROM esafs")
-            # participation_slots: total (user, ESAF) assignments across Approved ESAFs
-            # one user listed on N experiments counts as N slots
+            total_esafs = scalar(
+                f"SELECT COUNT(*) FROM esafs WHERE status = 'Approved'{yr_direct}",
+                yr_direct_p,
+            )
+            total_all_esafs = scalar(
+                f"SELECT COUNT(*) FROM esafs WHERE 1=1{yr_direct}",
+                yr_direct_p,
+            )
             participation_slots = scalar(
-                """SELECT COUNT(*) FROM esaf_users eu
-                   JOIN esafs e ON eu.esaf_id = e.esaf_id
-                   WHERE e.status = 'Approved'"""
+                f"""SELECT COUNT(*) FROM esaf_users eu
+                    JOIN esafs e ON eu.esaf_id = e.esaf_id
+                    WHERE e.status = 'Approved'{yr_clause}""",
+                yr_params,
             )
             unique_users = scalar(
-                """SELECT COUNT(DISTINCT eu.badge) FROM esaf_users eu
-                   JOIN esafs e ON eu.esaf_id = e.esaf_id
-                   WHERE e.status = 'Approved'"""
+                f"""SELECT COUNT(DISTINCT eu.badge) FROM esaf_users eu
+                    JOIN esafs e ON eu.esaf_id = e.esaf_id
+                    WHERE e.status = 'Approved'{yr_clause}""",
+                yr_params,
             )
 
             by_year = [
                 dict(r) for r in conn.execute(
-                    """SELECT year, COUNT(*) AS count FROM esafs
-                       WHERE status = 'Approved'
-                       GROUP BY year ORDER BY year DESC"""
+                    f"""SELECT year, COUNT(*) AS count FROM esafs
+                        WHERE status = 'Approved'{yr_direct}
+                        GROUP BY year ORDER BY year DESC""",
+                    yr_direct_p,
                 ).fetchall()
             ]
             by_beamline = [
                 dict(r) for r in conn.execute(
-                    """SELECT beamline, COUNT(*) AS count FROM esafs
-                       WHERE status = 'Approved'
-                       GROUP BY beamline ORDER BY count DESC"""
+                    f"""SELECT beamline, COUNT(*) AS count FROM esafs
+                        WHERE status = 'Approved'{yr_direct}
+                        GROUP BY beamline ORDER BY count DESC""",
+                    yr_direct_p,
                 ).fetchall()
             ]
-            # Status breakdown always includes all ESAFs — it is itself the status summary
+            # Status breakdown uses the same year filter but shows all statuses
             by_status = [
                 dict(r) for r in conn.execute(
-                    "SELECT status, COUNT(*) AS count FROM esafs GROUP BY status ORDER BY count DESC"
+                    f"""SELECT status, COUNT(*) AS count FROM esafs
+                        WHERE 1=1{yr_direct}
+                        GROUP BY status ORDER BY count DESC""",
+                    yr_direct_p,
                 ).fetchall()
             ]
             by_institution = [
                 dict(r) for r in conn.execute(
-                    """SELECT u.institution,
-                              COUNT(DISTINCT u.badge)  AS unique_users,
-                              COUNT(eu.esaf_id)        AS esaf_slots
-                       FROM users u
-                       JOIN esaf_users eu ON u.badge      = eu.badge
-                       JOIN esafs e       ON eu.esaf_id   = e.esaf_id
-                       WHERE u.institution IS NOT NULL AND u.institution != ''
-                         AND e.status = 'Approved'
-                       GROUP BY u.institution
-                       ORDER BY unique_users DESC LIMIT 30"""
+                    f"""SELECT u.institution,
+                               COUNT(DISTINCT u.badge) AS unique_users,
+                               COUNT(eu.esaf_id)       AS esaf_slots
+                        FROM users u
+                        JOIN esaf_users eu ON u.badge    = eu.badge
+                        JOIN esafs e       ON eu.esaf_id = e.esaf_id
+                        WHERE u.institution IS NOT NULL AND u.institution != ''
+                          AND e.status = 'Approved'{yr_clause}
+                        GROUP BY u.institution
+                        ORDER BY unique_users DESC LIMIT 30""",
+                    yr_params,
                 ).fetchall()
             ]
             by_funding = [
                 dict(r) for r in conn.execute(
-                    """SELECT fs.source, COUNT(*) AS count
-                       FROM funding_sources fs
-                       JOIN esafs e ON fs.esaf_id = e.esaf_id
-                       WHERE e.status = 'Approved'
-                       GROUP BY fs.source ORDER BY count DESC"""
+                    f"""SELECT fs.source, COUNT(*) AS count
+                        FROM funding_sources fs
+                        JOIN esafs e ON fs.esaf_id = e.esaf_id
+                        WHERE e.status = 'Approved'{yr_clause}
+                        GROUP BY fs.source ORDER BY count DESC""",
+                    yr_params,
                 ).fetchall()
             ]
             top_users = [
                 dict(r) for r in conn.execute(
-                    """SELECT u.first_name || ' ' || u.last_name AS name,
-                              u.institution, COUNT(eu.esaf_id) AS experiments
-                       FROM users u
-                       JOIN esaf_users eu ON u.badge    = eu.badge
-                       JOIN esafs e       ON eu.esaf_id = e.esaf_id
-                       WHERE e.status = 'Approved'
-                       GROUP BY u.badge ORDER BY experiments DESC LIMIT 20"""
+                    f"""SELECT u.first_name || ' ' || u.last_name AS name,
+                               u.institution, COUNT(eu.esaf_id) AS experiments
+                        FROM users u
+                        JOIN esaf_users eu ON u.badge    = eu.badge
+                        JOIN esafs e       ON eu.esaf_id = e.esaf_id
+                        WHERE e.status = 'Approved'{yr_clause}
+                        GROUP BY u.badge ORDER BY experiments DESC LIMIT 20""",
+                    yr_params,
+                ).fetchall()
+            ]
+            all_years = [
+                r[0] for r in conn.execute(
+                    "SELECT DISTINCT year FROM esafs WHERE year IS NOT NULL ORDER BY year"
                 ).fetchall()
             ]
 
         return {
-            "total_esafs":          total_esafs,
-            "total_all_esafs":      total_all_esafs,
-            "participation_slots":  participation_slots,
-            "unique_users":         unique_users,
-            "by_year":              by_year,
-            "by_beamline":          by_beamline,
-            "by_status":            by_status,
-            "by_institution":       by_institution,
-            "by_funding":           by_funding,
-            "top_users":            top_users,
+            "total_esafs":         total_esafs,
+            "total_all_esafs":     total_all_esafs,
+            "participation_slots": participation_slots,
+            "unique_users":        unique_users,
+            "by_year":             by_year,
+            "by_beamline":         by_beamline,
+            "by_status":           by_status,
+            "by_institution":      by_institution,
+            "by_funding":          by_funding,
+            "top_users":           top_users,
+            "all_years":           all_years,
+            "year_from":           year_from,
+            "year_to":             year_to,
         }
 
     # ------------------------------------------------------------------
