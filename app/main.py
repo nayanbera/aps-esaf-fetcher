@@ -16,6 +16,8 @@ from .routers import overrides as overrides_router
 from .routers import pi_groups_router
 from .routers import gups as gups_router
 from .routers import institutions as institutions_router
+from .routers import users_router
+from .routers import beamline_scientists_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,6 +64,8 @@ app.include_router(fields.router)
 app.include_router(overrides_router.router)
 app.include_router(pi_groups_router.router)
 app.include_router(institutions_router.router)
+app.include_router(users_router.router)
+app.include_router(beamline_scientists_router.router)
 
 
 @app.get("/", include_in_schema=False)

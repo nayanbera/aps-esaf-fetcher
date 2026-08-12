@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Unique Users — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+  <h4 class="mb-0"><i class="bi bi-people-fill me-1"></i>Unique Users</h4>
+
+  <!-- Filters -->
+  <form method="get" action="/users" class="d-flex align-items-center gap-2 flex-wrap">
+    <label class="form-label mb-0 small fw-semibold text-nowrap">Year range:</label>
+    <select name="from_year" class="form-select form-select-sm" style="width:auto">
+      <option value="">All years</option>
+      {% for y in all_years %}
+        <option value="{{ y }}" {% if from_year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    <span class="text-muted small">to</span>
+    <select name="to_year" class="form-select form-select-sm" style="width:auto">
+      <option value="">Present</option>
+      {% for y in all_years %}
+        <option value="{{ y }}" {% if to_year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+
+    {% if all_techniques %}
+    <select name="technique" class="form-select form-select-sm ms-2" style="width:auto">
+      <option value="">All techniques</option>
+      {% for t in all_techniques %}
+        <option value="{{ t }}" {% if technique == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    <div class="form-check form-check-inline ms-1 mb-0">
+      <input class="form-check-input" type="checkbox" name="exclude_scientists" value="1"
+             id="exc-sci" {% if exclude_scientists %}checked{% endif %}>
+      <label class="form-check-label small" for="exc-sci">Exclude beamline scientists</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a href="/users" class="btn btn-outline-secondary btn-sm">Reset</a>
+  </form>
+</div>
+
+<p class="text-muted small mb-3">
+  Unique users on <strong>Approved</strong> ESAFs
+  {% if from_year and to_year %}
+    from <strong>{{ from_year }}</strong> to <strong>{{ to_year }}</strong>
+  {% elif from_year %}
+    from <strong>{{ from_year }}</strong> to present
+  {% elif to_year %}
+    up to <strong>{{ to_year }}</strong>
+  {% else %}
+    across all years
+  {% endif %}
+  {% if technique %} · technique <strong>{{ technique }}</strong>{% endif %}
+  {% if exclude_scientists %} · <em>beamline scientists excluded</em>{% endif %}
+  — <strong>{{ users | length }}</strong> users found.
+</p>
+
+<!-- Regex filter -->
+<div class="filter-wrap mb-2 d-flex align-items-center gap-2">
+  <input type="text" class="form-control form-control-sm table-regex-filter"
+         data-target="users-table" placeholder="Filter by name, institution, technique…"
+         style="max-width:360px">
+  <button class="btn btn-sm btn-outline-secondary filter-clear" style="display:none">
+    <i class="bi bi-x"></i> Clear
+  </button>
+  <span class="filter-count text-muted small"></span>
+</div>
+
+<div class="table-responsive">
+  <table id="users-table" class="table table-sm table-hover align-middle mb-0">
+    <thead class="table-light sticky-top">
+      <tr>
+        <th>Badge</th>
+        <th>Name</th>
+        <th>Institution</th>
+        <th>Country</th>
+        <th>Email</th>
+        <th>Techniques</th>
+        <th class="text-end" title="Number of Approved ESAFs this person is listed on"># ESAFs</th>
+        <th>First experiment</th>
+        <th>Last experiment</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for u in users %}
+      <tr>
+        <td><code>{{ u.badge }}</code></td>
+        <td>{{ u.name }}</td>
+        <td>{{ u.institution or '—' }}</td>
+        <td>{{ u.country or '—' }}</td>
+        <td>
+          {% if u.email %}
+            <a href="mailto:{{ u.email }}" class="text-decoration-none small">{{ u.email }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% for t in u.techniques %}
+            {% if t == 'Surf' %}
+              <span class="badge bg-primary">{{ t }}</span>
+            {% elif t == 'Xtal' %}
+              <span class="badge bg-success">{{ t }}</span>
+            {% elif t == 'ASWAXS' %}
+              <span class="badge bg-warning text-dark">{{ t }}</span>
+            {% elif t == 'Beamline' %}
+              <span class="badge bg-info text-dark">{{ t }}</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ t }}</span>
+            {% endif %}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endfor %}
+        </td>
+        <td class="text-end">{{ u.esaf_count }}</td>
+        <td class="text-nowrap small">{{ u.first_experiment or '—' }}</td>
+        <td class="text-nowrap small">{{ u.last_experiment or '—' }}</td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="9" class="text-muted text-center py-4">
+          No users found for the selected filters.
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

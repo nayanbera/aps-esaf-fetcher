@@ -145,8 +145,37 @@ def get_last_sync() -> Optional[dict]:
 def get_stats(
     year_from: Optional[int] = None,
     year_to:   Optional[int] = None,
+    technique: Optional[str] = None,
+    exclude_scientists: bool = False,
 ) -> dict:
-    return _r().get_stats(year_from=year_from, year_to=year_to)
+    return _r().get_stats(
+        year_from=year_from, year_to=year_to,
+        technique=technique, exclude_scientists=exclude_scientists,
+    )
+
+
+def list_unique_users(
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    technique: Optional[str] = None,
+    exclude_scientists: bool = False,
+) -> list[dict]:
+    return _r().list_unique_users(
+        year_from=year_from, year_to=year_to,
+        technique=technique, exclude_scientists=exclude_scientists,
+    )
+
+
+def list_beamline_scientists() -> list[dict]:
+    return _r().list_beamline_scientists()
+
+
+def add_beamline_scientist(badge: str) -> bool:
+    return _r().add_beamline_scientist(badge)
+
+
+def remove_beamline_scientist(badge: str) -> bool:
+    return _r().remove_beamline_scientist(badge)
 
 
 # ------------------------------------------------------------------

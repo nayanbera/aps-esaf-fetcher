@@ -5,8 +5,8 @@
 <div class="d-flex align-items-center justify-content-between mb-3">
   <h4 class="mb-0"><i class="bi bi-bar-chart-fill me-1"></i>Statistics</h4>
 
-  <!-- Year range filter -->
-  <form method="get" action="/stats" class="d-flex align-items-center gap-2">
+  <!-- Filters -->
+  <form method="get" action="/stats" class="d-flex align-items-center gap-2 flex-wrap">
     <label class="form-label mb-0 small fw-semibold text-nowrap">Year range:</label>
     <select name="from_year" class="form-select form-select-sm" style="width:auto">
       <option value="">All years</option>
@@ -21,6 +21,22 @@
         <option value="{{ y }}" {% if to_year == y %}selected{% endif %}>{{ y }}</option>
       {% endfor %}
     </select>
+
+    {% if stats.all_techniques %}
+    <select name="technique" class="form-select form-select-sm ms-2" style="width:auto">
+      <option value="">All techniques</option>
+      {% for t in stats.all_techniques %}
+        <option value="{{ t }}" {% if technique == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    <div class="form-check form-check-inline ms-1 mb-0">
+      <input class="form-check-input" type="checkbox" name="exclude_scientists" value="1"
+             id="exc-sci" {% if exclude_scientists %}checked{% endif %}>
+      <label class="form-check-label small" for="exc-sci">Exclude beamline scientists</label>
+    </div>
+
     <button type="submit" class="btn btn-primary btn-sm">Apply</button>
     <a href="/stats" class="btn btn-outline-secondary btn-sm">Reset</a>
   </form>
@@ -37,6 +53,8 @@
   {% else %}
     across all years
   {% endif %}
+  {% if technique %} · technique <strong>{{ technique }}</strong>{% endif %}
+  {% if exclude_scientists %} · <em>beamline scientists excluded</em>{% endif %}
   — {{ stats.total_esafs }} matched
   ({{ stats.total_all_esafs - stats.total_esafs }} non-Approved excluded in this range).
 </p>

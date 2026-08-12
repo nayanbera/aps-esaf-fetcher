@@ -329,6 +329,8 @@ class MongoESAFRepository(ESAFRepository):
         self,
         year_from: Optional[int] = None,
         year_to:   Optional[int] = None,
+        technique: Optional[str] = None,
+        exclude_scientists: bool = False,
     ) -> dict:
         yr: dict = {}
         if year_from is not None:
@@ -336,10 +338,17 @@ class MongoESAFRepository(ESAFRepository):
         if year_to is not None:
             yr.setdefault("year", {})["$lte"] = year_to
 
-        _approved     = {"status": "Approved", **yr}
-        _any_status   = {**yr}
+        _approved   = {"status": "Approved", **yr}
+        _any_status = {**yr}
+
+        if technique:
+            _approved["technique"]   = technique
+            _any_status["technique"] = technique
 
         all_years = sorted(y for y in self._esafs().distinct("year") if y is not None)
+        all_techniques = sorted(
+            t for t in self._esafs().distinct("technique") if t
+        )
 
         total_esafs     = self._esafs().count_documents(_approved)
         total_all_esafs = self._esafs().count_documents(_any_status)
@@ -435,9 +444,77 @@ class MongoESAFRepository(ESAFRepository):
             "by_funding":          by_funding,
             "top_users":           top_users,
             "all_years":           all_years,
+            "all_techniques":      all_techniques,
             "year_from":           year_from,
             "year_to":             year_to,
+            "technique":           technique,
+            "exclude_scientists":  exclude_scientists,
         }
+
+    def list_unique_users(
+        self,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+        technique: Optional[str] = None,
+        exclude_scientists: bool = False,
+    ) -> list[dict]:
+        # Mongo backend stub — not implemented for beamline scientists exclusion
+        match: dict = {"status": "Approved"}
+        if year_from is not None:
+            match.setdefault("year", {})["$gte"] = year_from
+        if year_to is not None:
+            match.setdefault("year", {})["$lte"] = year_to
+        if technique:
+            match["technique"] = technique
+        pipeline = [
+            {"$match": match},
+            {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
+            {"$group": {
+                "_id":             "$users.badge",
+                "name":            {"$first": {"$concat": ["$users.first_name", " ", "$users.last_name"]}},
+                "institution":     {"$first": "$users.institution"},
+                "country":         {"$first": "$users.country"},
+                "email":           {"$first": "$users.email"},
+                "techniques":      {"$addToSet": "$technique"},
+                "esaf_count":      {"$sum": 1},
+                "first_experiment": {"$min": "$start_date"},
+                "last_experiment":  {"$max": "$end_date"},
+            }},
+            {"$sort": {"name": 1}},
+        ]
+        results = []
+        for doc in self._esafs().aggregate(pipeline):
+            doc["badge"] = doc.pop("_id")
+            doc["techniques"] = sorted(t for t in doc.get("techniques", []) if t)
+            results.append(doc)
+        return results
+
+    def list_beamline_scientists(self) -> list[dict]:
+        coll = self._client[self._db_name]["beamline_scientists"]
+        return [self._clean(d) for d in coll.find().sort("name", 1)]
+
+    def add_beamline_scientist(self, badge: str) -> bool:
+        user_doc = self._esafs().find_one(
+            {"users.badge": badge}, {"users.$": 1}
+        )
+        if not user_doc:
+            return False
+        u = user_doc["users"][0]
+        coll = self._client[self._db_name]["beamline_scientists"]
+        coll.update_one(
+            {"badge": badge},
+            {"$set": {
+                "badge": badge,
+                "name": f"{u.get('first_name','')} {u.get('last_name','')}".strip(),
+                "institution": u.get("institution", ""),
+            }},
+            upsert=True,
+        )
+        return True
+
+    def remove_beamline_scientist(self, badge: str) -> bool:
+        coll = self._client[self._db_name]["beamline_scientists"]
+        return coll.delete_one({"badge": badge}).deleted_count > 0
 
     # ------------------------------------------------------------------
     # Custom field definitions

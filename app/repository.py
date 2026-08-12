@@ -114,7 +114,35 @@ class ESAFRepository(ABC):
         self,
         year_from: Optional[int] = None,
         year_to:   Optional[int] = None,
+        technique: Optional[str] = None,
+        exclude_scientists: bool = False,
     ) -> dict: ...
+
+    @abstractmethod
+    def list_unique_users(
+        self,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+        technique: Optional[str] = None,
+        exclude_scientists: bool = False,
+    ) -> list[dict]:
+        """Return one row per unique user across Approved ESAFs, with aggregated technique list."""
+        ...
+
+    @abstractmethod
+    def list_beamline_scientists(self) -> list[dict]:
+        """Return all rows from beamline_scientists, sorted by name."""
+        ...
+
+    @abstractmethod
+    def add_beamline_scientist(self, badge: str) -> bool:
+        """Add a user to the beamline scientists list. Returns False if badge not found."""
+        ...
+
+    @abstractmethod
+    def remove_beamline_scientist(self, badge: str) -> bool:
+        """Remove a user from the beamline scientists list. Returns False if not found."""
+        ...
 
     # ------------------------------------------------------------------
     # Custom field definitions

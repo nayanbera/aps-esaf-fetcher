@@ -1,0 +1,35 @@
+<!-- Beamline scientists table body — swapped by HTMX add/remove -->
+<table id="scientists-table" class="table table-sm table-hover mb-0">
+  <thead class="table-light">
+    <tr>
+      <th>Badge</th>
+      <th>Name</th>
+      <th>Institution</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in scientists %}
+    <tr>
+      <td><code>{{ s.badge }}</code></td>
+      <td>{{ s.name }}</td>
+      <td>{{ s.institution or '—' }}</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-danger py-0"
+                hx-delete="/api/beamline-scientists/{{ s.badge }}"
+                hx-target="#scientists-wrap"
+                hx-swap="innerHTML"
+                hx-confirm="Remove {{ s.name }} from beamline scientists?">
+          <i class="bi bi-trash"></i>
+        </button>
+      </td>
+    </tr>
+  {% else %}
+    <tr>
+      <td colspan="4" class="text-muted text-center py-3 fst-italic">
+        No beamline scientists added yet.
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>

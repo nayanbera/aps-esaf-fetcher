@@ -147,6 +147,12 @@ CREATE TABLE IF NOT EXISTS institution_ror (
     looked_up_at TEXT DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS beamline_scientists (
+    badge       TEXT PRIMARY KEY,
+    name        TEXT NOT NULL DEFAULT '',
+    institution TEXT NOT NULL DEFAULT ''
+);
+
 CREATE INDEX IF NOT EXISTS idx_esafs_year       ON esafs(year);
 CREATE INDEX IF NOT EXISTS idx_esafs_beamline   ON esafs(beamline);
 CREATE INDEX IF NOT EXISTS idx_esafs_status     ON esafs(status);
@@ -320,6 +326,14 @@ class SQLiteESAFRepository(ESAFRepository):
                 )
             except sqlite3.OperationalError:
                 pass
+            conn.commit()
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS beamline_scientists (
+                    badge       TEXT PRIMARY KEY,
+                    name        TEXT NOT NULL DEFAULT '',
+                    institution TEXT NOT NULL DEFAULT ''
+                )
+            """)
             conn.commit()
 
             conn.executescript("""
@@ -678,75 +692,82 @@ class SQLiteESAFRepository(ESAFRepository):
         self,
         year_from: Optional[int] = None,
         year_to:   Optional[int] = None,
+        technique: Optional[str] = None,
+        exclude_scientists: bool = False,
     ) -> dict:
-        # Build year-range clause fragments
-        yr_clause   = ""  # added after "WHERE status = 'Approved'"
-        yr_params   = []
-        if year_from is not None:
-            yr_clause  += " AND e.year >= ?"
-            yr_params.append(year_from)
-        if year_to is not None:
-            yr_clause  += " AND e.year <= ?"
-            yr_params.append(year_to)
+        # Build shared WHERE clause fragments
+        direct_clause = ""   # for direct esafs table (no alias)
+        direct_params: list = []
+        join_clause   = ""   # for queries with JOIN esafs e
+        join_params: list   = []
 
-        # Same for queries directly on esafs (no alias)
-        yr_direct   = ""
-        yr_direct_p = []
         if year_from is not None:
-            yr_direct  += " AND year >= ?"
-            yr_direct_p.append(year_from)
+            direct_clause += " AND year >= ?";   direct_params.append(year_from)
+            join_clause   += " AND e.year >= ?";  join_params.append(year_from)
         if year_to is not None:
-            yr_direct  += " AND year <= ?"
-            yr_direct_p.append(year_to)
+            direct_clause += " AND year <= ?";   direct_params.append(year_to)
+            join_clause   += " AND e.year <= ?";  join_params.append(year_to)
+        if technique:
+            direct_clause += " AND technique = ?";   direct_params.append(technique)
+            join_clause   += " AND e.technique = ?"; join_params.append(technique)
+
+        sci_eu = (
+            " AND eu.badge NOT IN (SELECT badge FROM beamline_scientists)"
+            if exclude_scientists else ""
+        )
+        sci_u = (
+            " AND u.badge NOT IN (SELECT badge FROM beamline_scientists)"
+            if exclude_scientists else ""
+        )
 
         with self._db() as conn:
             def scalar(sql, params=()):
                 return conn.execute(sql, params).fetchone()[0]
 
             total_esafs = scalar(
-                f"SELECT COUNT(*) FROM esafs WHERE status = 'Approved'{yr_direct}",
-                yr_direct_p,
+                f"SELECT COUNT(*) FROM esafs WHERE status = 'Approved'{direct_clause}",
+                direct_params,
             )
             total_all_esafs = scalar(
-                f"SELECT COUNT(*) FROM esafs WHERE 1=1{yr_direct}",
-                yr_direct_p,
+                f"SELECT COUNT(*) FROM esafs WHERE 1=1{direct_clause}",
+                direct_params,
             )
             participation_slots = scalar(
                 f"""SELECT COUNT(*) FROM esaf_users eu
                     JOIN esafs e ON eu.esaf_id = e.esaf_id
-                    WHERE e.status = 'Approved'{yr_clause}""",
-                yr_params,
+                    WHERE e.status = 'Approved'{join_clause}{sci_eu}""",
+                join_params,
             )
             unique_users = scalar(
                 f"""SELECT COUNT(DISTINCT eu.badge) FROM esaf_users eu
                     JOIN esafs e ON eu.esaf_id = e.esaf_id
-                    WHERE e.status = 'Approved'{yr_clause}""",
-                yr_params,
+                    WHERE e.status = 'Approved'{join_clause}{sci_eu}""",
+                join_params,
             )
 
             by_year = [
                 dict(r) for r in conn.execute(
                     f"""SELECT year, COUNT(*) AS count FROM esafs
-                        WHERE status = 'Approved'{yr_direct}
+                        WHERE status = 'Approved'{direct_clause}
                         GROUP BY year ORDER BY year DESC""",
-                    yr_direct_p,
+                    direct_params,
                 ).fetchall()
             ]
             by_beamline = [
                 dict(r) for r in conn.execute(
                     f"""SELECT beamline, COUNT(*) AS count FROM esafs
-                        WHERE status = 'Approved'{yr_direct}
+                        WHERE status = 'Approved'{direct_clause}
                         GROUP BY beamline ORDER BY count DESC""",
-                    yr_direct_p,
+                    direct_params,
                 ).fetchall()
             ]
-            # Status breakdown uses the same year filter but shows all statuses
+            # Status breakdown uses same filters but shows all statuses
             by_status = [
                 dict(r) for r in conn.execute(
                     f"""SELECT status, COUNT(*) AS count FROM esafs
-                        WHERE 1=1{yr_direct}
+                        WHERE 1=1{direct_clause}
                         GROUP BY status ORDER BY count DESC""",
-                    yr_direct_p,
+                    direct_params,
                 ).fetchall()
             ]
             by_institution = [
@@ -758,10 +779,10 @@ class SQLiteESAFRepository(ESAFRepository):
                         JOIN esaf_users eu ON u.badge    = eu.badge
                         JOIN esafs e       ON eu.esaf_id = e.esaf_id
                         WHERE u.institution IS NOT NULL AND u.institution != ''
-                          AND e.status = 'Approved'{yr_clause}
+                          AND e.status = 'Approved'{join_clause}{sci_u}
                         GROUP BY u.institution
                         ORDER BY unique_users DESC LIMIT 30""",
-                    yr_params,
+                    join_params,
                 ).fetchall()
             ]
             by_funding = [
@@ -769,9 +790,9 @@ class SQLiteESAFRepository(ESAFRepository):
                     f"""SELECT fs.source, COUNT(*) AS count
                         FROM funding_sources fs
                         JOIN esafs e ON fs.esaf_id = e.esaf_id
-                        WHERE e.status = 'Approved'{yr_clause}
+                        WHERE e.status = 'Approved'{join_clause}
                         GROUP BY fs.source ORDER BY count DESC""",
-                    yr_params,
+                    join_params,
                 ).fetchall()
             ]
             top_users = [
@@ -781,14 +802,20 @@ class SQLiteESAFRepository(ESAFRepository):
                         FROM users u
                         JOIN esaf_users eu ON u.badge    = eu.badge
                         JOIN esafs e       ON eu.esaf_id = e.esaf_id
-                        WHERE e.status = 'Approved'{yr_clause}
+                        WHERE e.status = 'Approved'{join_clause}{sci_u}
                         GROUP BY u.badge ORDER BY experiments DESC LIMIT 20""",
-                    yr_params,
+                    join_params,
                 ).fetchall()
             ]
             all_years = [
                 r[0] for r in conn.execute(
                     "SELECT DISTINCT year FROM esafs WHERE year IS NOT NULL ORDER BY year"
+                ).fetchall()
+            ]
+            all_techniques = [
+                r[0] for r in conn.execute(
+                    """SELECT DISTINCT technique FROM esafs
+                       WHERE technique != '' AND technique IS NOT NULL ORDER BY technique"""
                 ).fetchall()
             ]
 
@@ -804,9 +831,94 @@ class SQLiteESAFRepository(ESAFRepository):
             "by_funding":          by_funding,
             "top_users":           top_users,
             "all_years":           all_years,
+            "all_techniques":      all_techniques,
             "year_from":           year_from,
             "year_to":             year_to,
+            "technique":           technique,
+            "exclude_scientists":  exclude_scientists,
         }
+
+    # ------------------------------------------------------------------
+    # Unique users list
+    # ------------------------------------------------------------------
+
+    def list_unique_users(
+        self,
+        year_from: Optional[int] = None,
+        year_to: Optional[int] = None,
+        technique: Optional[str] = None,
+        exclude_scientists: bool = False,
+    ) -> list[dict]:
+        clauses = ["e.status = 'Approved'"]
+        params: list = []
+        if year_from is not None:
+            clauses.append("e.year >= ?"); params.append(year_from)
+        if year_to is not None:
+            clauses.append("e.year <= ?"); params.append(year_to)
+        if technique:
+            clauses.append("e.technique = ?"); params.append(technique)
+        if exclude_scientists:
+            clauses.append("u.badge NOT IN (SELECT badge FROM beamline_scientists)")
+        where = " AND ".join(clauses)
+        sql = f"""
+            SELECT u.badge,
+                   u.first_name || ' ' || u.last_name AS name,
+                   u.institution, u.country, u.state, u.email,
+                   GROUP_CONCAT(DISTINCT e.technique) AS techniques,
+                   COUNT(DISTINCT e.esaf_id) AS esaf_count,
+                   MIN(e.start_date) AS first_experiment,
+                   MAX(e.end_date)   AS last_experiment
+            FROM users u
+            JOIN esaf_users eu ON u.badge    = eu.badge
+            JOIN esafs e       ON eu.esaf_id = e.esaf_id
+            WHERE {where}
+            GROUP BY u.badge
+            ORDER BY name
+        """
+        with self._db() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            raw = d.get("techniques") or ""
+            d["techniques"] = sorted({t for t in raw.split(",") if t})
+            result.append(d)
+        return result
+
+    # ------------------------------------------------------------------
+    # Beamline scientists
+    # ------------------------------------------------------------------
+
+    def list_beamline_scientists(self) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT badge, name, institution FROM beamline_scientists ORDER BY name"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def add_beamline_scientist(self, badge: str) -> bool:
+        with self._db() as conn:
+            user = conn.execute(
+                "SELECT badge, first_name || ' ' || last_name AS name, institution "
+                "FROM users WHERE badge = ?",
+                (badge,),
+            ).fetchone()
+            if user is None:
+                return False
+            conn.execute(
+                """INSERT INTO beamline_scientists (badge, name, institution)
+                   VALUES (?,?,?)
+                   ON CONFLICT(badge) DO NOTHING""",
+                (user["badge"], user["name"], user["institution"] or ""),
+            )
+        return True
+
+    def remove_beamline_scientist(self, badge: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute(
+                "DELETE FROM beamline_scientists WHERE badge = ?", (badge,)
+            )
+        return cur.rowcount > 0
 
     # ------------------------------------------------------------------
     # Custom field definitions
