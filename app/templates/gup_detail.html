@@ -54,11 +54,23 @@
               </td>
             </tr>
             <tr><th class="text-nowrap" style="width:40%">GUP ID</th><td><code>{{ gup.gup_id }}</code></td></tr>
-            <tr><th>PI Name</th><td>{{ gup.pi_name or '—' }}</td></tr>
-            <tr><th>Institution</th><td>{{ gup.pi_institution or '—' }}</td></tr>
-            <tr><th>Run Cycle</th><td>{{ gup.run_cycle or '—' }}</td></tr>
-            <tr><th>Proposal Type</th><td>{{ gup.proposal_type or '—' }}</td></tr>
+            <tr><th>Proposal Call</th><td>{{ gup.proposal_call or '—' }}</td></tr>
+            <tr><th>Type</th><td>{{ gup.proposal_type or '—' }}</td></tr>
+            <tr><th>PI</th><td>{{ gup.pi_name or '—' }}{% if gup.pi_institution %}, <span class="text-muted">{{ gup.pi_institution }}</span>{% endif %}</td></tr>
+            {% if gup.co_pi %}
+            <tr><th>Co-PI</th><td>{{ gup.co_pi }}</td></tr>
+            {% endif %}
+            {% if gup.co_proposers %}
+            <tr><th>Co-Proposers</th><td>{{ gup.co_proposers }}</td></tr>
+            {% endif %}
             <tr><th>Primary Area</th><td>{{ gup.primary_area or '—' }}</td></tr>
+            {% if gup.additional_areas %}
+            <tr><th>Additional Areas</th><td>{{ gup.additional_areas }}</td></tr>
+            {% endif %}
+            {% if gup.review_panel %}
+            <tr><th>Review Panel</th><td>{{ gup.review_panel }}</td></tr>
+            {% endif %}
+            <tr><th>Run Cycle</th><td>{{ gup.run_cycle or '—' }}</td></tr>
             <tr><th>Status</th><td>{{ gup.status or '—' }}</td></tr>
             <tr><th>Submitted</th><td>{{ gup.submitted_at or '—' }}</td></tr>
             <tr><th>Beamlines</th><td>{{ gup.beamlines or '—' }}</td></tr>

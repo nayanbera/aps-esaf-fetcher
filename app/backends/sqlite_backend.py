@@ -101,23 +101,28 @@ CREATE TABLE IF NOT EXISTS domain_overrides (
 );
 
 CREATE TABLE IF NOT EXISTS gups (
-    gup_id         TEXT PRIMARY KEY,
-    title          TEXT DEFAULT '',
-    pi_name        TEXT DEFAULT '',
-    pi_institution TEXT DEFAULT '',
-    run_cycle      TEXT DEFAULT '',
-    proposal_type  TEXT DEFAULT '',
-    primary_area   TEXT DEFAULT '',
-    keywords       TEXT DEFAULT '',
-    abstract       TEXT DEFAULT '',
-    beamlines      TEXT DEFAULT '',
-    status         TEXT DEFAULT '',
-    submitted_at   TEXT DEFAULT '',
-    notes          TEXT DEFAULT '',
-    pdf_path       TEXT DEFAULT '',
-    raw_fields     TEXT DEFAULT '{}',
-    created_at     TEXT DEFAULT (datetime('now')),
-    updated_at     TEXT DEFAULT (datetime('now'))
+    gup_id           TEXT PRIMARY KEY,
+    title            TEXT DEFAULT '',
+    pi_name          TEXT DEFAULT '',
+    pi_institution   TEXT DEFAULT '',
+    run_cycle        TEXT DEFAULT '',
+    proposal_call    TEXT DEFAULT '',
+    proposal_type    TEXT DEFAULT '',
+    primary_area     TEXT DEFAULT '',
+    additional_areas TEXT DEFAULT '',
+    review_panel     TEXT DEFAULT '',
+    co_pi            TEXT DEFAULT '',
+    co_proposers     TEXT DEFAULT '',
+    keywords         TEXT DEFAULT '',
+    abstract         TEXT DEFAULT '',
+    beamlines        TEXT DEFAULT '',
+    status           TEXT DEFAULT '',
+    submitted_at     TEXT DEFAULT '',
+    notes            TEXT DEFAULT '',
+    pdf_path         TEXT DEFAULT '',
+    raw_fields       TEXT DEFAULT '{}',
+    created_at       TEXT DEFAULT (datetime('now')),
+    updated_at       TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS gup_funding_sources (
@@ -259,6 +264,19 @@ class SQLiteESAFRepository(ESAFRepository):
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
+            # New parsed GUP fields (migration-safe)
+            for col, defn in [
+                ("proposal_call",  "TEXT DEFAULT ''"),
+                ("review_panel",   "TEXT DEFAULT ''"),
+                ("co_pi",          "TEXT DEFAULT ''"),
+                ("co_proposers",   "TEXT DEFAULT ''"),
+                ("additional_areas", "TEXT DEFAULT ''"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE gups ADD COLUMN {col} {defn}")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
             # GUP tables (already in _SCHEMA but ensure on old DBs)
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS gups (
@@ -831,13 +849,18 @@ class SQLiteESAFRepository(ESAFRepository):
             if existing:
                 conn.execute(
                     """UPDATE gups SET title=?, pi_name=?, pi_institution=?, run_cycle=?,
-                       proposal_type=?, primary_area=?, keywords=?, abstract=?, beamlines=?,
+                       proposal_call=?, proposal_type=?, primary_area=?, additional_areas=?,
+                       review_panel=?, co_pi=?, co_proposers=?,
+                       keywords=?, abstract=?, beamlines=?,
                        status=?, submitted_at=?, pdf_path=?, raw_fields=?,
                        updated_at=datetime('now') WHERE gup_id=?""",
                     (
                         data.get("title", ""), data.get("pi_name", ""),
                         data.get("pi_institution", ""), data.get("run_cycle", ""),
-                        data.get("proposal_type", ""), data.get("primary_area", ""),
+                        data.get("proposal_call", ""), data.get("proposal_type", ""),
+                        data.get("primary_area", ""), data.get("additional_areas", ""),
+                        data.get("review_panel", ""), data.get("co_pi", ""),
+                        data.get("co_proposers", ""),
                         data.get("keywords", ""), data.get("abstract", ""),
                         data.get("beamlines", ""), data.get("status", ""),
                         data.get("submitted_at", ""), data.get("pdf_path", ""),
@@ -848,14 +871,19 @@ class SQLiteESAFRepository(ESAFRepository):
             else:
                 conn.execute(
                     """INSERT INTO gups
-                       (gup_id, title, pi_name, pi_institution, run_cycle, proposal_type,
-                        primary_area, keywords, abstract, beamlines, status, submitted_at,
+                       (gup_id, title, pi_name, pi_institution, run_cycle,
+                        proposal_call, proposal_type, primary_area, additional_areas,
+                        review_panel, co_pi, co_proposers,
+                        keywords, abstract, beamlines, status, submitted_at,
                         pdf_path, raw_fields)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         gup_id, data.get("title", ""), data.get("pi_name", ""),
                         data.get("pi_institution", ""), data.get("run_cycle", ""),
-                        data.get("proposal_type", ""), data.get("primary_area", ""),
+                        data.get("proposal_call", ""), data.get("proposal_type", ""),
+                        data.get("primary_area", ""), data.get("additional_areas", ""),
+                        data.get("review_panel", ""), data.get("co_pi", ""),
+                        data.get("co_proposers", ""),
                         data.get("keywords", ""), data.get("abstract", ""),
                         data.get("beamlines", ""), data.get("status", ""),
                         data.get("submitted_at", ""), data.get("pdf_path", ""),

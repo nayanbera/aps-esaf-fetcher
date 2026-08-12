@@ -89,46 +89,8 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
     else:
         confidence["title"] = 0.0
 
-    # Run cycle — "2026-3 Standard General User Proposals"
-    m = re.search(r"(\d{4}-\d+)\s+(?:Standard\s+)?General\s+User", raw_text, re.IGNORECASE)
-    if m:
-        extracted["run_cycle"] = m.group(1)
-        confidence["run_cycle"] = 1.0
-    else:
-        confidence["run_cycle"] = 0.0
-
-    # Principal Investigator — next line after "Principal Investigator\n"
-    m = re.search(r"Principal\s+Investigator\s*\n([^\n]+)", raw_text)
-    if m:
-        pi_line = m.group(1).strip()
-        if "," in pi_line:
-            parts = pi_line.split(",", 1)
-            extracted["pi_name"] = parts[0].strip()
-            extracted["pi_institution"] = parts[1].strip()
-        else:
-            extracted["pi_name"] = pi_line
-        confidence["pi_name"] = 0.95
-    else:
-        confidence["pi_name"] = 0.0
-
-    # Primary area of research
-    m = re.search(r"Primary\s+Area\s+of\s+Research\s*\n([^\n]+)", raw_text)
-    if m:
-        area = m.group(1).strip()
-        # Two-column layout sometimes merges the next label onto the same line
-        area = re.split(r"\s{3,}", area)[0].strip()
-        extracted["primary_area"] = area
-        confidence["primary_area"] = 0.9
-
-    # Keywords — between "Keywords\n" and "Review Panel" or "Abstract"
-    m = re.search(
-        r"Keywords?\s*\n(.+?)(?=Review Panel|Abstract\b)",
-        raw_text, re.DOTALL | re.IGNORECASE,
-    )
-    if m:
-        kw = re.sub(r"\s+", " ", m.group(1)).strip()
-        extracted["keywords"] = kw
-        confidence["keywords"] = 0.8
+    # Page-1 structured fields (two-column layout)
+    _parse_page1_into(raw_text, extracted, confidence)
 
     # Abstract — between "Abstract\n" heading and "Funding Sources" or "ETR"
     m = re.search(
@@ -139,12 +101,6 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
         abstract = re.sub(r"\s+", " ", m.group(1)).strip()
         extracted["abstract"] = abstract
         confidence["abstract"] = 0.9
-
-    # Proposal type
-    m = re.search(r"\bType\b\s*\n([^\n]+)", raw_text)
-    if m:
-        extracted["proposal_type"] = m.group(1).strip()
-        confidence["proposal_type"] = 0.8
 
     # Text fallbacks if table parsing found nothing
     if not funding_rows:
@@ -159,6 +115,188 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
         "beamlines": beamlines,
         "raw_text": raw_text,
     }
+
+
+# ---------------------------------------------------------------------------
+# Page-1 structured field parser
+# ---------------------------------------------------------------------------
+
+# All known headings on GUP page 1.  Order doesn't matter here — used for
+# "is this line a heading?" lookups.
+_P1_HEADINGS = {
+    "Proposal Call Principal Investigator",
+    "Proposal Call",
+    "Principal Investigator",
+    "Type",
+    "Co-Principal Investigator",
+    "Primary Area of Research",
+    "Co-Proposers",
+    "Additional Areas of Research",
+    "Keywords",
+    "Review Panel",
+    "Abstract",
+    "Funding Sources",
+}
+
+# Pattern: "Firstname Lastname, Institution"  (exactly 2 capitalized words before the comma)
+# Using \b ensures we anchor to a word boundary, so the leftmost 2-word match
+# followed by a comma wins.  This prevents "Proposals David Gidalevitz" from
+# matching when only "David Gidalevitz" is directly followed by a comma.
+_PI_LINE_PAT = re.compile(r"\b([A-Z][a-z]+\s+[A-Z][a-z]+),\s+(.+)$")
+
+# Additional-areas values are short, comma-separated, capitalized science
+# categories.  Keywords are longer phrases that may contain parentheticals,
+# hyphens, or all-lowercase words.
+_ADDITIONAL_AREA_PAT = re.compile(
+    r"^[A-Z][a-zA-Z ]+(?:,\s*[A-Za-z][a-zA-Z ]+)*$"
+)
+
+
+def _page1_field(text: str, heading: str, stop_headings: set) -> str:
+    """Return content after *heading*, collecting lines until a stop heading.
+
+    Lines that are themselves P1 headings (but not stop headings) are skipped
+    — they are right-column headings interleaved by pdfplumber's column order.
+    """
+    m = re.search(r"(?:^|\n)" + re.escape(heading) + r"\n", text, re.MULTILINE)
+    if not m:
+        return ""
+    lines = []
+    for line in text[m.end():].split("\n"):
+        ls = line.strip()
+        if ls in stop_headings:
+            break
+        if ls in _P1_HEADINGS:
+            continue  # interleaved heading — skip
+        lines.append(ls)
+    return " ".join(filter(None, lines)).strip()
+
+
+def _parse_page1_into(raw_text: str, extracted: dict, confidence: dict) -> None:
+    """Parse the structured two-column table on page 1 of a GUP PDF."""
+    # Grab only up to "Abstract" to avoid bleed from later sections.
+    m_abs = re.search(r"(?:^|\n)Abstract\n", raw_text, re.MULTILINE)
+    p1 = raw_text[: m_abs.start()] if m_abs else raw_text
+
+    # ── Proposal Call + Principal Investigator (share row 1) ──
+    # pdfplumber emits both headings on the same line when they sit side-by-side.
+    m = re.search(r"Proposal Call Principal Investigator\n(.+)", p1)
+    if m:
+        combined = m.group(1).strip()
+        # _PI_LINE_PAT finds the FIRST "Firstname Lastname, Institution" that has
+        # the comma immediately after exactly 2 capitalized words.  For
+        # "2026-3 Standard General User Proposals David Gidalevitz, Illinois..."
+        # the first such pair followed by a comma is "David Gidalevitz,".
+        pi_m = _PI_LINE_PAT.search(combined)
+        if pi_m:
+            extracted["pi_name"] = pi_m.group(1).strip()
+            extracted["pi_institution"] = pi_m.group(2).strip()
+            extracted["proposal_call"] = combined[: pi_m.start()].strip()
+        else:
+            extracted["proposal_call"] = combined
+        confidence["pi_name"] = 0.9
+        confidence["proposal_call"] = 0.9
+    else:
+        # Separate-line fallback
+        m = re.search(r"(?:^|\n)Proposal Call\n([^\n]+)", p1, re.MULTILINE)
+        if m:
+            extracted["proposal_call"] = m.group(1).strip()
+            confidence["proposal_call"] = 0.7
+        m = re.search(r"(?:^|\n)Principal Investigator\n([^\n]+)", p1, re.MULTILINE)
+        if m:
+            pi_line = m.group(1).strip()
+            pi_m = _PI_LINE_PAT.search(pi_line)
+            if pi_m:
+                extracted["pi_name"] = pi_m.group(1).strip()
+                extracted["pi_institution"] = pi_m.group(2).strip()
+            elif "," in pi_line:
+                parts = pi_line.split(",", 1)
+                extracted["pi_name"] = parts[0].strip()
+                extracted["pi_institution"] = parts[1].strip()
+            else:
+                extracted["pi_name"] = pi_line
+            confidence["pi_name"] = 0.8
+
+    # Run cycle extracted from the proposal_call string
+    pc = extracted.get("proposal_call", "")
+    rc_m = re.search(r"(\d{4}-\d+)", pc)
+    if rc_m:
+        extracted["run_cycle"] = rc_m.group(1)
+        confidence["run_cycle"] = 1.0
+
+    # ── Type ── (Co-Principal Investigator heading appears between heading & value)
+    type_val = _page1_field(p1, "Type", {"Primary Area of Research", "Abstract"})
+    if type_val:
+        extracted["proposal_type"] = type_val
+        confidence["proposal_type"] = 0.85
+
+    # ── Co-Principal Investigator ──
+    # Only accept if the value looks like a person's name (contains a comma,
+    # which "General User - Regular" etc. do not).
+    co_pi = _page1_field(p1, "Co-Principal Investigator",
+                         {"Co-Proposers", "Primary Area of Research", "Abstract"})
+    if co_pi and "," in co_pi:
+        extracted["co_pi"] = co_pi
+        confidence["co_pi"] = 0.85
+
+    # ── Primary Area of Research ──
+    # The Co-Proposers value may be appended on the same line when columns merge.
+    primary_raw = _page1_field(p1, "Primary Area of Research",
+                               {"Additional Areas of Research", "Abstract"})
+    if primary_raw:
+        pi_m = _PI_LINE_PAT.search(primary_raw)
+        if pi_m:
+            extracted["primary_area"] = primary_raw[: pi_m.start()].strip()
+            if not extracted.get("co_proposers"):
+                extracted["co_proposers"] = (pi_m.group(1) + ", " + pi_m.group(2)).strip()
+                confidence["co_proposers"] = 0.75
+        else:
+            extracted["primary_area"] = primary_raw
+        confidence["primary_area"] = 0.85
+
+    # ── Co-Proposers (right column) ──
+    # Only accept if the value looks like a name+institution.
+    if not extracted.get("co_proposers"):
+        co_prop_raw = _page1_field(p1, "Co-Proposers",
+                                   {"Keywords", "Additional Areas of Research", "Abstract"})
+        if co_prop_raw:
+            pi_m = _PI_LINE_PAT.search(co_prop_raw)
+            if pi_m:
+                extracted["co_proposers"] = pi_m.group(1) + ", " + pi_m.group(2)
+                confidence["co_proposers"] = 0.8
+
+    # ── Keywords + Additional Areas ──
+    # Both fields share the same text block.  Classify each line: a short,
+    # comma-separated, all-capitalized list → additional_areas; everything
+    # else → keywords.
+    kw_lines: list[str] = []
+    add_lines: list[str] = []
+    m = re.search(r"(?:^|\n)Keywords\n", p1, re.MULTILINE)
+    if m:
+        for line in p1[m.end():].split("\n"):
+            ls = line.strip()
+            if ls in {"Review Panel", "Abstract", "Funding Sources"}:
+                break
+            if ls in _P1_HEADINGS:
+                continue
+            if not ls:
+                continue
+            if _ADDITIONAL_AREA_PAT.match(ls):
+                add_lines.append(ls)
+            else:
+                kw_lines.append(ls)
+        if kw_lines:
+            extracted["keywords"] = " ".join(kw_lines)
+            confidence["keywords"] = 0.8
+        if add_lines:
+            extracted["additional_areas"] = ", ".join(add_lines)
+            confidence["additional_areas"] = 0.75
+
+    # ── Review Panel ──
+    review_val = _page1_field(p1, "Review Panel", {"Abstract", "Funding Sources"})
+    if review_val:
+        extracted["review_panel"] = review_val
+        confidence["review_panel"] = 0.9
 
 
 # ---------------------------------------------------------------------------
