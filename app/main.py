@@ -56,17 +56,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=config.SESSION_SECRET_KEY,
-    session_cookie="esaf_admin_session",
-    max_age=86400 * 7,  # 7 days
-    https_only=False,
-)
-
-
 # ---------------------------------------------------------------------------
 # Auth middleware — protect all write operations
+# IMPORTANT: SessionMiddleware must be added AFTER this decorator so that
+# it ends up as the outermost layer (Starlette inserts at position 0 and
+# reverses the stack, so last-added = first-executed).
 # ---------------------------------------------------------------------------
 
 _PUBLIC_WRITE_PATHS = {"/admin/login", "/admin/setup"}
@@ -80,7 +74,6 @@ async def require_login_for_writes(request: Request, call_next):
             user = request.session.get("admin_user")
             if not user:
                 from fastapi.responses import JSONResponse
-                # Return JSON for HTMX, redirect for browser
                 is_htmx = request.headers.get("HX-Request") == "true"
                 if is_htmx:
                     return JSONResponse(
@@ -90,6 +83,16 @@ async def require_login_for_writes(request: Request, call_next):
                     )
                 return RedirectResponse("/admin/login", status_code=303)
     return await call_next(request)
+
+
+# SessionMiddleware must come after @app.middleware so it is outermost in the stack.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET_KEY,
+    session_cookie="esaf_admin_session",
+    max_age=86400 * 7,
+    https_only=False,
+)
 
 
 _static = Path(__file__).parent.parent / "static"
