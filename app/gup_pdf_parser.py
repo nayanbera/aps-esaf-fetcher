@@ -171,6 +171,30 @@ _ETR_SKIP = re.compile(
     re.IGNORECASE,
 )
 
+# Matches a grant/award number at the end of a merged source cell, e.g.:
+# "R01 HL136734", "CBET 2309886", "EFRI E3P2132178", "2215190"
+_GRANT_PAT = re.compile(
+    r"\s+((?:[A-Z][A-Z0-9]{0,4}\s+)?[A-Z]*\d{5,}\w*)\s*$"
+)
+
+
+def _split_merged_source_cell(text: str) -> tuple:
+    """Parse 'Agency [grant] [pct]' when pdfplumber collapses all columns into one cell."""
+    text = text.strip()
+    pct = 0
+    pct_m = re.search(r"\s+(\d{1,3})\s*$", text)
+    if pct_m:
+        v = int(pct_m.group(1))
+        if v <= 100:
+            pct = v
+            text = text[: pct_m.start()].strip()
+    grn = ""
+    grn_m = _GRANT_PAT.search(text)
+    if grn_m:
+        grn = grn_m.group(1).strip()
+        text = text[: grn_m.start()].strip()
+    return text, grn, pct
+
 
 def _try_funding_table(table: list, funding_rows: list[dict]) -> None:
     """Detect and parse a Funding Sources table, appending rows to funding_rows."""
@@ -191,18 +215,24 @@ def _try_funding_table(table: list, funding_rows: list[dict]) -> None:
                 src = dc[src_i].strip() if src_i < len(dc) else ""
                 det = dc[det_i].strip() if det_i >= 0 and det_i < len(dc) else ""
                 grn = dc[grn_i].strip() if grn_i >= 0 and grn_i < len(dc) else ""
-                pct_raw = dc[pct_i].strip() if pct_i >= 0 and pct_i < len(dc) else "0"
+                pct_raw = dc[pct_i].strip() if pct_i >= 0 and pct_i < len(dc) else ""
                 if src and not _ETR_SKIP.search(src):
-                    try:
-                        pct = int(re.sub(r"[^\d]", "", pct_raw) or "0")
-                    except ValueError:
-                        pct = 0
+                    # pdfplumber sometimes collapses all columns into the first cell.
+                    # Detect this when grant and percentage columns are both empty.
+                    if not grn and not pct_raw:
+                        src, grn, pct = _split_merged_source_cell(src)
+                    else:
+                        try:
+                            pct = int(re.sub(r"[^\d]", "", pct_raw) or "0")
+                        except ValueError:
+                            pct = 0
                     if pct > 100:
                         continue  # nonsensical percentage — ETR or parse artifact
-                    funding_rows.append({
-                        "agency": src, "details": det,
-                        "grant_number": grn, "percentage": pct,
-                    })
+                    if src:
+                        funding_rows.append({
+                            "agency": src, "details": det,
+                            "grant_number": grn, "percentage": pct,
+                        })
             return
 
 
