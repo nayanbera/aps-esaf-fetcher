@@ -81,11 +81,23 @@
   </div>
 </form>
 
+<!-- Client-side regex filter -->
+<div class="filter-wrap d-flex align-items-center gap-2 mb-2">
+  <div class="input-group input-group-sm" style="max-width:420px">
+    <span class="input-group-text text-muted"><i class="bi bi-regex"></i></span>
+    <input type="text" class="form-control table-regex-filter"
+           data-target="gups-table"
+           placeholder="Regex filter all fields… e.g. Chemistry, ^102">
+    <button class="btn btn-outline-secondary filter-clear" type="button" tabindex="-1">✕</button>
+  </div>
+  <span class="filter-count text-muted small"></span>
+</div>
+
 <!-- GUPs table -->
 <div class="card">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-sm table-hover align-middle mb-0">
+      <table id="gups-table" class="table table-sm table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
             <th>GUP ID</th>
