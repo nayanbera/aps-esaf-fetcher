@@ -16,7 +16,7 @@ _sync_running = False
 _last_result: dict | None = None
 
 _CURRENT_YEAR = datetime.now().year
-_YEAR_CHOICES = list(range(_CURRENT_YEAR, 1999, -1))   # current … 2000
+_YEAR_CHOICES = list(range(_CURRENT_YEAR, 1997, -1))   # current … 1998
 
 
 def _years_from_range(from_year: Optional[int], to_year: Optional[int]) -> list[str] | None:
