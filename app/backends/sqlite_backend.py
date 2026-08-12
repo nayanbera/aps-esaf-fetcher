@@ -885,6 +885,30 @@ class SQLiteESAFRepository(ESAFRepository):
             result.append(d)
         return result
 
+    def get_user_detail(self, badge: str) -> Optional[dict]:
+        with self._db() as conn:
+            user_row = conn.execute(
+                "SELECT * FROM users WHERE badge = ?", (badge,)
+            ).fetchone()
+            if user_row is None:
+                return None
+            d = self._row_to_dict(user_row)
+            esaf_rows = conn.execute(
+                """SELECT e.esaf_id, e.title, e.year, e.start_date, e.end_date,
+                          e.beamline, e.status, e.technique, e.pi_name, eu.role
+                   FROM esafs e
+                   JOIN esaf_users eu ON eu.esaf_id = e.esaf_id
+                   WHERE eu.badge = ?
+                   ORDER BY e.start_date DESC""",
+                (badge,),
+            ).fetchall()
+            d["esafs"] = [dict(r) for r in esaf_rows]
+            is_scientist = conn.execute(
+                "SELECT 1 FROM beamline_scientists WHERE badge = ?", (badge,)
+            ).fetchone()
+            d["is_beamline_scientist"] = is_scientist is not None
+        return d
+
     # ------------------------------------------------------------------
     # Beamline scientists
     # ------------------------------------------------------------------

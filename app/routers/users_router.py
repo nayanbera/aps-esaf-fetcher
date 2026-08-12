@@ -3,7 +3,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from .. import db
 from ..templates_env import templates
@@ -52,4 +52,15 @@ def users_page(
         "exclude_scientists": exc_sci,
         "all_years":          all_years,
         "all_techniques":     all_techniques,
+    })
+
+
+@router.get("/users/{badge}/detail", response_class=HTMLResponse)
+def user_detail(badge: str, request: Request):
+    user = db.get_user_detail(badge)
+    if user is None:
+        return Response(status_code=204)
+    return templates.TemplateResponse("partials/user_detail_row.html", {
+        "request": request,
+        "user":    user,
     })

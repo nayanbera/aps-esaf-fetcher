@@ -1,0 +1,161 @@
+<td colspan="9" class="p-0">
+  <div class="p-3 bg-light border-top border-bottom">
+
+    <!-- User profile -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header fw-semibold small py-1">
+            <i class="bi bi-person-circle me-1"></i>User Profile
+            {% if user.is_beamline_scientist %}
+              <span class="badge bg-info text-dark ms-2">Beamline Scientist</span>
+            {% endif %}
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+              <tbody>
+                <tr><th class="text-nowrap ps-3" style="width:130px">Badge</th>
+                    <td><code>{{ user.badge }}</code></td></tr>
+                <tr><th class="ps-3">First name</th>
+                    <td>{{ user.first_name or '—' }}</td></tr>
+                <tr><th class="ps-3">Last name</th>
+                    <td>{{ user.last_name or '—' }}</td></tr>
+                <tr><th class="ps-3">Institution</th>
+                    <td>{{ user.institution or '—' }}</td></tr>
+                <tr><th class="ps-3">Country</th>
+                    <td>{{ user.country or '—' }}</td></tr>
+                <tr><th class="ps-3">State</th>
+                    <td>{{ user.state or '—' }}</td></tr>
+                <tr><th class="ps-3">Email</th>
+                    <td>
+                      {% if user.email %}
+                        <a href="mailto:{{ user.email }}">{{ user.email }}</a>
+                      {% else %}—{% endif %}
+                    </td></tr>
+                <tr><th class="ps-3">ORCID</th>
+                    <td>
+                      {% if user.orcid_id %}
+                        <a href="https://orcid.org/{{ user.orcid_id }}" target="_blank" rel="noopener"
+                           class="small font-monospace">
+                          <img src="https://orcid.org/sites/default/files/images/orcid_16x16.png"
+                               width="14" height="14" alt="ORCID" class="me-1">{{ user.orcid_id }}
+                        </a>
+                      {% else %}—{% endif %}
+                    </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 d-flex flex-column gap-2">
+        <div class="card">
+          <div class="card-body py-2">
+            <div class="fw-semibold small text-muted mb-1">Total ESAFs</div>
+            <div class="display-6 fw-bold">{{ user.esafs | length }}</div>
+          </div>
+        </div>
+        {% set techniques = user.esafs | map(attribute='technique') | select | unique | list %}
+        {% if techniques %}
+        <div class="card">
+          <div class="card-body py-2">
+            <div class="fw-semibold small text-muted mb-1">Techniques</div>
+            {% for t in techniques %}
+              {% if t == 'Surf' %}
+                <span class="badge bg-primary me-1">{{ t }}</span>
+              {% elif t == 'Xtal' %}
+                <span class="badge bg-success me-1">{{ t }}</span>
+              {% elif t == 'ASWAXS' %}
+                <span class="badge bg-warning text-dark me-1">{{ t }}</span>
+              {% elif t == 'Beamline' %}
+                <span class="badge bg-info text-dark me-1">{{ t }}</span>
+              {% else %}
+                <span class="badge bg-secondary me-1">{{ t }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ESAF list -->
+    <div class="card">
+      <div class="card-header fw-semibold small py-1">
+        <i class="bi bi-list-ul me-1"></i>ESAFs ({{ user.esafs | length }})
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>ESAF ID</th>
+                <th>Title</th>
+                <th>Year</th>
+                <th>Beamline</th>
+                <th>Status</th>
+                <th>Technique</th>
+                <th>PI</th>
+                <th>Role</th>
+                <th>Start</th>
+                <th>End</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for e in user.esafs %}
+              <tr>
+                <td>
+                  <a href="/esafs/{{ e.esaf_id }}" class="font-monospace text-decoration-none small">
+                    {{ e.esaf_id }}
+                  </a>
+                </td>
+                <td style="max-width:280px" class="text-truncate" title="{{ e.title }}">
+                  {{ e.title or '—' }}
+                </td>
+                <td>{{ e.year or '—' }}</td>
+                <td>{{ e.beamline or '—' }}</td>
+                <td>
+                  {% if e.status == 'Approved' %}
+                    <span class="badge bg-success">{{ e.status }}</span>
+                  {% elif e.status == 'Closed' %}
+                    <span class="badge bg-secondary">{{ e.status }}</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark">{{ e.status or '?' }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if e.technique == 'Surf' %}
+                    <span class="badge bg-primary">{{ e.technique }}</span>
+                  {% elif e.technique == 'Xtal' %}
+                    <span class="badge bg-success">{{ e.technique }}</span>
+                  {% elif e.technique == 'ASWAXS' %}
+                    <span class="badge bg-warning text-dark">{{ e.technique }}</span>
+                  {% elif e.technique == 'Beamline' %}
+                    <span class="badge bg-info text-dark">{{ e.technique }}</span>
+                  {% elif e.technique %}
+                    <span class="badge bg-secondary">{{ e.technique }}</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="small">{{ e.pi_name or '—' }}</td>
+                <td>
+                  {% if e.role == 'pi' %}
+                    <span class="badge bg-primary">PI</span>
+                  {% else %}
+                    <span class="badge bg-light text-dark border">{{ e.role or 'user' }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-nowrap small">{{ e.start_date or '—' }}</td>
+                <td class="text-nowrap small">{{ e.end_date or '—' }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="10" class="text-muted text-center py-2">No ESAFs found.</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</td>

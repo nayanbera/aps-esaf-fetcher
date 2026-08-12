@@ -86,14 +86,20 @@
     </thead>
     <tbody>
     {% for u in users %}
-      <tr>
+      <tr class="user-row" style="cursor:pointer"
+          data-badge="{{ u.badge }}"
+          hx-get="/users/{{ u.badge }}/detail"
+          hx-target="next tr.user-detail-row"
+          hx-swap="innerHTML"
+          hx-trigger="expand">
         <td><code>{{ u.badge }}</code></td>
         <td>{{ u.name }}</td>
         <td>{{ u.institution or '—' }}</td>
         <td>{{ u.country or '—' }}</td>
         <td>
           {% if u.email %}
-            <a href="mailto:{{ u.email }}" class="text-decoration-none small">{{ u.email }}</a>
+            <a href="mailto:{{ u.email }}" class="text-decoration-none small"
+               onclick="event.stopPropagation()">{{ u.email }}</a>
           {% else %}—{% endif %}
         </td>
         <td>
@@ -115,8 +121,12 @@
         </td>
         <td class="text-end">{{ u.esaf_count }}</td>
         <td class="text-nowrap small">{{ u.first_experiment or '—' }}</td>
-        <td class="text-nowrap small">{{ u.last_experiment or '—' }}</td>
+        <td class="text-nowrap small">
+          {{ u.last_experiment or '—' }}
+          <span class="float-end text-muted small expand-icon">▶</span>
+        </td>
       </tr>
+      <tr class="user-detail-row"><td colspan="9" class="p-0"></td></tr>
     {% else %}
       <tr>
         <td colspan="9" class="text-muted text-center py-4">
@@ -127,4 +137,39 @@
     </tbody>
   </table>
 </div>
+
+<script>
+(function () {
+  var table = document.getElementById('users-table');
+  if (!table) return;
+
+  table.addEventListener('click', function (e) {
+    var row = e.target.closest('tr.user-row');
+    if (!row) return;
+
+    var detailRow = row.nextElementSibling;
+    if (!detailRow || !detailRow.classList.contains('user-detail-row')) return;
+
+    if (row.classList.contains('expanded')) {
+      detailRow.querySelector('td').innerHTML = '';
+      row.classList.remove('expanded', 'table-primary');
+      var icon = row.querySelector('.expand-icon');
+      if (icon) icon.textContent = '▶';
+    } else {
+      htmx.trigger(row, 'expand');
+    }
+  });
+
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    var detail = e.detail.target.closest('tr.user-detail-row');
+    if (!detail) return;
+    var row = detail.previousElementSibling;
+    if (row && row.classList.contains('user-row')) {
+      row.classList.add('expanded', 'table-primary');
+      var icon = row.querySelector('.expand-icon');
+      if (icon) icon.textContent = '▼';
+    }
+  });
+})();
+</script>
 {% endblock %}

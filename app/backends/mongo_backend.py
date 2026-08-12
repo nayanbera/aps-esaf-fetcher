@@ -451,6 +451,47 @@ class MongoESAFRepository(ESAFRepository):
             "exclude_scientists":  exclude_scientists,
         }
 
+    def get_user_detail(self, badge: str) -> Optional[dict]:
+        # Find one ESAF that contains this user to get their profile
+        doc = self._esafs().find_one(
+            {"users.badge": badge}, {"users.$": 1}
+        )
+        if not doc:
+            return None
+        u = doc["users"][0]
+        esafs_cursor = self._esafs().find(
+            {"users.badge": badge},
+            {"esaf_id": 1, "title": 1, "year": 1, "start_date": 1, "end_date": 1,
+             "beamline": 1, "status": 1, "technique": 1, "pi_name": 1, "users.$": 1},
+        ).sort("start_date", -1)
+        esafs = []
+        for e in esafs_cursor:
+            role = e["users"][0].get("role", "user") if e.get("users") else "user"
+            esafs.append({
+                "esaf_id":    e.get("esaf_id"),
+                "title":      e.get("title"),
+                "year":       e.get("year"),
+                "start_date": e.get("start_date"),
+                "end_date":   e.get("end_date"),
+                "beamline":   e.get("beamline"),
+                "status":     e.get("status"),
+                "technique":  e.get("technique"),
+                "pi_name":    e.get("pi_name"),
+                "role":       role,
+            })
+        return {
+            "badge":       badge,
+            "first_name":  u.get("first_name", ""),
+            "last_name":   u.get("last_name", ""),
+            "institution": u.get("institution", ""),
+            "country":     u.get("country", ""),
+            "state":       u.get("state", ""),
+            "email":       u.get("email", ""),
+            "orcid_id":    u.get("orcid_id", ""),
+            "esafs":       esafs,
+            "is_beamline_scientist": False,
+        }
+
     def list_unique_users(
         self,
         year_from: Optional[int] = None,

@@ -154,6 +154,10 @@ def get_stats(
     )
 
 
+def get_user_detail(badge: str) -> Optional[dict]:
+    return _r().get_user_detail(badge)
+
+
 def list_unique_users(
     year_from: Optional[int] = None,
     year_to: Optional[int] = None,

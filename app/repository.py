@@ -119,6 +119,11 @@ class ESAFRepository(ABC):
     ) -> dict: ...
 
     @abstractmethod
+    def get_user_detail(self, badge: str) -> Optional[dict]:
+        """Return full user record plus all ESAFs they appear on."""
+        ...
+
+    @abstractmethod
     def list_unique_users(
         self,
         year_from: Optional[int] = None,
