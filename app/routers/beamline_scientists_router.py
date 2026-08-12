@@ -34,6 +34,18 @@ async def add_scientist(request: Request):
     })
 
 
+@router.put("/api/beamline-scientists/{badge}")
+async def update_scientist(badge: str, request: Request):
+    form = await request.form()
+    start_date = (form.get("start_date") or "").strip()
+    db.update_beamline_scientist(badge, start_date)
+    scientists = db.list_beamline_scientists()
+    return templates.TemplateResponse("partials/scientists_table.html", {
+        "request":    request,
+        "scientists": scientists,
+    })
+
+
 @router.delete("/api/beamline-scientists/{badge}")
 def remove_scientist(badge: str, request: Request):
     db.remove_beamline_scientist(badge)

@@ -174,8 +174,12 @@ def list_beamline_scientists() -> list[dict]:
     return _r().list_beamline_scientists()
 
 
-def add_beamline_scientist(badge: str) -> bool:
-    return _r().add_beamline_scientist(badge)
+def add_beamline_scientist(badge: str, start_date: str = "") -> bool:
+    return _r().add_beamline_scientist(badge, start_date)
+
+
+def update_beamline_scientist(badge: str, start_date: str) -> bool:
+    return _r().update_beamline_scientist(badge, start_date)
 
 
 def remove_beamline_scientist(badge: str) -> bool:

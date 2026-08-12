@@ -140,8 +140,13 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
-    def add_beamline_scientist(self, badge: str) -> bool:
+    def add_beamline_scientist(self, badge: str, start_date: str = "") -> bool:
         """Add a user to the beamline scientists list. Returns False if badge not found."""
+        ...
+
+    @abstractmethod
+    def update_beamline_scientist(self, badge: str, start_date: str) -> bool:
+        """Update the start_date for a beamline scientist. Returns False if not found."""
         ...
 
     @abstractmethod

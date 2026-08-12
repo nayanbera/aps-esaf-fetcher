@@ -534,7 +534,7 @@ class MongoESAFRepository(ESAFRepository):
         coll = self._client[self._db_name]["beamline_scientists"]
         return [self._clean(d) for d in coll.find().sort("name", 1)]
 
-    def add_beamline_scientist(self, badge: str) -> bool:
+    def add_beamline_scientist(self, badge: str, start_date: str = "") -> bool:
         user_doc = self._esafs().find_one(
             {"users.badge": badge}, {"users.$": 1}
         )
@@ -548,10 +548,17 @@ class MongoESAFRepository(ESAFRepository):
                 "badge": badge,
                 "name": f"{u.get('first_name','')} {u.get('last_name','')}".strip(),
                 "institution": u.get("institution", ""),
+                "start_date": start_date,
             }},
             upsert=True,
         )
         return True
+
+    def update_beamline_scientist(self, badge: str, start_date: str) -> bool:
+        coll = self._client[self._db_name]["beamline_scientists"]
+        return coll.update_one(
+            {"badge": badge}, {"$set": {"start_date": start_date}}
+        ).matched_count > 0
 
     def remove_beamline_scientist(self, badge: str) -> bool:
         coll = self._client[self._db_name]["beamline_scientists"]

@@ -150,7 +150,8 @@ CREATE TABLE IF NOT EXISTS institution_ror (
 CREATE TABLE IF NOT EXISTS beamline_scientists (
     badge       TEXT PRIMARY KEY,
     name        TEXT NOT NULL DEFAULT '',
-    institution TEXT NOT NULL DEFAULT ''
+    institution TEXT NOT NULL DEFAULT '',
+    start_date  TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_esafs_year       ON esafs(year);
@@ -331,9 +332,16 @@ class SQLiteESAFRepository(ESAFRepository):
                 CREATE TABLE IF NOT EXISTS beamline_scientists (
                     badge       TEXT PRIMARY KEY,
                     name        TEXT NOT NULL DEFAULT '',
-                    institution TEXT NOT NULL DEFAULT ''
+                    institution TEXT NOT NULL DEFAULT '',
+                    start_date  TEXT NOT NULL DEFAULT ''
                 )
             """)
+            try:
+                conn.execute(
+                    "ALTER TABLE beamline_scientists ADD COLUMN start_date TEXT NOT NULL DEFAULT ''"
+                )
+            except sqlite3.OperationalError:
+                pass
             conn.commit()
 
             conn.executescript("""
@@ -711,14 +719,24 @@ class SQLiteESAFRepository(ESAFRepository):
             direct_clause += " AND technique = ?";   direct_params.append(technique)
             join_clause   += " AND e.technique = ?"; join_params.append(technique)
 
-        sci_eu = (
-            " AND eu.badge NOT IN (SELECT badge FROM beamline_scientists)"
-            if exclude_scientists else ""
-        )
-        sci_u = (
-            " AND u.badge NOT IN (SELECT badge FROM beamline_scientists)"
-            if exclude_scientists else ""
-        )
+        # Exclude a user from an ESAF only when the ESAF started on or after
+        # the scientist's own start_date (NULL/empty start_date means always excluded).
+        _sci_subq_eu = """
+            NOT EXISTS (
+                SELECT 1 FROM beamline_scientists bs
+                WHERE bs.badge = eu.badge
+                  AND (bs.start_date = '' OR bs.start_date IS NULL
+                       OR e.start_date >= bs.start_date)
+            )"""
+        _sci_subq_u = """
+            NOT EXISTS (
+                SELECT 1 FROM beamline_scientists bs
+                WHERE bs.badge = u.badge
+                  AND (bs.start_date = '' OR bs.start_date IS NULL
+                       OR e.start_date >= bs.start_date)
+            )"""
+        sci_eu = f" AND {_sci_subq_eu}" if exclude_scientists else ""
+        sci_u  = f" AND {_sci_subq_u}"  if exclude_scientists else ""
 
         with self._db() as conn:
             def scalar(sql, params=()):
@@ -858,7 +876,12 @@ class SQLiteESAFRepository(ESAFRepository):
         if technique:
             clauses.append("e.technique = ?"); params.append(technique)
         if exclude_scientists:
-            clauses.append("u.badge NOT IN (SELECT badge FROM beamline_scientists)")
+            clauses.append("""NOT EXISTS (
+                SELECT 1 FROM beamline_scientists bs
+                WHERE bs.badge = u.badge
+                  AND (bs.start_date = '' OR bs.start_date IS NULL
+                       OR e.start_date >= bs.start_date)
+            )""")
         where = " AND ".join(clauses)
         sql = f"""
             SELECT u.badge,
@@ -916,11 +939,12 @@ class SQLiteESAFRepository(ESAFRepository):
     def list_beamline_scientists(self) -> list[dict]:
         with self._db() as conn:
             rows = conn.execute(
-                "SELECT badge, name, institution FROM beamline_scientists ORDER BY name"
+                "SELECT badge, name, institution, start_date "
+                "FROM beamline_scientists ORDER BY name"
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def add_beamline_scientist(self, badge: str) -> bool:
+    def add_beamline_scientist(self, badge: str, start_date: str = "") -> bool:
         with self._db() as conn:
             user = conn.execute(
                 "SELECT badge, first_name || ' ' || last_name AS name, institution "
@@ -930,12 +954,20 @@ class SQLiteESAFRepository(ESAFRepository):
             if user is None:
                 return False
             conn.execute(
-                """INSERT INTO beamline_scientists (badge, name, institution)
-                   VALUES (?,?,?)
+                """INSERT INTO beamline_scientists (badge, name, institution, start_date)
+                   VALUES (?,?,?,?)
                    ON CONFLICT(badge) DO NOTHING""",
-                (user["badge"], user["name"], user["institution"] or ""),
+                (user["badge"], user["name"], user["institution"] or "", start_date),
             )
         return True
+
+    def update_beamline_scientist(self, badge: str, start_date: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute(
+                "UPDATE beamline_scientists SET start_date = ? WHERE badge = ?",
+                (start_date, badge),
+            )
+        return cur.rowcount > 0
 
     def remove_beamline_scientist(self, badge: str) -> bool:
         with self._db() as conn:

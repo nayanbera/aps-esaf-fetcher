@@ -1,10 +1,17 @@
-<!-- Beamline scientists table body — swapped by HTMX add/remove -->
+<!-- Beamline scientists table body — swapped by HTMX add/remove/update -->
 <table id="scientists-table" class="table table-sm table-hover mb-0">
   <thead class="table-light">
     <tr>
       <th>Badge</th>
       <th>Name</th>
       <th>Institution</th>
+      <th>
+        Scientist since
+        <span class="text-muted fw-normal small ms-1"
+              title="ESAFs starting on or after this date will have this person excluded from statistics. Leave blank to exclude from all ESAFs.">
+          <i class="bi bi-info-circle"></i>
+        </span>
+      </th>
       <th></th>
     </tr>
   </thead>
@@ -14,6 +21,18 @@
       <td><code>{{ s.badge }}</code></td>
       <td>{{ s.name }}</td>
       <td>{{ s.institution or '—' }}</td>
+      <td>
+        <input type="date"
+               name="start_date"
+               value="{{ s.start_date or '' }}"
+               class="form-control form-control-sm"
+               style="width:160px"
+               title="Exclusion applies to ESAFs starting on or after this date"
+               hx-put="/api/beamline-scientists/{{ s.badge }}"
+               hx-trigger="change"
+               hx-target="#scientists-wrap"
+               hx-swap="innerHTML">
+      </td>
       <td class="text-end">
         <button class="btn btn-sm btn-outline-danger py-0"
                 hx-delete="/api/beamline-scientists/{{ s.badge }}"
@@ -26,7 +45,7 @@
     </tr>
   {% else %}
     <tr>
-      <td colspan="4" class="text-muted text-center py-3 fst-italic">
+      <td colspan="5" class="text-muted text-center py-3 fst-italic">
         No beamline scientists added yet.
       </td>
     </tr>
