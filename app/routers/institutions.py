@@ -131,6 +131,8 @@ def save_edit(
     original_name: str = Form(...),
     new_name: str = Form(...),
     manual_types: List[str] = Form(default=[]),
+    country: str = Form(default=""),
+    state: str = Form(default=""),
 ):
     new_name = new_name.strip()
     if not new_name:
@@ -140,7 +142,7 @@ def save_edit(
     if new_name != original_name:
         rename_counts = db.rename_institution(original_name, new_name)
 
-    db.set_institution_manual_types(new_name, manual_types)
+    db.update_institution_attrs(new_name, manual_types, country, state)
 
     rows = db.list_institution_ror()
     row = next((r for r in rows if r["name"] == new_name), None)

@@ -7,7 +7,7 @@
     <input type="text" name="new_name" value="{{ row.name }}"
            class="form-control form-control-sm" style="min-width:16rem;">
   </td>
-  <td colspan="2">
+  <td>
     <div class="d-flex flex-wrap gap-1">
       {% for t in _all_types %}
       {% set _checked = t.lower() in _active_lower %}
@@ -22,11 +22,15 @@
       </label>
       {% endfor %}
     </div>
-    <div class="text-muted" style="font-size:0.75rem; margin-top:0.25rem;">
-      Select to override (imported types are pre-checked; leave all unchecked to clear).
-    </div>
   </td>
-  <td class="small text-muted">{{ row.inst_state or '—' }}</td>
+  <td>
+    <input type="text" name="country" value="{{ row.country or '' }}"
+           class="form-control form-control-sm" placeholder="Country" style="min-width:7rem;">
+  </td>
+  <td>
+    <input type="text" name="state" value="{{ row.inst_state or '' }}"
+           class="form-control form-control-sm" placeholder="State" style="min-width:5rem;">
+  </td>
   <td class="text-end small text-muted">{{ row.user_count or 0 }}</td>
   <td class="text-end small text-muted">{{ row.esaf_count or 0 }}</td>
   <td>

@@ -314,6 +314,11 @@ class SQLiteESAFRepository(ESAFRepository):
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
+            try:
+                conn.execute("ALTER TABLE institution_ror ADD COLUMN state TEXT DEFAULT ''")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
             # GUP-related migrations for esafs table
             for col, defn in [
                 ("gup_id",   "TEXT DEFAULT ''"),
@@ -1384,9 +1389,10 @@ class SQLiteESAFRepository(ESAFRepository):
                         FROM esaf_users eu
                         JOIN users u ON eu.badge = u.badge
                         WHERE u.institution = ir.name) AS esaf_count,
-                       (SELECT u.state FROM users u
-                        WHERE u.institution = ir.name AND u.state != ''
-                        LIMIT 1) AS inst_state
+                       COALESCE(NULLIF(ir.state, ''),
+                           (SELECT u.state FROM users u
+                            WHERE u.institution = ir.name AND u.state != ''
+                            LIMIT 1)) AS inst_state
                 FROM institution_ror ir
                 ORDER BY ir.name
             """).fetchall()
@@ -1448,6 +1454,15 @@ class SQLiteESAFRepository(ESAFRepository):
             conn.execute(
                 "UPDATE institution_ror SET manual_types=? WHERE name=?",
                 (json.dumps(types), name),
+            )
+
+    def update_institution_attrs(
+        self, name: str, manual_types: list[str], country: str, state: str
+    ) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE institution_ror SET manual_types=?, country=?, state=? WHERE name=?",
+                (json.dumps(manual_types), country.strip(), state.strip(), name),
             )
 
     def sync_institution_names(self) -> int:

@@ -303,6 +303,9 @@ def rename_institution(old_name: str, new_name: str) -> dict:
 def set_institution_manual_types(name: str, types: list[str]) -> None:
     _r().set_institution_manual_types(name, types)
 
+def update_institution_attrs(name: str, manual_types: list[str], country: str, state: str) -> None:
+    _r().update_institution_attrs(name, manual_types, country, state)
+
 
 # ------------------------------------------------------------------
 # Admin users

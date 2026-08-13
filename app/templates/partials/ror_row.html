@@ -18,7 +18,7 @@
   <td class="text-end small">{{ row.esaf_count or 0 }}</td>
   <td>
     <div class="d-flex gap-1">
-      <button class="btn btn-outline-primary btn-sm py-0"
+      <button type="button" class="btn btn-outline-primary btn-sm py-0"
               hx-get="/institutions/edit-form?name={{ url_quote(row.name) }}"
               hx-target="closest tr"
               hx-swap="outerHTML"
