@@ -309,6 +309,11 @@ class SQLiteESAFRepository(ESAFRepository):
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
+            try:
+                conn.execute("ALTER TABLE institution_ror ADD COLUMN imported_type TEXT DEFAULT ''")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
             # GUP-related migrations for esafs table
             for col, defn in [
                 ("gup_id",   "TEXT DEFAULT ''"),
@@ -1967,6 +1972,22 @@ class SQLiteESAFRepository(ESAFRepository):
                             conn.execute(
                                 f"UPDATE users SET {field}=? WHERE badge=?", (val, badge)
                             )
+
+            # --- Institution types from CSV ---
+            # Collect the most-common institution_type per institution name
+            inst_type_map: dict[str, str] = {}
+            for r in normed:
+                inst = r.get("institution", "")
+                itype = r.get("institution_type", "")
+                if inst and itype:
+                    inst_type_map[inst] = itype  # last occurrence wins (all same institution)
+            for inst_name, itype in inst_type_map.items():
+                conn.execute(
+                    """INSERT INTO institution_ror (name, imported_type, status)
+                       VALUES (?, ?, 'pending')
+                       ON CONFLICT(name) DO UPDATE SET imported_type=excluded.imported_type""",
+                    (inst_name, itype),
+                )
 
             # --- esaf_users linkage ---
             for r in normed:
