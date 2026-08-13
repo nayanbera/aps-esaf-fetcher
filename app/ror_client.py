@@ -24,7 +24,8 @@ _TYPE_COLORS = {
     # CSV-imported institution types
     "academic":     "primary",
     "industry":     "secondary",
-    "national lab": "warning text-dark",
+    "national lab":        "warning text-dark",
+    "national laboratory": "warning text-dark",
     "federal":      "success",
     "non-profit":   "info text-dark",
     "hospital":     "danger",
