@@ -1833,6 +1833,35 @@ class SQLiteESAFRepository(ESAFRepository):
                             "name": name,
                         })
 
+            # Institution type changes
+            inst_type_map: dict[str, str] = {}
+            for r in normed:
+                inst = r.get("institution", "")
+                itype = r.get("institution_type", "")
+                if inst and itype:
+                    inst_type_map[inst] = itype
+            for inst_name, itype in inst_type_map.items():
+                ror_row = conn.execute(
+                    "SELECT manual_types FROM institution_ror WHERE name=?", (inst_name,)
+                ).fetchone()
+                if ror_row is None:
+                    changes.append({
+                        "id": inst_name, "field": "institution.type",
+                        "old_value": "", "new_value": itype, "action": "add",
+                    })
+                else:
+                    try:
+                        current_types = json.loads(ror_row[0] or "[]")
+                    except (ValueError, TypeError):
+                        current_types = []
+                    current_str = ", ".join(current_types)
+                    if current_str.lower() != itype.lower():
+                        changes.append({
+                            "id": inst_name, "field": "institution.type",
+                            "old_value": current_str, "new_value": itype,
+                            "action": "update" if current_types else "add",
+                        })
+
         return changes
 
     def apply_esaf_import(self, records: list[dict]) -> int:
