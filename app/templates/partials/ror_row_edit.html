@@ -7,9 +7,6 @@
     <input type="text" name="new_name" value="{{ row.name }}"
            class="form-control form-control-sm" style="min-width:16rem;">
   </td>
-  <td class="small text-muted">
-    {% if row.ror_name %}{{ row.ror_name }}{% else %}—{% endif %}
-  </td>
   <td colspan="2">
     <div class="d-flex flex-wrap gap-1">
       {% for t in _all_types %}

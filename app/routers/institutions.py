@@ -104,7 +104,7 @@ def edit_form(request: Request, name: str):
     rows = db.list_institution_ror()
     row = next((r for r in rows if r["name"] == name), None)
     if row is None:
-        return HTMLResponse(f"<tr><td colspan='7' class='text-danger'>Not found: {name}</td></tr>")
+        return HTMLResponse(f"<tr><td colspan='6' class='text-danger'>Not found: {name}</td></tr>")
     return templates.TemplateResponse("partials/ror_row_edit.html", {
         "request":          request,
         "row":              row,
@@ -146,7 +146,7 @@ def save_edit(
     row = next((r for r in rows if r["name"] == new_name), None)
     if row is None:
         return HTMLResponse(
-            f"<tr><td colspan='7' class='text-danger'>Save failed for {new_name}</td></tr>"
+            f"<tr><td colspan='6' class='text-danger'>Save failed for {new_name}</td></tr>"
         )
 
     row_html = templates.TemplateResponse("partials/ror_row.html", {
@@ -158,7 +158,7 @@ def save_edit(
     if rename_counts:
         total = sum(rename_counts.values())
         row_html += (
-            f'<tr class="table-success ror-rename-notice"><td colspan="7" class="py-1 small">'
+            f'<tr class="table-success ror-rename-notice"><td colspan="6" class="py-1 small">'
             f'Renamed to <strong>{new_name}</strong> — updated {total} record(s): '
             f'{rename_counts.get("users",0)} users, {rename_counts.get("esafs",0)} ESAFs, '
             f'{rename_counts.get("gups",0)} GUPs, {rename_counts.get("pi_groups",0)} PI groups'

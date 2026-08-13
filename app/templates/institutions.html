@@ -114,7 +114,6 @@
         <thead class="table-light">
           <tr>
             <th>Institution Name</th>
-            <th>ROR Canonical Name</th>
             <th>Institution Type</th>
             <th>Country</th>
             <th class="text-end">Score</th>
@@ -127,7 +126,7 @@
           {% include "partials/ror_row.html" %}
         {% else %}
         <tr>
-          <td colspan="7" class="text-center text-muted py-4">
+          <td colspan="6" class="text-center text-muted py-4">
             No institutions found. Sync some ESAFs first, then click "Lookup All via ROR".
           </td>
         </tr>

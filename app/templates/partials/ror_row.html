@@ -2,15 +2,6 @@
 <tr>
   <td class="small">{{ row.name }}</td>
   <td>
-    {% if row.ror_id %}
-    <a href="{{ row.ror_id }}" target="_blank" rel="noopener" class="text-decoration-none small">
-      {{ row.ror_name or row.ror_id }}
-    </a>
-    {% else %}
-    <span class="text-muted">—</span>
-    {% endif %}
-  </td>
-  <td>
     {% for t in ror_types %}
     <span class="badge bg-{{ type_badge_class(t) }} me-1">{{ t }}</span>
     {% endfor %}
