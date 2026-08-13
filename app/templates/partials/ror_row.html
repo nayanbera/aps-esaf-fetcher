@@ -13,20 +13,9 @@
     {% endif %}
   </td>
   <td class="small">{{ row.country or '—' }}</td>
-  <td class="text-end small">
-    {% if row.score %}<span class="text-muted">{{ "%.2f" | format(row.score) }}</span>{% else %}—{% endif %}
-  </td>
-  <td>
-    {% if row.status == 'found' %}
-    <span class="badge bg-success">found</span>
-    {% elif row.status == 'not_found' %}
-    <span class="badge bg-secondary">not found</span>
-    {% elif row.status == 'error' %}
-    <span class="badge bg-danger">error</span>
-    {% else %}
-    <span class="badge bg-light text-dark border">pending</span>
-    {% endif %}
-  </td>
+  <td class="small">{{ row.inst_state or '—' }}</td>
+  <td class="text-end small">{{ row.user_count or 0 }}</td>
+  <td class="text-end small">{{ row.esaf_count or 0 }}</td>
   <td>
     <div class="d-flex gap-1">
       <button class="btn btn-outline-primary btn-sm py-0"

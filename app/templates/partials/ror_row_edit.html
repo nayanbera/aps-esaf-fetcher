@@ -23,18 +23,12 @@
       {% endfor %}
     </div>
     <div class="text-muted" style="font-size:0.75rem; margin-top:0.25rem;">
-      Select to override (imported types are pre-checked; leave all unchecked to use ROR data).
+      Select to override (imported types are pre-checked; leave all unchecked to clear).
     </div>
   </td>
-  <td class="text-end small text-muted">
-    {% if row.score %}{{ "%.2f" | format(row.score) }}{% else %}—{% endif %}
-  </td>
-  <td>
-    {% if row.status == 'found' %}<span class="badge bg-success">found</span>
-    {% elif row.status == 'not_found' %}<span class="badge bg-secondary">not found</span>
-    {% elif row.status == 'error' %}<span class="badge bg-danger">error</span>
-    {% else %}<span class="badge bg-light text-dark border">pending</span>{% endif %}
-  </td>
+  <td class="small text-muted">{{ row.inst_state or '—' }}</td>
+  <td class="text-end small text-muted">{{ row.user_count or 0 }}</td>
+  <td class="text-end small text-muted">{{ row.esaf_count or 0 }}</td>
   <td>
     <div class="d-flex gap-1">
       <button type="button"

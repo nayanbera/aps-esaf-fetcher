@@ -1376,9 +1376,20 @@ class SQLiteESAFRepository(ESAFRepository):
 
     def list_institution_ror(self) -> list[dict]:
         with self._db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM institution_ror ORDER BY name"
-            ).fetchall()
+            rows = conn.execute("""
+                SELECT ir.*,
+                       (SELECT COUNT(*)
+                        FROM users u WHERE u.institution = ir.name) AS user_count,
+                       (SELECT COUNT(DISTINCT eu.esaf_id)
+                        FROM esaf_users eu
+                        JOIN users u ON eu.badge = u.badge
+                        WHERE u.institution = ir.name) AS esaf_count,
+                       (SELECT u.state FROM users u
+                        WHERE u.institution = ir.name AND u.state != ''
+                        LIMIT 1) AS inst_state
+                FROM institution_ror ir
+                ORDER BY ir.name
+            """).fetchall()
         result = []
         for r in rows:
             d = dict(r)
