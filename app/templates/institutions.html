@@ -71,35 +71,22 @@
   {% endif %}
 </div>
 
-<!-- Type breakdown -->
-{%- set typed_rows = rows | selectattr("imported_type") | list -%}
-{% if typed_rows %}
+<!-- Type breakdown: manual_types (includes imported) take priority over org_types -->
+{%- set ns = namespace(all_types=[]) -%}
+{%- for row in rows -%}
+  {%- set effective = row.manual_types if row.manual_types else (row.org_types | reject("equalto", "funder") | list) -%}
+  {%- set ns.all_types = ns.all_types + effective -%}
+{%- endfor -%}
+{% if ns.all_types %}
 <div class="card mb-4">
   <div class="card-header fw-semibold">
     <i class="bi bi-pie-chart me-1"></i>By Institution Type
   </div>
   <div class="card-body">
     <div class="d-flex flex-wrap gap-2">
-    {%- set all_types = typed_rows | map(attribute='imported_type') | list -%}
-    {%- set unique_types = all_types | unique | list -%}
+    {%- set unique_types = ns.all_types | unique | list -%}
     {%- for t in unique_types | sort -%}
-      {%- set cnt = all_types | select("equalto", t) | list | length -%}
-      <span class="badge bg-{{ type_badge_class(t) }} fs-6 px-3 py-2">{{ t }}: {{ cnt }}</span>
-    {%- endfor -%}
-    </div>
-  </div>
-</div>
-{% elif found_rows %}
-<div class="card mb-4">
-  <div class="card-header fw-semibold">
-    <i class="bi bi-pie-chart me-1"></i>By Organization Type (ROR)
-  </div>
-  <div class="card-body">
-    <div class="d-flex flex-wrap gap-2">
-    {%- set all_types = found_rows | map(attribute='org_types') | sum(start=[]) | list -%}
-    {%- set unique_types = all_types | unique | list -%}
-    {%- for t in unique_types | sort -%}
-      {%- set cnt = all_types | select("equalto", t) | list | length -%}
+      {%- set cnt = ns.all_types | select("equalto", t) | list | length -%}
       <span class="badge bg-{{ type_badge_class(t) }} fs-6 px-3 py-2">{{ t }}: {{ cnt }}</span>
     {%- endfor -%}
     </div>

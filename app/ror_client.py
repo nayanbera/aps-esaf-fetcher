@@ -11,15 +11,26 @@ log = logging.getLogger(__name__)
 _ROR_API = "https://api.ror.org/v2/organizations"
 
 _TYPE_COLORS = {
-    "education":  "primary",
-    "government": "success",
-    "facility":   "warning text-dark",
-    "funder":     "dark",
-    "company":    "secondary",
-    "nonprofit":  "info text-dark",
-    "healthcare": "danger",
-    "archive":    "light text-dark border",
-    "other":      "secondary",
+    # ROR types
+    "education":    "primary",
+    "government":   "success",
+    "facility":     "warning text-dark",
+    "funder":       "dark",
+    "company":      "secondary",
+    "nonprofit":    "info text-dark",
+    "healthcare":   "danger",
+    "archive":      "light text-dark border",
+    "other":        "secondary",
+    # CSV-imported institution types
+    "academic":     "primary",
+    "industry":     "secondary",
+    "national lab": "warning text-dark",
+    "federal":      "success",
+    "non-profit":   "info text-dark",
+    "hospital":     "danger",
+    "medical":      "danger",
+    "international":"info text-dark",
+    "foreign":      "info text-dark",
 }
 
 

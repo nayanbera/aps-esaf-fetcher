@@ -1983,10 +1983,12 @@ class SQLiteESAFRepository(ESAFRepository):
                     inst_type_map[inst] = itype  # last occurrence wins (all same institution)
             for inst_name, itype in inst_type_map.items():
                 conn.execute(
-                    """INSERT INTO institution_ror (name, imported_type, status)
-                       VALUES (?, ?, 'pending')
-                       ON CONFLICT(name) DO UPDATE SET imported_type=excluded.imported_type""",
-                    (inst_name, itype),
+                    """INSERT INTO institution_ror (name, imported_type, manual_types, status)
+                       VALUES (?, ?, ?, 'pending')
+                       ON CONFLICT(name) DO UPDATE SET
+                           imported_type=excluded.imported_type,
+                           manual_types=excluded.manual_types""",
+                    (inst_name, itype, json.dumps([itype])),
                 )
 
             # --- esaf_users linkage ---
