@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 _ROR_API = "https://api.ror.org/v2/organizations"
 
 _TYPE_COLORS = {
-    # ROR types
+    # ROR types (kept for backward compatibility)
     "education":    "primary",
     "government":   "success",
     "facility":     "warning text-dark",
@@ -21,17 +21,18 @@ _TYPE_COLORS = {
     "healthcare":   "danger",
     "archive":      "light text-dark border",
     "other":        "secondary",
-    # CSV-imported institution types
-    "academic":     "primary",
-    "industry":     "secondary",
-    "national lab":        "warning text-dark",
-    "national laboratory": "warning text-dark",
-    "federal":      "success",
-    "non-profit":   "info text-dark",
-    "hospital":     "danger",
-    "medical":      "danger",
-    "international":"info text-dark",
-    "foreign":      "info text-dark",
+    # CSV institution types (ChemMatCARS master file)
+    "u.s. academic inst.":           "primary",
+    "foreign academic inst.":        "primary",
+    "u.s. national laboratory":      "warning text-dark",
+    "foreign national lab.":         "warning text-dark",
+    "u.s. govt-funded agency/inst.": "success",
+    "u.s. industrial firm":          "secondary",
+    "foreign industry":              "secondary",
+    "u.s. medical school":           "danger",
+    "u.s. pvt. research inst.":      "info text-dark",
+    "foreign other":                 "light text-dark border",
+    "no information provided":       "light text-dark border",
 }
 
 

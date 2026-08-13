@@ -1,4 +1,4 @@
-{% set _all_types = ['Academic', 'Government', 'Industry', 'National Laboratory', 'Non-Profit', 'Federal', 'Hospital', 'International', 'Other', 'education', 'facility', 'company', 'nonprofit', 'healthcare', 'funder', 'archive'] %}
+{% set _all_types = ['U.S. academic inst.', 'U.S. national laboratory', 'U.S. govt-funded agency/inst.', 'U.S. industrial firm', 'U.S. medical school', 'U.S. pvt. research inst.', 'Foreign academic inst.', 'Foreign national lab.', 'Foreign industry', 'Foreign other', 'No information provided'] %}
 {% set _active_types = row.manual_types %}
 {% set _active_lower = _active_types | map('lower') | list %}
 <tr class="table-warning">
