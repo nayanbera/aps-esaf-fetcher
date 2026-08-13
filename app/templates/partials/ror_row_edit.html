@@ -1,5 +1,5 @@
 {% set _all_types = ['Academic', 'Government', 'Industry', 'National Laboratory', 'Non-Profit', 'Federal', 'Hospital', 'International', 'Other', 'education', 'facility', 'company', 'nonprofit', 'healthcare', 'funder', 'archive'] %}
-{% set _active_types = row.manual_types if row.manual_types else (row.org_types | reject("equalto", "funder") | list) %}
+{% set _active_types = row.manual_types %}
 {% set _active_lower = _active_types | map('lower') | list %}
 <tr class="table-warning">
   <input type="hidden" name="original_name" value="{{ row.name }}">

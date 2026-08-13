@@ -1,4 +1,4 @@
-{% set ror_types = row.manual_types if row.manual_types else (row.org_types | reject("equalto", "funder") | list) %}
+{% set ror_types = row.manual_types %}
 <tr>
   <td class="small">{{ row.name }}</td>
   <td>
@@ -8,10 +8,7 @@
     {% if row.manual_types %}
     <span class="badge bg-light text-dark border ms-1" title="Imported / manually set">✎</span>
     {% endif %}
-    {% if not ror_types and row.status == 'found' %}
-    <span class="text-muted small">funder only</span>
-    {% endif %}
-    {% if not ror_types and row.status != 'found' %}
+    {% if not ror_types %}
     <span class="text-muted small">—</span>
     {% endif %}
   </td>

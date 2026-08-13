@@ -74,7 +74,7 @@
 <!-- Type breakdown: manual_types (includes imported) take priority over org_types -->
 {%- set ns = namespace(all_types=[]) -%}
 {%- for row in rows -%}
-  {%- set effective = row.manual_types if row.manual_types else (row.org_types | reject("equalto", "funder") | list) -%}
+  {%- set effective = row.manual_types -%}
   {%- set ns.all_types = ns.all_types + effective -%}
 {%- endfor -%}
 {% if ns.all_types %}
