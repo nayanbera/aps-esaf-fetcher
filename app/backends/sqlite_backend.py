@@ -479,9 +479,10 @@ class SQLiteESAFRepository(ESAFRepository):
             clauses.append("status = ?"); params.append(status)
         if search:
             clauses.append(
-                "(e.title LIKE ? OR e.pi_name LIKE ? OR e.description LIKE ? OR e.esaf_id LIKE ?)"
+                "(e.title LIKE ? OR e.pi_name LIKE ? OR e.description LIKE ?"
+                " OR e.esaf_id LIKE ? OR e.pi_group LIKE ?)"
             )
-            params.extend([f"%{search}%"] * 4)
+            params.extend([f"%{search}%"] * 5)
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         sql = f"""
             SELECT e.*, COUNT(eu.badge) AS user_count
