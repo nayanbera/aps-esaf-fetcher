@@ -21,6 +21,7 @@ from .routers import users_router
 from .routers import beamline_scientists_router
 from .routers import admin_router
 from .routers import upload_router
+from .routers import public_api
 
 logging.basicConfig(
     level=logging.INFO,
@@ -109,6 +110,7 @@ app.include_router(overrides_router.router)
 app.include_router(pi_groups_router.router)
 app.include_router(institutions_router.router)
 app.include_router(users_router.router)
+app.include_router(public_api.router)
 app.include_router(beamline_scientists_router.router)
 
 

@@ -154,6 +154,11 @@ def get_stats(
     )
 
 
+def list_users(q: str = "", badge: str = "", institution: str = "",
+               limit: int = 200, offset: int = 0) -> tuple[list[dict], int]:
+    return _r().list_users(q=q, badge=badge, institution=institution,
+                           limit=limit, offset=offset)
+
 def get_user_detail(badge: str) -> Optional[dict]:
     return _r().get_user_detail(badge)
 

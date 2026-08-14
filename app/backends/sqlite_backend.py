@@ -497,6 +497,14 @@ class SQLiteESAFRepository(ESAFRepository):
             rows = conn.execute(sql, params).fetchall()
         return [self._row_to_dict(r) for r in rows]
 
+    @staticmethod
+    def _inst_type_from_row(row: dict) -> str:
+        try:
+            types = json.loads(row.get("inst_manual_types") or "[]")
+            return types[0] if types else (row.get("inst_imported_type") or "")
+        except (ValueError, TypeError):
+            return row.get("inst_imported_type") or ""
+
     def get_esaf(self, esaf_id: str) -> Optional[dict]:
         with self._db() as conn:
             row = conn.execute(
@@ -505,16 +513,30 @@ class SQLiteESAFRepository(ESAFRepository):
             if row is None:
                 return None
             esaf = self._row_to_dict(row)
-            esaf["users"] = [
-                self._row_to_dict(r)
-                for r in conn.execute(
-                    """SELECT u.*, eu.role
-                       FROM users u JOIN esaf_users eu ON u.badge = eu.badge
-                       WHERE eu.esaf_id = ?
-                       ORDER BY eu.role, u.last_name""",
-                    (esaf_id,),
-                ).fetchall()
-            ]
+            user_rows = conn.execute(
+                """SELECT u.*, eu.role, eu.user_type,
+                          ir.manual_types  AS inst_manual_types,
+                          ir.imported_type AS inst_imported_type,
+                          ir.country       AS institution_country,
+                          COALESCE(NULLIF(ir.state,''),
+                              (SELECT s.state FROM users s
+                               WHERE s.institution=u.institution AND s.state!=''
+                               LIMIT 1)) AS institution_state
+                   FROM users u
+                   JOIN esaf_users eu ON u.badge = eu.badge
+                   LEFT JOIN institution_ror ir ON ir.name = u.institution
+                   WHERE eu.esaf_id = ?
+                   ORDER BY eu.role, u.last_name""",
+                (esaf_id,),
+            ).fetchall()
+            users = []
+            for r in user_rows:
+                d = self._row_to_dict(r)
+                d["institution_type"] = self._inst_type_from_row(d)
+                d.pop("inst_manual_types", None)
+                d.pop("inst_imported_type", None)
+                users.append(d)
+            esaf["users"] = users
             esaf["funding_sources"] = [
                 r["source"]
                 for r in conn.execute(
@@ -991,18 +1013,33 @@ class SQLiteESAFRepository(ESAFRepository):
     def get_user_detail(self, badge: str) -> Optional[dict]:
         with self._db() as conn:
             user_row = conn.execute(
-                "SELECT * FROM users WHERE badge = ?", (badge,)
+                """SELECT u.*,
+                          ir.manual_types  AS inst_manual_types,
+                          ir.imported_type AS inst_imported_type,
+                          ir.country       AS institution_country,
+                          COALESCE(NULLIF(ir.state,''),
+                              (SELECT s.state FROM users s
+                               WHERE s.institution=u.institution AND s.state!=''
+                               LIMIT 1)) AS institution_state
+                   FROM users u
+                   LEFT JOIN institution_ror ir ON ir.name = u.institution
+                   WHERE u.badge = ?""",
+                (badge,),
             ).fetchone()
             if user_row is None:
                 return None
             d = self._row_to_dict(user_row)
+            d["institution_type"] = self._inst_type_from_row(d)
+            d.pop("inst_manual_types", None)
+            d.pop("inst_imported_type", None)
             esaf_rows = conn.execute(
                 """SELECT e.esaf_id, e.title, e.year, e.start_date, e.end_date,
-                          e.beamline, e.status, e.technique, e.pi_name, eu.role
+                          e.beamline, e.status, e.technique, e.pi_name,
+                          eu.role, eu.user_type
                    FROM esafs e
                    JOIN esaf_users eu ON eu.esaf_id = e.esaf_id
                    WHERE eu.badge = ?
-                   ORDER BY e.start_date DESC""",
+                   ORDER BY e.year DESC, e.start_date DESC""",
                 (badge,),
             ).fetchall()
             d["esafs"] = [dict(r) for r in esaf_rows]
@@ -1011,6 +1048,57 @@ class SQLiteESAFRepository(ESAFRepository):
             ).fetchone()
             d["is_beamline_scientist"] = is_scientist is not None
         return d
+
+    def list_users(
+        self,
+        q: str = "",
+        badge: str = "",
+        institution: str = "",
+        limit: int = 200,
+        offset: int = 0,
+    ) -> tuple[list[dict], int]:
+        clauses, params = [], []
+        if q:
+            pat = f"%{q}%"
+            clauses.append(
+                "(u.first_name||' '||u.last_name LIKE ? OR u.last_name LIKE ?"
+                " OR u.email LIKE ? OR u.badge LIKE ?)"
+            )
+            params.extend([pat, pat, pat, pat])
+        if badge:
+            clauses.append("u.badge = ?"); params.append(badge)
+        if institution:
+            clauses.append("u.institution LIKE ?"); params.append(f"%{institution}%")
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        base_sql = f"""
+            FROM users u
+            LEFT JOIN institution_ror ir ON ir.name = u.institution
+            {where}
+        """
+        with self._db() as conn:
+            total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
+            rows = conn.execute(
+                f"""SELECT u.*,
+                           ir.manual_types  AS inst_manual_types,
+                           ir.imported_type AS inst_imported_type,
+                           ir.country       AS institution_country,
+                           COALESCE(NULLIF(ir.state,''),
+                               (SELECT s.state FROM users s
+                                WHERE s.institution=u.institution AND s.state!=''
+                                LIMIT 1)) AS institution_state
+                    {base_sql}
+                    ORDER BY u.last_name, u.first_name
+                    LIMIT ? OFFSET ?""",
+                params + [limit, offset],
+            ).fetchall()
+        result = []
+        for r in rows:
+            d = self._row_to_dict(r)
+            d["institution_type"] = self._inst_type_from_row(d)
+            d.pop("inst_manual_types", None)
+            d.pop("inst_imported_type", None)
+            result.append(d)
+        return result, total
 
     # ------------------------------------------------------------------
     # Beamline scientists
