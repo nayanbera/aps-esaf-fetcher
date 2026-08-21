@@ -256,3 +256,32 @@ def stop_scheduler():
     global _scheduler
     if _scheduler and _scheduler.running:
         _scheduler.shutdown(wait=False)
+
+
+def get_interval_hours() -> int:
+    """Return the current auto-sync interval in hours (0 = disabled)."""
+    if _scheduler and _scheduler.running:
+        job = _scheduler.get_job("esaf_sync")
+        if job:
+            return int(job.trigger.interval.total_seconds() // 3600)
+    return config.SYNC_INTERVAL_HOURS
+
+
+def reschedule(hours: int) -> None:
+    """Update the auto-sync interval at runtime. hours=0 disables auto-sync."""
+    global _scheduler
+    if hours <= 0:
+        if _scheduler and _scheduler.running:
+            _scheduler.shutdown(wait=False)
+            _scheduler = None
+        config.SYNC_INTERVAL_HOURS = 0
+        log.info("Auto-sync disabled via admin")
+        return
+
+    config.SYNC_INTERVAL_HOURS = hours
+    if _scheduler and _scheduler.running:
+        _scheduler.reschedule_job("esaf_sync", trigger="interval", hours=hours)
+        log.info("Auto-sync rescheduled to every %d h", hours)
+    else:
+        start_scheduler()
+        log.info("Auto-sync scheduler started at %d h interval", hours)
