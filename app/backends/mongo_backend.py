@@ -875,18 +875,18 @@ class MongoESAFRepository(ESAFRepository):
     # ------------------------------------------------------------------
 
     def count_admin_users(self) -> int:
-        return self._db()["admin_users"].count_documents({})
+        return self._client[self._db_name]["admin_users"].count_documents({})
 
     def list_admin_users(self) -> list[dict]:
-        return list(self._db()["admin_users"].find({}, {"_id": 0}))
+        return list(self._client[self._db_name]["admin_users"].find({}, {"_id": 0}))
 
     def get_admin_user_by_email(self, email: str) -> dict | None:
-        return self._db()["admin_users"].find_one({"email": email}, {"_id": 0})
+        return self._client[self._db_name]["admin_users"].find_one({"email": email}, {"_id": 0})
 
     def add_admin_user(self, email: str, name: str, password_hash: str) -> bool:
         from pymongo.errors import DuplicateKeyError
         try:
-            self._db()["admin_users"].insert_one(
+            self._client[self._db_name]["admin_users"].insert_one(
                 {"email": email, "name": name, "password_hash": password_hash, "created_at": ""}
             )
             return True
@@ -894,7 +894,7 @@ class MongoESAFRepository(ESAFRepository):
             return False
 
     def remove_admin_user(self, email: str) -> bool:
-        result = self._db()["admin_users"].delete_one({"email": email})
+        result = self._client[self._db_name]["admin_users"].delete_one({"email": email})
         return result.deleted_count > 0
 
     # ------------------------------------------------------------------
@@ -911,7 +911,7 @@ class MongoESAFRepository(ESAFRepository):
         changes: dict = {},
     ) -> None:
         import json
-        self._db()["audit_log"].insert_one({
+        self._client[self._db_name]["audit_log"].insert_one({
             "user_email": user_email,
             "action": action,
             "table_name": table_name,
@@ -935,9 +935,9 @@ class MongoESAFRepository(ESAFRepository):
             filt["user_email"] = user_email
         if action:
             filt["action"] = action
-        total = self._db()["audit_log"].count_documents(filt)
+        total = self._client[self._db_name]["audit_log"].count_documents(filt)
         rows = list(
-            self._db()["audit_log"]
+            self._client[self._db_name]["audit_log"]
             .find(filt, {"_id": 0})
             .sort("created_at", -1)
             .skip(offset)
