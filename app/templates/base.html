@@ -68,6 +68,11 @@
         </li>
       </ul>
       <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item me-2">
+          <span class="badge {% if db_backend == 'MongoDB' %}bg-success{% else %}bg-secondary{% endif %} opacity-75">
+            <i class="bi bi-database me-1"></i>{{ db_backend }}
+          </span>
+        </li>
         {% set admin_user = request.session.get('admin_user') if request.session else None %}
         {% if admin_user %}
         <li class="nav-item">

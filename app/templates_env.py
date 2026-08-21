@@ -20,6 +20,9 @@ _env = Environment(
 )
 _env.globals["url_quote"] = quote
 
+from . import config as _config
+_env.globals["db_backend"] = "MongoDB" if _config.MONGODB_URI else "SQLite"
+
 
 def _replace_param(query_string, key: str, value) -> str:
     """Replace or add a query-string parameter, returning the new query string."""
