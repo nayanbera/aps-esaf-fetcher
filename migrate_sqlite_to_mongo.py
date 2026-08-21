@@ -308,16 +308,24 @@ def migrate(sqlite_path: str, mongo_uri: str, mongo_db: str, dry_run: bool = Fal
     print(f"  Audit Log: {len(audit_rows)} entries")
 
     # ── 10. Sync Log ──────────────────────────────────────────────────────────
+    # Column names vary by schema version: older DBs use synced_at/records_added/records_updated.
     print("Migrating Sync Log …")
+    conn = sqlite3.connect(sqlite_path)
+    conn.row_factory = sqlite3.Row
+    sl_cols = {r["name"] for r in conn.execute("PRAGMA table_info(sync_log)").fetchall()}
+    conn.close()
+    order_col = "started_at" if "started_at" in sl_cols else "synced_at" if "synced_at" in sl_cols else "id"
     sync_rows = _get_sqlite_rows(sqlite_path,
-        "SELECT * FROM sync_log ORDER BY started_at ASC")
+        f"SELECT * FROM sync_log ORDER BY {order_col} ASC")
     for row in sync_rows:
         if not dry_run:
+            added_val   = row.get("added") or row.get("records_added", 0) or 0
+            updated_val = row.get("updated") or row.get("records_updated", 0) or 0
             mg.log_sync(
                 beamlines=row.get("beamlines", ""),
                 years=row.get("years", ""),
-                added=row.get("added", 0),
-                updated=row.get("updated", 0),
+                added=added_val,
+                updated=updated_val,
                 error=row.get("error") or None,
             )
     print(f"  Sync Log: {len(sync_rows)} entries")
