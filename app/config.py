@@ -50,7 +50,7 @@ PDF_DIR: str = os.getenv("PDF_DIR", _default_pdf_dir)
 
 # MongoDB — set MONGODB_URI to switch the backend; leave unset to use SQLite
 MONGODB_URI: str = os.getenv("MONGODB_URI", "")
-MONGODB_DB: str  = os.getenv("MONGODB_DB", "aps_esaf")
+MONGODB_ESAF_DB: str = os.getenv("MONGODB_ESAF_DB", "aps_esaf")
 
 HOST: str = os.getenv("HOST", "0.0.0.0")
 PORT: int = int(os.getenv("PORT", "8088"))

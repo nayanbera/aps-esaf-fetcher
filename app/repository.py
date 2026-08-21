@@ -373,7 +373,7 @@ def get_repository() -> ESAFRepository:
 
     if config.MONGODB_URI:
         from .backends.mongo_backend import MongoESAFRepository
-        return MongoESAFRepository(uri=config.MONGODB_URI, db_name=config.MONGODB_DB)
+        return MongoESAFRepository(uri=config.MONGODB_URI, db_name=config.MONGODB_ESAF_DB)
 
     from .backends.sqlite_backend import SQLiteESAFRepository
     return SQLiteESAFRepository(db_path=config.DB_PATH)

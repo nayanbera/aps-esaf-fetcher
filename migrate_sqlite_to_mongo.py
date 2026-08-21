@@ -5,7 +5,7 @@ Usage:
 
 Environment variables:
     MONGODB_URI   MongoDB connection URI (required)
-    MONGODB_DB    Database name (default: aps_esaf)
+    MONGODB_ESAF_DB   Database name (default: aps_esaf)
     DB_PATH       SQLite database path (default: ~/.aps-esaf-fetcher/esaf.db)
 
 The script reads every table from SQLite via SQLiteESAFRepository and writes
@@ -316,7 +316,7 @@ def main():
                    or os.getenv("DB_PATH")
                    or str(Path.home() / ".aps-esaf-fetcher" / "esaf.db"))
     mongo_uri   = os.getenv("MONGODB_URI", "")
-    mongo_db    = os.getenv("MONGODB_DB", "aps_esaf")
+    mongo_db    = os.getenv("MONGODB_ESAF_DB", "aps_esaf")
 
     if not Path(sqlite_path).exists():
         print(f"ERROR: SQLite database not found: {sqlite_path}", file=sys.stderr)
