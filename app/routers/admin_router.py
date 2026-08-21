@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import db, sync
+from .. import db
 from ..auth import hash_password, verify_password, get_session_user, log_action
 from ..templates_env import templates
 
@@ -138,7 +138,6 @@ def admin_dashboard(
         "log_action_filter": log_action_filter,
         "log_from": log_from,
         "log_to": log_to,
-        "sync_interval_hours": sync.get_interval_hours(),
     })
 
 
@@ -213,32 +212,3 @@ def remove_admin_user(email: str, request: Request):
     })
 
 
-# ---------------------------------------------------------------------------
-# Sync settings
-# ---------------------------------------------------------------------------
-
-@router.post("/admin/sync-settings", response_class=HTMLResponse)
-async def update_sync_settings(request: Request):
-    redir = _require_admin(request)
-    if redir:
-        return redir
-
-    form = await request.form()
-    try:
-        hours = int(form.get("sync_interval_hours") or 0)
-        if hours < 0:
-            hours = 0
-    except ValueError:
-        hours = 0
-
-    sync.reschedule(hours)
-    log_action(request, "edit", "settings", "sync_interval",
-               f"Auto-sync interval set to {hours}h (0 = disabled)")
-
-    msg = f"Auto-sync interval updated to every {hours} hour(s)." if hours > 0 \
-          else "Auto-sync disabled."
-    return templates.TemplateResponse("partials/sync_settings.html", {
-        "request": request,
-        "sync_interval_hours": sync.get_interval_hours(),
-        "sync_settings_msg": msg,
-    })

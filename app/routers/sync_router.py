@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from typing import Annotated, Optional
 
 from .. import db, sync
-from ..auth import log_action
+from ..auth import get_session_user, log_action
 from ..templates_env import templates
 
 router = APIRouter()
@@ -30,6 +30,15 @@ def _years_from_range(from_year: Optional[int], to_year: Optional[int]) -> list[
     return [str(y) for y in range(fy, ty + 1)]
 
 
+def _resolve_years(all_years: bool, from_year: Optional[int], to_year: Optional[int]) -> list[str] | None:
+    """Return year list for sync: all years in DB, a range, or None for config default."""
+    if all_years:
+        opts = db.get_filter_options().get("years", [])
+        if opts:
+            return [str(y) for y in sorted(opts)]
+    return _years_from_range(from_year, to_year)
+
+
 @router.get("/api/sync/status")
 def api_sync_status():
     return {"running": _sync_running, "last_sync": db.get_last_sync()}
@@ -45,15 +54,18 @@ def api_trigger_sync(
 
 
 @router.post("/sync/apply", response_class=HTMLResponse)
-def web_apply_preview(
+async def web_apply_preview(
     request:   Request,
     from_year: Annotated[Optional[int], Form()] = None,
     to_year:   Annotated[Optional[int], Form()] = None,
 ):
     """Apply a previously-previewed sync (runs the real sync)."""
     global _preview_result
+    form = await request.form()
+    all_years = form.get("all_years") == "1"
+    years = _resolve_years(all_years, from_year, to_year)
     _preview_result = None
-    _trigger(_years_from_range(from_year, to_year), request)
+    _trigger(years, request)
     return templates.TemplateResponse("partials/sync_status.html",
                                       {"request": request, **_sync_context()})
 
@@ -62,13 +74,16 @@ _preview_result: dict | None = None
 
 
 def _sync_context():
+    db_years = sorted(db.get_filter_options().get("years", []), reverse=True)
     return {
-        "last_sync":      db.get_last_sync(),
-        "running":        _sync_running,
-        "last_result":    _last_result,
-        "preview_result": _preview_result,
-        "year_choices":   _YEAR_CHOICES,
-        "current_year":   _CURRENT_YEAR,
+        "last_sync":            db.get_last_sync(),
+        "running":              _sync_running,
+        "last_result":          _last_result,
+        "preview_result":       _preview_result,
+        "year_choices":         _YEAR_CHOICES,
+        "current_year":         _CURRENT_YEAR,
+        "db_years":             db_years,
+        "sync_interval_hours":  sync.get_interval_hours(),
     }
 
 
@@ -78,28 +93,33 @@ def sync_page(request: Request):
 
 
 @router.post("/sync/preview", response_class=HTMLResponse)
-def web_preview_sync(
+async def web_preview_sync(
     request:   Request,
     from_year: Annotated[Optional[int], Form()] = None,
     to_year:   Annotated[Optional[int], Form()] = None,
 ):
     """Run a dry-run sync and show what would change."""
     global _preview_result
-    years = _years_from_range(from_year, to_year)
+    form = await request.form()
+    all_years = form.get("all_years") == "1"
+    years = _resolve_years(all_years, from_year, to_year)
     _preview_result = sync.run_sync(years=years, dry_run=True)
     return templates.TemplateResponse("partials/sync_preview.html",
                                       {"request": request, **_sync_context()})
 
 
 @router.post("/sync/trigger", response_class=HTMLResponse)
-def web_trigger_sync(
+async def web_trigger_sync(
     request:   Request,
     from_year: Annotated[Optional[int], Form()] = None,
     to_year:   Annotated[Optional[int], Form()] = None,
 ):
     global _preview_result
+    form = await request.form()
+    all_years = form.get("all_years") == "1"
+    years = _resolve_years(all_years, from_year, to_year)
     _preview_result = None
-    _trigger(_years_from_range(from_year, to_year), request)
+    _trigger(years, request)
     return templates.TemplateResponse("partials/sync_status.html",
                                       {"request": request, **_sync_context()})
 
@@ -109,6 +129,30 @@ def web_sync_status(request: Request):
     """HTMX polling target — returns updated status partial."""
     return templates.TemplateResponse("partials/sync_status.html",
                                       {"request": request, **_sync_context()})
+
+
+@router.post("/sync/settings", response_class=HTMLResponse)
+async def web_update_sync_settings(request: Request):
+    """Update auto-sync interval — admin only."""
+    from ..auth import get_session_user
+    form = await request.form()
+    try:
+        hours = int(form.get("sync_interval_hours") or 0)
+        if hours < 0:
+            hours = 0
+    except ValueError:
+        hours = 0
+
+    user = get_session_user(request)
+    sync.reschedule(hours)
+    log_action(request, "edit", "settings", "sync_interval",
+               f"Auto-sync interval set to {hours}h")
+
+    msg = f"Auto-sync set to every {hours}h." if hours > 0 else "Auto-sync disabled."
+    return templates.TemplateResponse("partials/sync_status.html",
+                                      {"request": request,
+                                       "sync_settings_msg": msg,
+                                       **_sync_context()})
 
 
 def _trigger(years: list[str] | None = None, request: Request | None = None):
