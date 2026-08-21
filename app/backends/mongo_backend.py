@@ -127,7 +127,7 @@ class MongoESAFRepository(ESAFRepository):
         return self._esafs().count_documents(query)
 
     def get_filter_options(self) -> dict:
-        years     = sorted(self._esafs().distinct("year"), reverse=True)
+        years     = sorted((y for y in self._esafs().distinct("year") if y is not None), reverse=True)
         beamlines = sorted(b for b in self._esafs().distinct("beamline") if b)
         statuses  = sorted(s for s in self._esafs().distinct("status")   if s)
         return {"years": years, "beamlines": beamlines, "statuses": statuses}
