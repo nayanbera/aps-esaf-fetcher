@@ -205,8 +205,24 @@ def migrate(sqlite_path: str, mongo_uri: str, mongo_db: str, dry_run: bool = Fal
     print(f"  PI Groups: {len(pi_rows)}")
 
     # ── 4. Institution ROR ────────────────────────────────────────────────────
+    # Query the table directly to avoid backend methods that reference columns
+    # added by later migrations (e.g. state, manual_types) which may not exist
+    # on older databases that have never been started with the latest code.
     print("Migrating Institution ROR …")
-    ror_rows = sq.list_institution_ror()
+    conn = sqlite3.connect(sqlite_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.execute("PRAGMA table_info(institution_ror)")
+    ror_cols = {r["name"] for r in cur.fetchall()}
+    conn.close()
+    select_cols = ", ".join(
+        c for c in [
+            "name", "ror_id", "ror_name", "org_types", "manual_types",
+            "imported_type", "country", "state", "website", "score",
+            "status", "looked_up_at",
+        ] if c in ror_cols
+    )
+    ror_rows = _get_sqlite_rows(sqlite_path,
+        f"SELECT {select_cols} FROM institution_ror ORDER BY name")
     for row in ror_rows:
         if not dry_run:
             data = {k: v for k, v in row.items() if k != "name"}
