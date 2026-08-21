@@ -140,10 +140,17 @@ def migrate(sqlite_path: str, mongo_uri: str, mongo_db: str, dry_run: bool = Fal
     # ── 2. GUPs ──────────────────────────────────────────────────────────────
     print("Migrating GUPs …")
     gup_rows  = _get_sqlite_rows(sqlite_path, "SELECT * FROM gups")
-    gfs_rows  = _get_sqlite_rows(sqlite_path, "SELECT * FROM gup_funding_sources")
+    gfs_rows  = _get_sqlite_rows(sqlite_path,
+        "SELECT gup_id, agency, details, grant_number, percentage "
+        "FROM gup_funding_sources ORDER BY id")
     gfs_by_gup: dict[str, list] = {}
     for r in gfs_rows:
-        gfs_by_gup.setdefault(r["gup_id"], []).append(r["source"])
+        gfs_by_gup.setdefault(r["gup_id"], []).append({
+            "agency":       r.get("agency", ""),
+            "details":      r.get("details", ""),
+            "grant_number": r.get("grant_number", ""),
+            "percentage":   r.get("percentage", 0),
+        })
 
     added = updated = 0
     for row in gup_rows:
