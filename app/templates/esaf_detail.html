@@ -160,7 +160,7 @@
             </td>
             <td>
               {% if u.email and '@' in u.email %}
-                {% set _missing = not u.institution or not u.country %}
+                {% set _missing = not u.institution or not u.country or not u.state %}
                 <button class="btn btn-sm py-0 {{ 'btn-outline-secondary' if _missing else 'btn-outline-light text-muted border-0' }}"
                         data-domain="{{ u.email.split('@')[1] }}"
                         data-institution="{{ u.institution or '' }}"
