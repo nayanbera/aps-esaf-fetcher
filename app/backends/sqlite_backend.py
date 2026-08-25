@@ -689,14 +689,23 @@ class SQLiteESAFRepository(ESAFRepository):
                 ).fetchall()
             return [{f: dict(r).get(f, "") for f in fields} for r in rows]
 
+    # Fields that are set by the user in the UI and must never be overwritten by sync.
+    _USER_EDITABLE_ESAF_FIELDS = ("notes", "custom_fields", "technique", "local_id",
+                                   "pi_group", "gup_id")
+
     def upsert_esaf(self, data: dict, now: str) -> str:
         with self._db() as conn:
             existing = conn.execute(
-                "SELECT esaf_id, notes, custom_fields FROM esafs WHERE esaf_id=?",
+                # Select all user-editable fields so we never overwrite them on update.
+                "SELECT esaf_id, notes, custom_fields, technique, local_id, pi_group, gup_id "
+                "FROM esafs WHERE esaf_id=?",
                 (data["esaf_id"],),
             ).fetchone()
 
             if existing:
+                # Only update fields that come from the DM API.
+                # User-editable fields (notes, technique, local_id, pi_group, gup_id,
+                # custom_fields) are NOT in this SET clause — SQLite leaves them unchanged.
                 conn.execute(
                     """UPDATE esafs SET title=?, description=?, sector=?, beamline=?,
                        year=?, status=?, start_date=?, end_date=?, doi=?,

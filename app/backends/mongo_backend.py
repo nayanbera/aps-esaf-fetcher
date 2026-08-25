@@ -245,9 +245,12 @@ class MongoESAFRepository(ESAFRepository):
         esaf_id = data["esaf_id"]
         existing = self._esafs().find_one(
             {"esaf_id": esaf_id},
-            {"notes": 1, "custom_fields": 1, "pi_group": 1, "created_at": 1, "users": 1},
+            # Fetch ALL user-editable fields so replace_one never silently drops them.
+            {"notes": 1, "custom_fields": 1, "technique": 1, "local_id": 1,
+             "pi_group": 1, "gup_id": 1, "created_at": 1, "users": 1},
         )
 
+        # Build doc from DM API fields only.
         doc = {
             "esaf_id":        esaf_id,
             "title":          data["title"],
@@ -270,9 +273,14 @@ class MongoESAFRepository(ESAFRepository):
         }
 
         if existing:
+            # Restore every user-editable field from the existing document so that
+            # replace_one does not silently discard values the user set manually.
             doc["notes"]         = existing.get("notes", "")
             doc["custom_fields"] = existing.get("custom_fields", {})
+            doc["technique"]     = existing.get("technique", "")
+            doc["local_id"]      = existing.get("local_id", "")
             doc["pi_group"]      = existing.get("pi_group", "")
+            doc["gup_id"]        = existing.get("gup_id", "")
             doc["created_at"]    = existing.get("created_at", now)
             # Preserve orcid_id / institution set by previous enrichment
             existing_users = {u.get("badge", ""): u for u in (existing.get("users") or [])}
@@ -291,7 +299,10 @@ class MongoESAFRepository(ESAFRepository):
         else:
             doc["notes"]         = ""
             doc["custom_fields"] = {}
+            doc["technique"]     = ""
+            doc["local_id"]      = ""
             doc["pi_group"]      = ""
+            doc["gup_id"]        = ""
             doc["created_at"]    = now
             self._esafs().insert_one(doc)
             return "added"
