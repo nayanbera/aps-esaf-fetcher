@@ -320,6 +320,9 @@ class ESAFRepository(ABC):
     @abstractmethod
     def remove_admin_user(self, email: str) -> bool: ...
 
+    @abstractmethod
+    def update_admin_password(self, email: str, new_hash: str) -> bool: ...
+
     # ------------------------------------------------------------------
     # Audit log
     # ------------------------------------------------------------------

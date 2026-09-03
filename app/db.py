@@ -336,6 +336,10 @@ def remove_admin_user(email: str) -> bool:
     return _r().remove_admin_user(email)
 
 
+def update_admin_password(email: str, new_hash: str) -> bool:
+    return _r().update_admin_password(email, new_hash)
+
+
 # ------------------------------------------------------------------
 # Audit log
 # ------------------------------------------------------------------

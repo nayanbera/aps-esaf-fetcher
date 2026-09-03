@@ -1615,6 +1615,14 @@ class SQLiteESAFRepository(ESAFRepository):
             cur = conn.execute("DELETE FROM admin_users WHERE email = ?", (email,))
         return cur.rowcount > 0
 
+    def update_admin_password(self, email: str, new_hash: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute(
+                "UPDATE admin_users SET password_hash = ? WHERE email = ?",
+                (new_hash, email),
+            )
+        return cur.rowcount > 0
+
     # ------------------------------------------------------------------
     # Audit log
     # ------------------------------------------------------------------

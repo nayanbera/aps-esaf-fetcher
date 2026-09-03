@@ -138,6 +138,9 @@ def admin_dashboard(
         "log_action_filter": log_action_filter,
         "log_from": log_from,
         "log_to": log_to,
+        # change-password form initial state
+        "cp_error": "",
+        "cp_msg": "",
     })
 
 
@@ -209,6 +212,75 @@ def remove_admin_user(email: str, request: Request):
         "current_admin": current,
         "add_error": "",
         "add_msg": "",
+    })
+
+
+@router.post("/admin/users/{email:path}/reset-password", response_class=HTMLResponse)
+async def reset_admin_password(email: str, request: Request):
+    """Any logged-in admin can force-set another admin's password (no old password needed)."""
+    redir = _require_admin(request)
+    if redir:
+        return redir
+
+    current = get_session_user(request)
+    form = await request.form()
+    new_pw = (form.get("new_password") or "")
+    confirm = (form.get("confirm_password") or "")
+
+    errors = []
+    if len(new_pw) < 8:
+        errors.append("Password must be ≥ 8 characters.")
+    if new_pw != confirm:
+        errors.append("Passwords do not match.")
+
+    msg = ""
+    if not errors:
+        db.update_admin_password(email, hash_password(new_pw))
+        log_action(request, "edit", "admin_users", email, f"Reset password for {email}")
+        msg = f"Password for {email} has been reset."
+
+    admins = db.list_admin_users()
+    return templates.TemplateResponse("partials/admins_table.html", {
+        "request": request,
+        "admins": admins,
+        "current_admin": current,
+        "add_error": " ".join(errors),
+        "add_msg": msg,
+    })
+
+
+@router.post("/admin/change-password", response_class=HTMLResponse)
+async def change_own_password(request: Request):
+    """Logged-in admin changes their own password (current password required)."""
+    redir = _require_admin(request)
+    if redir:
+        return redir
+
+    current = get_session_user(request)
+    form = await request.form()
+    current_pw = (form.get("current_password") or "")
+    new_pw = (form.get("new_password") or "")
+    confirm = (form.get("confirm_password") or "")
+
+    user = db.get_admin_user_by_email(current["email"])
+    errors = []
+    if not user or not verify_password(current_pw, user["password_hash"]):
+        errors.append("Current password is incorrect.")
+    if len(new_pw) < 8:
+        errors.append("New password must be ≥ 8 characters.")
+    if new_pw != confirm:
+        errors.append("Passwords do not match.")
+
+    msg = ""
+    if not errors:
+        db.update_admin_password(current["email"], hash_password(new_pw))
+        log_action(request, "edit", "admin_users", current["email"], "Changed own password")
+        msg = "Password updated successfully."
+
+    return templates.TemplateResponse("partials/change_password_form.html", {
+        "request": request,
+        "cp_error": " ".join(errors),
+        "cp_msg": msg,
     })
 
 

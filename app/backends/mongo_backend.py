@@ -908,6 +908,12 @@ class MongoESAFRepository(ESAFRepository):
         result = self._client[self._db_name]["admin_users"].delete_one({"email": email})
         return result.deleted_count > 0
 
+    def update_admin_password(self, email: str, new_hash: str) -> bool:
+        result = self._client[self._db_name]["admin_users"].update_one(
+            {"email": email}, {"$set": {"password_hash": new_hash}}
+        )
+        return result.modified_count > 0
+
     # ------------------------------------------------------------------
     # Audit log (stubs)
     # ------------------------------------------------------------------

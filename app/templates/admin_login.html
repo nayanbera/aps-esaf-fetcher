@@ -48,6 +48,24 @@
       </div>
     </div><!-- /login card -->
 
+    {% if error %}
+    <div class="text-center mt-3">
+      <a class="small text-muted" data-bs-toggle="collapse" href="#forgot-hint" role="button">
+        Forgot your password?
+      </a>
+      <div class="collapse mt-2" id="forgot-hint">
+        <div class="card card-body text-start small text-muted">
+          Ask another admin to reset your password from the
+          <strong>Admin Dashboard → Admin Users</strong> table
+          (the <i class="bi bi-key"></i> icon next to your name).<br><br>
+          If you are the only admin and are completely locked out, run this
+          on the server to reset credentials:
+          <pre class="mt-2 mb-0 p-2 bg-light rounded" style="font-size:0.78rem">python3 -m app.reset_admin</pre>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     {% if no_admins %}
     <div class="card shadow-sm mt-4">
       <div class="card-header bg-success text-white">

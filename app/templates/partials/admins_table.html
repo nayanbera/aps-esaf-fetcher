@@ -19,8 +19,17 @@
       <td>{{ a.email }}</td>
       <td>{{ a.name }}</td>
       <td class="text-muted small">{{ a.created_at[:10] if a.created_at else '—' }}</td>
-      <td>
+      <td class="text-end" style="white-space:nowrap">
         {% if current_admin and current_admin.email != a.email %}
+        <!-- Reset password button triggers a modal -->
+        <button class="btn btn-outline-secondary btn-sm py-0 px-1 me-1"
+                data-bs-toggle="modal"
+                data-bs-target="#resetPwModal"
+                data-email="{{ a.email }}"
+                data-name="{{ a.name }}"
+                title="Reset password for {{ a.name }}">
+          <i class="bi bi-key"></i>
+        </button>
         <button class="btn btn-outline-danger btn-sm py-0 px-1"
                 hx-delete="/admin/users/{{ a.email }}"
                 hx-target="#admins-wrap"
@@ -38,3 +47,68 @@
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Reset password modal -->
+<div class="modal fade" id="resetPwModal" tabindex="-1" aria-labelledby="resetPwModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="resetPwModalLabel">
+          <i class="bi bi-key me-1"></i>Reset password
+        </h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">Setting new password for <strong id="resetPwName"></strong>.</p>
+        <div id="resetPwResult"></div>
+        <div class="mb-2">
+          <input type="password" id="resetPwNew" name="new_password"
+                 class="form-control form-control-sm" placeholder="New password (min 8 chars)"
+                 autocomplete="new-password">
+        </div>
+        <div class="mb-2">
+          <input type="password" id="resetPwConfirm" name="confirm_password"
+                 class="form-control form-control-sm" placeholder="Confirm new password"
+                 autocomplete="new-password">
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="resetPwSave">
+          <i class="bi bi-floppy me-1"></i>Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  let _resetEmail = '';
+
+  document.getElementById('resetPwModal').addEventListener('show.bs.modal', function (e) {
+    const btn = e.relatedTarget;
+    _resetEmail = btn.dataset.email;
+    document.getElementById('resetPwName').textContent = btn.dataset.name + ' (' + _resetEmail + ')';
+    document.getElementById('resetPwNew').value = '';
+    document.getElementById('resetPwConfirm').value = '';
+    document.getElementById('resetPwResult').innerHTML = '';
+  });
+
+  document.getElementById('resetPwSave').addEventListener('click', async function () {
+    const body = new URLSearchParams({
+      new_password: document.getElementById('resetPwNew').value,
+      confirm_password: document.getElementById('resetPwConfirm').value,
+    });
+    const res = await fetch('/admin/users/' + encodeURIComponent(_resetEmail) + '/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    const html = await res.text();
+    // The response replaces the whole #admins-wrap so we just swap it and close.
+    document.getElementById('admins-wrap').innerHTML = html;
+    bootstrap.Modal.getInstance(document.getElementById('resetPwModal')).hide();
+  });
+})();
+</script>
