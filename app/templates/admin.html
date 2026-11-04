@@ -63,6 +63,42 @@
     </div>
   </div><!-- /col -->
 
+  <!-- ── Section A3: Display Time Zone ───────────────────────────── -->
+  <div class="col-xl-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-clock me-1"></i>Display Time Zone
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-2">
+          Times throughout the site (sync, imports, audit log) are shown in this zone.
+          Stored values stay in UTC. Default: America/Chicago.
+        </p>
+        <form method="post" action="/admin/timezone" class="d-flex gap-2">
+          <select name="timezone" class="form-select form-select-sm" aria-label="Time zone">
+            <optgroup label="Common">
+              {% for z in tz_common %}
+              <option value="{{ z }}" {{ 'selected' if z == tz_name }}>{{ z }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="All time zones">
+              {% for z in tz_all if z not in tz_common %}
+              <option value="{{ z }}" {{ 'selected' if z == tz_name }}>{{ z }}</option>
+              {% endfor %}
+            </optgroup>
+          </select>
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        </form>
+        <div class="small mt-2 text-muted">Current time in this zone: {{ now_utc | localtime }}</div>
+        {% if tz_saved == '1' %}
+        <div class="alert alert-success py-1 small mt-2 mb-0">Time zone saved.</div>
+        {% elif tz_saved == '0' %}
+        <div class="alert alert-danger py-1 small mt-2 mb-0">Unknown time zone — not saved.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div><!-- /col -->
+
   <!-- ── Section B: Audit Log ───────────────────────────────────── -->
   <div class="col-xl-8">
     <div class="card shadow-sm">
@@ -133,7 +169,7 @@
             <tbody>
             {% for entry in audit_rows %}
               <tr>
-                <td class="text-nowrap small text-muted">{{ entry.created_at[:19] if entry.created_at else '—' }}</td>
+                <td class="text-nowrap small text-muted">{{ entry.created_at | localtime }}</td>
                 <td class="small">{{ entry.user_email or '—' }}</td>
                 <td>
                   {% if entry.action == 'delete' %}

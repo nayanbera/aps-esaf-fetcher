@@ -16,7 +16,7 @@
       <input type="text" name="state" value="{{ o.state }}"
              class="form-control form-control-sm" placeholder="IL">
     </td>
-    <td class="text-muted small">{{ (o.created_at or '')[:10] }}</td>
+    <td class="text-muted small">{{ (o.created_at or '') | localtime('%Y-%m-%d') }}</td>
     <td class="text-end">
       <button type="submit" class="btn btn-success btn-sm py-0 me-1">
         <i class="bi bi-check-lg"></i>

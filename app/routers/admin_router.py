@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import db
+from .. import db, display_tz
 from ..auth import hash_password, verify_password, get_session_user, log_action
 from ..templates_env import templates
 
@@ -107,6 +109,7 @@ def admin_dashboard(
     log_from: str = "",
     log_to: str = "",
     log_page: int = 1,
+    tz_saved: str = "",
 ):
     redir = _require_admin(request)
     if redir:
@@ -138,6 +141,11 @@ def admin_dashboard(
         "log_action_filter": log_action_filter,
         "log_from": log_from,
         "log_to": log_to,
+        "tz_name": display_tz.get_timezone_name(),
+        "tz_common": display_tz.COMMON_TZS,
+        "tz_all": display_tz.all_timezones(),
+        "tz_saved": tz_saved,
+        "now_utc": datetime.now(timezone.utc),
         # change-password form initial state
         "cp_error": "",
         "cp_msg": "",
@@ -284,3 +292,23 @@ async def change_own_password(request: Request):
     })
 
 
+
+
+# ---------------------------------------------------------------------------
+# Display time zone
+# ---------------------------------------------------------------------------
+
+@router.post("/admin/timezone")
+async def set_display_timezone(request: Request):
+    """Admin picks the time zone used to display timestamps across the UI."""
+    redir = _require_admin(request)
+    if redir:
+        return redir
+    form = await request.form()
+    name = (form.get("timezone") or "").strip()
+    try:
+        display_tz.set_timezone_name(name)
+    except ValueError:
+        return RedirectResponse("/admin?tz_saved=0", status_code=303)
+    log_action(request, "edit", "settings", "timezone", f"Display time zone set to {name}")
+    return RedirectResponse("/admin?tz_saved=1", status_code=303)

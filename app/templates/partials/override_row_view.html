@@ -3,7 +3,7 @@
   <td>{{ o.institution or '—' }}</td>
   <td>{{ o.country or '—' }}</td>
   <td>{{ o.state or '—' }}</td>
-  <td class="text-muted small">{{ (o.created_at or '')[:10] }}</td>
+  <td class="text-muted small">{{ (o.created_at or '') | localtime('%Y-%m-%d') }}</td>
   <td class="text-end">
     <button class="btn btn-outline-secondary btn-sm py-0 me-1"
             hx-get="/overrides/{{ o.domain }}/edit"

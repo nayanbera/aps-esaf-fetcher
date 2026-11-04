@@ -18,7 +18,7 @@
     <tr>
       <td>{{ a.email }}</td>
       <td>{{ a.name }}</td>
-      <td class="text-muted small">{{ a.created_at[:10] if a.created_at else '—' }}</td>
+      <td class="text-muted small">{{ a.created_at | localtime('%Y-%m-%d') }}</td>
       <td class="text-end" style="white-space:nowrap">
         {% if current_admin and current_admin.email != a.email %}
         <!-- Reset password button triggers a modal -->

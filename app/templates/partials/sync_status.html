@@ -30,7 +30,7 @@
   {% if last_sync %}
     <table class="table table-sm table-bordered w-auto mb-3">
       <tbody>
-        <tr><th>Last sync time</th><td>{{ last_sync.synced_at }}</td></tr>
+        <tr><th>Last sync time</th><td>{{ last_sync.synced_at | localtime }}</td></tr>
         <tr><th>Beamlines</th><td>{{ last_sync.beamlines }}</td></tr>
         <tr><th>Years</th><td>{{ last_sync.years }}</td></tr>
         <tr><th>Records added</th><td>{{ last_sync.records_added }}</td></tr>

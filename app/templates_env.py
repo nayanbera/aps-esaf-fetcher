@@ -40,6 +40,10 @@ def _replace_param(query_string, key: str, value) -> str:
 
 _env.filters["replace_param"] = _replace_param
 
+from .display_tz import get_timezone_name as _tz_name, localtime as _localtime
+_env.filters["localtime"] = _localtime
+_env.globals["display_tz"] = _tz_name
+
 
 class _Templates:
     """Drop-in replacement for Starlette's Jinja2Templates."""

@@ -73,7 +73,7 @@
       </form>
       {% if import_cfg.last_run %}
       <div class="text-muted small mt-2">
-        Last run {{ import_cfg.last_run[:19].replace('T', ' ') }} UTC — {{ import_cfg.last_summary }}
+        Last run {{ import_cfg.last_run | localtime }} — {{ import_cfg.last_summary }}
       </div>
       {% endif %}
       <div id="esaf-bulk-result" class="mt-2"></div>
