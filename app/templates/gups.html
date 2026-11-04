@@ -51,9 +51,10 @@
               <input type="text" name="folder_path" id="gup-folder-path" class="form-control"
                      value="{{ import_cfg.folder }}" placeholder="/path/to/gups/folder" required>
               <button type="button" class="btn btn-outline-secondary"
-                      hx-get="/gups/browse" hx-include="#gup-folder-path"
-                      hx-target="#gup-browse-body" hx-swap="innerHTML"
-                      data-bs-toggle="modal" data-bs-target="#gup-browse-modal">
+                      hx-get="/folders/browse" hx-include="#gup-folder-path"
+                      hx-target="#folder-browse-body" hx-swap="innerHTML"
+                      data-bs-toggle="modal" data-bs-target="#folder-browse-modal"
+                      data-folder-input="gup-folder-path">
                 <i class="bi bi-folder2-open me-1"></i>Browse…
               </button>
             </div>
@@ -250,20 +251,7 @@
 })();
 </script>
 
-<!-- Server folder browser -->
-<div class="modal fade" id="gup-browse-modal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h6 class="modal-title"><i class="bi bi-hdd-network me-2"></i>Select a folder on the server</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="gup-browse-body">
-        <div class="text-muted small">Loading…</div>
-      </div>
-    </div>
-  </div>
-</div>
+{% include 'partials/folder_browse_modal.html' %}
 <script>
 // After a bulk import, refresh the table, pagination and count in place
 // (keeps the result banner visible, unlike a full page reload).
@@ -277,19 +265,6 @@ document.body.addEventListener('gups-imported', function () {
         if (fresh && cur) cur.innerHTML = fresh.innerHTML;
       });
     });
-});
-document.body.addEventListener('htmx:responseError', function (e) {
-  var body = document.getElementById('gup-browse-body');
-  if (body && e.detail.target === body) {
-    body.innerHTML = '<div class="alert alert-danger small mb-0">Could not list folders (HTTP ' +
-                     e.detail.xhr.status + ').</div>';
-  }
-});
-document.addEventListener('click', function (e) {
-  var btn = e.target.closest('[data-select-path]');
-  if (!btn) return;
-  document.getElementById('gup-folder-path').value = btn.dataset.selectPath;
-  bootstrap.Modal.getInstance(document.getElementById('gup-browse-modal')).hide();
 });
 </script>
 {% endblock %}

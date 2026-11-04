@@ -92,10 +92,9 @@ def set_gup_technique(
 
 # ---------------------------------------------------------------------------
 # Server-side folder browser (for choosing the import folder)
-# NB: must be registered before /gups/{gup_id}, or 'browse' is taken as a GUP ID.
 # ---------------------------------------------------------------------------
 
-@router.get("/gups/browse", response_class=HTMLResponse)
+@router.get("/folders/browse", response_class=HTMLResponse)
 def browse_folders(folder_path: str = ""):
     """Return an HTML fragment listing the sub-folders of *folder_path*."""
     p = Path(folder_path.strip() or gup_import.load_settings()["folder"] or "~").expanduser()
@@ -120,8 +119,8 @@ def browse_folders(folder_path: str = ""):
     def nav(target: Path, label: str, icon: str = "bi-folder") -> str:
         return (
             f'<a href="#" class="list-group-item list-group-item-action py-1" '
-            f'hx-get="/gups/browse?folder_path={quote(str(target))}" '
-            f'hx-target="#gup-browse-body" hx-swap="innerHTML">'
+            f'hx-get="/folders/browse?folder_path={quote(str(target))}" '
+            f'hx-target="#folder-browse-body" hx-swap="innerHTML">'
             f'<i class="bi {icon} me-2"></i>{html.escape(label)}</a>'
         )
 

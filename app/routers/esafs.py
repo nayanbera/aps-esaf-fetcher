@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Request, Form, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse
 from typing import Annotated
 
-from .. import config, db
+from .. import config, db, esaf_import
 from ..esaf_pdf_parser import parse_esaf_pdf
 from ..templates_env import templates
 
@@ -82,6 +84,7 @@ def esafs_page(
         "page": page, "total_pages": total_pages,
         "total": total, "per_page": _PER_PAGE,
         "offset": offset,
+        "import_cfg": {k: v for k, v in esaf_import.load_settings().items() if k != "manifest"},
     })
 
 
@@ -256,53 +259,30 @@ async def upload_esaf_pdf(request: Request, esaf_id: str, pdf_file: UploadFile =
 # ---------------------------------------------------------------------------
 
 @router.post("/esafs/bulk-import-pdfs", response_class=HTMLResponse)
-async def bulk_import_esaf_pdfs(request: Request, folder_path: str = Form(...)):
-    folder = Path(folder_path.strip())
-    if not folder.is_dir():
+async def bulk_import_esaf_pdfs(
+    request: Request,
+    folder_path: str = Form(...),
+    recursive: str = Form(""),
+    interval_hrs: int = Form(0),
+    force: str = Form(""),
+):
+    """Import ESAF PDFs from a server folder and remember it as the watched folder.
+
+    PDFs are read in place and never modified; the DB stores their original path.
+    """
+    folder = str(Path(folder_path.strip()).expanduser())
+    if not Path(folder).is_dir():
         return HTMLResponse(
-            f'<div class="alert alert-danger">Folder not found: <code>{folder_path}</code></div>',
+            f'<div class="alert alert-danger">Folder not found: <code>{html.escape(folder)}</code></div>',
             status_code=422,
         )
-
-    pdf_files = list(folder.glob("*.pdf")) + list(folder.glob("*.PDF"))
-    if not pdf_files:
-        return HTMLResponse(
-            '<div class="alert alert-warning">No PDF files found in that folder.</div>'
-        )
-
-    pdf_dir = Path(config.PDF_DIR) / "esafs"
-    pdf_dir.mkdir(parents=True, exist_ok=True)
-
-    matched = skipped = errors_count = 0
-    errors: list[str] = []
-
-    for p in pdf_files:
-        try:
-            result = parse_esaf_pdf(str(p))
-            esaf_id = result["extracted"].get("esaf_id", "").strip()
-            if not esaf_id:
-                skipped += 1
-                continue
-            esaf = db.get_esaf(esaf_id)
-            if esaf is None:
-                skipped += 1
-                continue
-            import shutil
-            dest = str(pdf_dir / f"{esaf_id}.pdf")
-            shutil.copy2(str(p), dest)
-            gup_id = result["extracted"].get("gup_id", "").strip()
-            db.update_esaf_pdf(esaf_id, gup_id, dest)
-            matched += 1
-        except Exception as exc:
-            errors.append(f"{p.name}: {exc}")
-            errors_count += 1
-            log.exception("Error importing ESAF PDF %s", p)
-
-    msg = (f"Processed {len(pdf_files)} files: {matched} matched and stored, "
-           f"{skipped} skipped (no ESAF ID or not in DB).")
-    if errors:
-        err_html = "<ul>" + "".join(f"<li>{e}</li>" for e in errors) + "</ul>"
-        return HTMLResponse(
-            f'<div class="alert alert-warning">{msg}<br>Errors:{err_html}</div>'
-        )
-    return HTMLResponse(f'<div class="alert alert-success">{msg}</div>')
+    try:
+        esaf_import.configure(folder, bool(recursive), interval_hrs)
+    except ValueError as exc:
+        return HTMLResponse(f'<div class="alert alert-danger">{html.escape(str(exc))}</div>', status_code=422)
+    try:
+        counts = await run_in_threadpool(
+            esaf_import.import_folder, folder, bool(recursive), bool(force))
+    except RuntimeError as exc:
+        return HTMLResponse(f'<div class="alert alert-warning">{html.escape(str(exc))}</div>')
+    return HTMLResponse(esaf_import.format_result(counts))

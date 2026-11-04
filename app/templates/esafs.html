@@ -25,27 +25,57 @@
     </div>
     <div class="card-body">
       <p class="text-muted small mb-2">
-        Supply the path to a server-side folder containing APS ESAF PDFs.
-        Each PDF is parsed for its ESAF ID, matched to an existing record in the
-        database, and the file is stored. PDFs that cannot be matched are skipped.
+        Choose a server-side folder containing APS ESAF PDFs. Each PDF is parsed for its
+        ESAF ID and matched to an existing record in the database. PDFs are read in place
+        and never copied, changed or deleted. PDFs whose ESAF isn't in the database yet
+        are skipped and retried on the next run.
       </p>
       <form hx-post="/esafs/bulk-import-pdfs"
             hx-target="#esaf-bulk-result"
             hx-swap="innerHTML"
-            hx-on::after-request="this.querySelector('[name=folder_path]').value=''">
-        <div class="row g-2 align-items-end">
-          <div class="col">
-            <label class="form-label mb-1 small">Server folder path:</label>
-            <input type="text" name="folder_path" class="form-control form-control-sm"
-                   placeholder="/path/to/esaf/pdfs" required>
-          </div>
-          <div class="col-auto">
-            <button type="submit" class="btn btn-secondary btn-sm">
-              <i class="bi bi-folder-symlink me-1"></i>Import All PDFs
+            hx-indicator="#esaf-bulk-spinner">
+        <div class="mb-2">
+          <label class="form-label mb-1 small">Server folder path containing ESAF PDFs:</label>
+          <div class="input-group input-group-sm">
+            <input type="text" name="folder_path" id="esaf-folder-path" class="form-control"
+                   value="{{ import_cfg.folder }}" placeholder="/path/to/esaf/pdfs" required>
+            <button type="button" class="btn btn-outline-secondary"
+                    hx-get="/folders/browse" hx-include="#esaf-folder-path"
+                    hx-target="#folder-browse-body" hx-swap="innerHTML"
+                    data-bs-toggle="modal" data-bs-target="#folder-browse-modal"
+                    data-folder-input="esaf-folder-path">
+              <i class="bi bi-folder2-open me-1"></i>Browse…
             </button>
           </div>
         </div>
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-2 small">
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="recursive" value="1" id="esaf-recursive"
+                   {{ 'checked' if import_cfg.recursive }}>
+            <label class="form-check-label" for="esaf-recursive">Include subfolders</label>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <label class="mb-0" for="esaf-interval">Re-scan every</label>
+            <input type="number" min="0" name="interval_hrs" id="esaf-interval"
+                   class="form-control form-control-sm" style="width:5rem"
+                   value="{{ import_cfg.interval_hrs }}">
+            <span>h (0 = off, 24 = daily)</span>
+          </div>
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="force" value="1" id="esaf-force">
+            <label class="form-check-label" for="esaf-force">Re-parse unchanged files</label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm">
+          <i class="bi bi-folder-symlink me-1"></i>Save &amp; Import Now
+        </button>
+        <span id="esaf-bulk-spinner" class="htmx-indicator spinner-border spinner-border-sm ms-2"></span>
       </form>
+      {% if import_cfg.last_run %}
+      <div class="text-muted small mt-2">
+        Last run {{ import_cfg.last_run[:19].replace('T', ' ') }} UTC — {{ import_cfg.last_summary }}
+      </div>
+      {% endif %}
       <div id="esaf-bulk-result" class="mt-2"></div>
     </div>
   </div>
@@ -214,4 +244,5 @@
   });
 })();
 </script>
+{% include 'partials/folder_browse_modal.html' %}
 {% endblock %}
