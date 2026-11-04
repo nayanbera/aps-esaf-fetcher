@@ -170,7 +170,10 @@ async def bulk_import_gups(
             f'<div class="alert alert-danger">Folder not found: <code>{html.escape(folder)}</code></div>',
             status_code=422,
         )
-    gup_import.configure(folder, bool(recursive), interval_hrs)
+    try:
+        gup_import.configure(folder, bool(recursive), interval_hrs)
+    except ValueError as exc:
+        return HTMLResponse(f'<div class="alert alert-danger">{html.escape(str(exc))}</div>', status_code=422)
     try:
         counts = await run_in_threadpool(
             gup_import.import_folder, folder, bool(recursive), bool(force))

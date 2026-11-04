@@ -123,6 +123,12 @@ def is_managed_pdf(pdf_path: str) -> bool:
 # Folder import
 # ---------------------------------------------------------------------------
 
+def _check_not_managed(folder: str) -> None:
+    """Refuse our own storage dir as a watched folder (its files may be deleted with a GUP)."""
+    if is_managed_pdf(str(Path(folder).expanduser() / "x.pdf")):
+        raise ValueError("That folder is the app's own PDF storage; choose your source folder instead")
+
+
 def find_pdfs(folder: Path, recursive: bool) -> list[Path]:
     it = folder.rglob("*") if recursive else folder.glob("*")
     return sorted(p for p in it if p.is_file() and p.suffix.lower() == ".pdf")
@@ -137,6 +143,7 @@ def import_folder(folder: str, recursive: bool = True, force: bool = False) -> d
     root = Path(folder).expanduser()
     if not root.is_dir():
         raise FileNotFoundError(f"Folder not found: {folder}")
+    _check_not_managed(str(root))
 
     if not _run_lock.acquire(blocking=False):
         raise RuntimeError("A GUP import is already running")
@@ -217,6 +224,7 @@ def _scheduled_run() -> None:
 def configure(folder: str, recursive: bool, interval_hrs: int) -> None:
     """Persist the watched-folder settings and (re)start the schedule."""
     folder = str(Path(folder).expanduser())
+    _check_not_managed(folder)
     s = load_settings()
     if folder != s["folder"]:
         s["manifest"] = {}  # new folder — re-import everything
