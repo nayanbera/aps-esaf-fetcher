@@ -147,6 +147,7 @@
         <th>Status</th>
         <th>Technique</th>
         <th class="text-center">Users</th>
+        <th class="text-center" title="ESAF data read from a PDF">PDF</th>
       </tr>
     </thead>
     <tbody>
@@ -175,9 +176,17 @@
           {% include "partials/esaf_technique_select.html" %}
         </td>
         <td class="text-center">{{ e.user_count or 0 }}</td>
+        <td class="text-center" onclick="event.stopPropagation()">
+          {% if e.pdf_path %}
+          <a href="/esafs/{{ e.esaf_id }}/pdf" target="_blank" class="text-success"
+             title="Read from PDF — click to open"><i class="bi bi-file-earmark-pdf-fill"></i></a>
+          {% else %}
+          <span class="text-muted" title="No PDF read for this ESAF">—</span>
+          {% endif %}
+        </td>
       </tr>
     {% else %}
-      <tr><td colspan="10" class="text-center text-muted py-4">No ESAFs found.</td></tr>
+      <tr><td colspan="11" class="text-center text-muted py-4">No ESAFs found.</td></tr>
     {% endfor %}
     </tbody>
   </table>
