@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import db, sync, config
+from . import db, sync, config, gup_import
 from .institution import _load_uni_db, load_overrides
 from .routers import esafs, stats, sync_router, fields
 from .routers import overrides as overrides_router
@@ -46,7 +46,9 @@ async def lifespan(app: FastAPI):
     load_overrides(db.list_domain_overrides())
     threading.Thread(target=_load_uni_db, daemon=True, name="uni-db-loader").start()
     sync.start_scheduler()
+    gup_import.start_scheduler()
     yield
+    gup_import.stop_scheduler()
     sync.stop_scheduler()
 
 
