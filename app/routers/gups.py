@@ -234,7 +234,9 @@ async def bulk_import_gups(
             gup_import.import_folder, folder, bool(recursive), bool(force))
     except RuntimeError as exc:
         return HTMLResponse(f'<div class="alert alert-warning">{html.escape(str(exc))}</div>')
-    return HTMLResponse(gup_import.format_result(counts))
+    # Tell the page to refresh its GUP table (see 'gups-imported' in gups.html).
+    return HTMLResponse(gup_import.format_result(counts),
+                        headers={"HX-Trigger": "gups-imported"})
 
 
 # ---------------------------------------------------------------------------

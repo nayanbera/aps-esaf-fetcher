@@ -4,7 +4,7 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
   <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>General User Proposals (GUPs)</h5>
-  <span class="text-muted small">{{ total }} proposal{{ 's' if total != 1 }}</span>
+  <span class="text-muted small" id="gup-total">{{ total }} proposal{{ 's' if total != 1 }}</span>
 </div>
 
 <!-- Upload / import cards -->
@@ -92,6 +92,7 @@
   </div>
 </div>
 
+<div id="gups-listing">
 <!-- Filter bar -->
 <form method="get" action="/gups" class="row g-2 mb-3">
   <div class="col-md-5">
@@ -232,6 +233,7 @@
   </ul>
 </nav>
 {% endif %}
+</div>
 
 <script>
 (function () {
@@ -263,6 +265,19 @@
   </div>
 </div>
 <script>
+// After a bulk import, refresh the table, pagination and count in place
+// (keeps the result banner visible, unlike a full page reload).
+document.body.addEventListener('gups-imported', function () {
+  fetch(location.href, {headers: {'X-Requested-With': 'fetch'}})
+    .then(function (r) { return r.text(); })
+    .then(function (text) {
+      var doc = new DOMParser().parseFromString(text, 'text/html');
+      ['gups-listing', 'gup-total'].forEach(function (id) {
+        var fresh = doc.getElementById(id), cur = document.getElementById(id);
+        if (fresh && cur) cur.innerHTML = fresh.innerHTML;
+      });
+    });
+});
 document.body.addEventListener('htmx:responseError', function (e) {
   var body = document.getElementById('gup-browse-body');
   if (body && e.detail.target === body) {
