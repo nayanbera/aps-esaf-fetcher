@@ -263,6 +263,13 @@
   </div>
 </div>
 <script>
+document.body.addEventListener('htmx:responseError', function (e) {
+  var body = document.getElementById('gup-browse-body');
+  if (body && e.detail.target === body) {
+    body.innerHTML = '<div class="alert alert-danger small mb-0">Could not list folders (HTTP ' +
+                     e.detail.xhr.status + ').</div>';
+  }
+});
 document.addEventListener('click', function (e) {
   var btn = e.target.closest('[data-select-path]');
   if (!btn) return;

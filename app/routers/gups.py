@@ -91,6 +91,61 @@ def set_gup_technique(
 
 
 # ---------------------------------------------------------------------------
+# Server-side folder browser (for choosing the import folder)
+# NB: must be registered before /gups/{gup_id}, or 'browse' is taken as a GUP ID.
+# ---------------------------------------------------------------------------
+
+@router.get("/gups/browse", response_class=HTMLResponse)
+def browse_folders(folder_path: str = ""):
+    """Return an HTML fragment listing the sub-folders of *folder_path*."""
+    p = Path(folder_path.strip() or gup_import.load_settings()["folder"] or "~").expanduser()
+    while not p.is_dir() and p != p.parent:  # climb to the nearest existing folder
+        p = p.parent
+    p = p.resolve()
+
+    error = ""
+    subdirs: list[Path] = []
+    try:
+        subdirs = sorted(
+            (c for c in p.iterdir() if not c.name.startswith(".") and c.is_dir()),
+            key=lambda c: c.name.lower(),
+        )
+    except OSError as exc:
+        error = f"Cannot read folder: {exc.strerror or exc}"
+    try:
+        n_pdfs = sum(1 for c in p.iterdir() if c.suffix.lower() == ".pdf" and c.is_file())
+    except OSError:
+        n_pdfs = 0
+
+    def nav(target: Path, label: str, icon: str = "bi-folder") -> str:
+        return (
+            f'<a href="#" class="list-group-item list-group-item-action py-1" '
+            f'hx-get="/gups/browse?folder_path={quote(str(target))}" '
+            f'hx-target="#gup-browse-body" hx-swap="innerHTML">'
+            f'<i class="bi {icon} me-2"></i>{html.escape(label)}</a>'
+        )
+
+    esc = html.escape(str(p), quote=True)
+    parts = [
+        f'<div class="d-flex align-items-center gap-2 mb-2">'
+        f'<code class="flex-grow-1 text-break">{html.escape(str(p))}</code>'
+        f'<span class="text-muted small text-nowrap">{n_pdfs} PDF(s) here</span>'
+        f'<button type="button" class="btn btn-primary btn-sm text-nowrap" data-select-path="{esc}">'
+        f'<i class="bi bi-check-lg me-1"></i>Select this folder</button></div>',
+    ]
+    if error:
+        parts.append(f'<div class="alert alert-warning py-1 small">{html.escape(error)}</div>')
+    parts.append('<div class="list-group" style="max-height:50vh;overflow:auto">')
+    if p != p.parent:
+        parts.append(nav(p.parent, "..  (parent folder)", "bi-arrow-up"))
+    parts.extend(nav(c, c.name) for c in subdirs)
+    if not subdirs and not error:
+        parts.append('<div class="list-group-item text-muted small">No sub-folders</div>')
+    parts.append("</div>")
+    return HTMLResponse("".join(parts))
+
+
+# ---------------------------------------------------------------------------
 # GUP detail page
 # ---------------------------------------------------------------------------
 
@@ -180,60 +235,6 @@ async def bulk_import_gups(
     except RuntimeError as exc:
         return HTMLResponse(f'<div class="alert alert-warning">{html.escape(str(exc))}</div>')
     return HTMLResponse(gup_import.format_result(counts))
-
-
-# ---------------------------------------------------------------------------
-# Server-side folder browser (for choosing the import folder)
-# ---------------------------------------------------------------------------
-
-@router.get("/gups/browse", response_class=HTMLResponse)
-def browse_folders(folder_path: str = ""):
-    """Return an HTML fragment listing the sub-folders of *folder_path*."""
-    p = Path(folder_path.strip() or gup_import.load_settings()["folder"] or "~").expanduser()
-    while not p.is_dir() and p != p.parent:  # climb to the nearest existing folder
-        p = p.parent
-    p = p.resolve()
-
-    error = ""
-    subdirs: list[Path] = []
-    try:
-        subdirs = sorted(
-            (c for c in p.iterdir() if not c.name.startswith(".") and c.is_dir()),
-            key=lambda c: c.name.lower(),
-        )
-    except OSError as exc:
-        error = f"Cannot read folder: {exc.strerror or exc}"
-    try:
-        n_pdfs = sum(1 for c in p.iterdir() if c.suffix.lower() == ".pdf" and c.is_file())
-    except OSError:
-        n_pdfs = 0
-
-    def nav(target: Path, label: str, icon: str = "bi-folder") -> str:
-        return (
-            f'<a href="#" class="list-group-item list-group-item-action py-1" '
-            f'hx-get="/gups/browse?folder_path={quote(str(target))}" '
-            f'hx-target="#gup-browse-body" hx-swap="innerHTML">'
-            f'<i class="bi {icon} me-2"></i>{html.escape(label)}</a>'
-        )
-
-    esc = html.escape(str(p), quote=True)
-    parts = [
-        f'<div class="d-flex align-items-center gap-2 mb-2">'
-        f'<code class="flex-grow-1 text-break">{html.escape(str(p))}</code>'
-        f'<span class="text-muted small text-nowrap">{n_pdfs} PDF(s) here</span>'
-        f'<button type="button" class="btn btn-primary btn-sm text-nowrap" data-select-path="{esc}">'
-        f'<i class="bi bi-check-lg me-1"></i>Select this folder</button></div>',
-    ]
-    if error:
-        parts.append(f'<div class="alert alert-warning py-1 small">{html.escape(error)}</div>')
-    parts.append('<div class="list-group" style="max-height:50vh;overflow:auto">')
-    if p != p.parent:
-        parts.append(nav(p.parent, "..  (parent folder)", "bi-arrow-up"))
-    parts.extend(nav(c, c.name) for c in subdirs)
-    if not subdirs and not error:
-        parts.append('<div class="list-group-item text-muted small">No sub-folders</div>')
-    parts.append("</div>")
-    return HTMLResponse("".join(parts))
 
 
 # ---------------------------------------------------------------------------
