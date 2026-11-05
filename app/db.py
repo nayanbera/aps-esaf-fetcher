@@ -69,7 +69,14 @@ def update_esaf_fields(
 
 
 def list_pi_groups() -> list[dict]:
-    return _r().list_pi_groups()
+    groups = _r().list_pi_groups()
+    for g in groups:
+        # An email typed into the ORCID box is shown (and edited) as the email.
+        if "@" in (g.get("orcid_id") or ""):
+            if not g.get("pi_email"):
+                g["pi_email"] = g["orcid_id"].strip()
+            g["orcid_id"] = ""
+    return groups
 
 
 def upsert_pi_group(
