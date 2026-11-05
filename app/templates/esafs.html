@@ -149,6 +149,7 @@
         <th>GUP</th>
         <th class="text-center">Users</th>
         <th class="text-center" title="ESAF data read from a PDF">PDF</th>
+        <th class="text-center" title="DOI assigned to this ESAF">DOI</th>
       </tr>
     </thead>
     <tbody>
@@ -193,9 +194,17 @@
           <span class="text-muted" title="No PDF read for this ESAF">—</span>
           {% endif %}
         </td>
+        <td class="text-center" onclick="event.stopPropagation()">
+          {% if e.doi %}
+          <a href="{{ e.doi if e.doi.startswith('http') else 'https://doi.org/' ~ e.doi }}" target="_blank" rel="noopener"
+             class="text-primary" title="{{ e.doi }}"><i class="bi bi-link-45deg fs-5"></i></a>
+          {% else %}
+          <span class="text-muted" title="No DOI">—</span>
+          {% endif %}
+        </td>
       </tr>
     {% else %}
-      <tr><td colspan="12" class="text-center text-muted py-4">No ESAFs found.</td></tr>
+      <tr><td colspan="13" class="text-center text-muted py-4">No ESAFs found.</td></tr>
     {% endfor %}
     </tbody>
   </table>
