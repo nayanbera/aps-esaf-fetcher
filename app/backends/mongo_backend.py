@@ -290,6 +290,10 @@ class MongoESAFRepository(ESAFRepository):
                     u["orcid_id"] = prev["orcid_id"]
                 if not u.get("institution") and prev.get("institution"):
                     u["institution"] = prev["institution"]
+                # Fields that come from the master-file import, not the APS API
+                for key in ("user_type", "employment_level", "gender"):
+                    if not u.get(key) and prev.get(key):
+                        u[key] = prev[key]
                 if not u.get("country") and prev.get("country"):
                     u["country"] = prev["country"]
                 if not u.get("state") and prev.get("state"):

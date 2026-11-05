@@ -738,6 +738,14 @@ class SQLiteESAFRepository(ESAFRepository):
                 )
                 action = "added"
 
+            # user_type (ON-SITE/OFF-SITE) comes from the master-file import, not the
+            # APS API, so carry it across the delete-and-reinsert below.
+            prev_user_type = {
+                r[0]: r[1] for r in conn.execute(
+                    "SELECT badge, user_type FROM esaf_users WHERE esaf_id=?",
+                    (data["esaf_id"],),
+                ).fetchall() if r[1]
+            }
             conn.execute("DELETE FROM esaf_users WHERE esaf_id=?", (data["esaf_id"],))
             conn.execute("DELETE FROM funding_sources WHERE esaf_id=?", (data["esaf_id"],))
 
@@ -766,8 +774,10 @@ class SQLiteESAFRepository(ESAFRepository):
                      u["email"], u.get("orcid_id", ""), json.dumps(u["raw_json"])),
                 )
                 conn.execute(
-                    "INSERT OR IGNORE INTO esaf_users (esaf_id, badge, role) VALUES (?,?,?)",
-                    (data["esaf_id"], u["badge"], u["role"]),
+                    "INSERT OR IGNORE INTO esaf_users (esaf_id, badge, role, user_type) "
+                    "VALUES (?,?,?,?)",
+                    (data["esaf_id"], u["badge"], u["role"],
+                     prev_user_type.get(u["badge"], "")),
                 )
 
             for src in data.get("funding_sources", []):
