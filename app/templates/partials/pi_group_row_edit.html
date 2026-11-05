@@ -1,6 +1,5 @@
 {% set _techs = (pg.technique or '').split(',') %}
-<tr id="pg-row-{{ pg.name | urlencode }}"
-    class="{% if 'Surf' in _techs %}table-primary{% elif 'Xtal' in _techs %}table-success{% elif 'ASWAXS' in _techs %}table-warning{% elif 'Beamline' in _techs %}table-info{% endif %}">
+<tr class="{% if 'Surf' in _techs %}table-primary{% elif 'Xtal' in _techs %}table-success{% elif 'ASWAXS' in _techs %}table-warning{% elif 'Beamline' in _techs %}table-info{% endif %}">
   <td>
     <input type="text" name="new_name"
            value="{{ pg.name }}" class="form-control form-control-sm fw-semibold"
@@ -54,7 +53,6 @@
   <td class="text-end text-nowrap">
     <button type="button" class="btn btn-success btn-sm py-0 me-1"
             data-pg-save
-            data-pg-save-row="pg-row-{{ pg.name | urlencode }}"
             data-pg-save-url="{{ pg.name | urlencode | replace('+', '%20') }}">
       <i class="bi bi-check-lg"></i>
     </button>

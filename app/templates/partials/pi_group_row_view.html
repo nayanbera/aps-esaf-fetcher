@@ -1,6 +1,5 @@
 {% set _techs = (pg.technique or '').split(',') %}
-<tr id="pg-row-{{ pg.name | urlencode }}"
-    class="{% if 'Surf' in _techs %}table-primary{% elif 'Xtal' in _techs %}table-success{% elif 'ASWAXS' in _techs %}table-warning{% elif 'Beamline' in _techs %}table-info{% endif %}">
+<tr class="{% if 'Surf' in _techs %}table-primary{% elif 'Xtal' in _techs %}table-success{% elif 'ASWAXS' in _techs %}table-warning{% elif 'Beamline' in _techs %}table-info{% endif %}">
   <td class="fw-semibold">{{ pg.name }}</td>
   <td>{{ pg.pi_name or '—' }}</td>
   <td>{{ pg.institution or '—' }}</td>

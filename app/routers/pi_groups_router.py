@@ -15,21 +15,22 @@ router = APIRouter()
 # Management page
 # ---------------------------------------------------------------------------
 
-# One table per technique.  A group with several techniques is listed under the
-# first of these (the same priority that picks its row colour).
+# One table per technique.  A group using several techniques is listed in each.
 _SECTIONS = [("Surf", "Surf", "primary"), ("Xtal", "Xtal", "success"),
              ("ASWAXS", "ASWAXS", "warning"), ("Beamline", "Beamline", "info"),
              ("", "No technique assigned", "secondary")]
 
 
 def _sections(groups: list[dict]) -> list[dict]:
-    out = [{"key": k, "label": label, "color": color, "groups": []}
-           for k, label, color in _SECTIONS]
-    by_key = {s["key"]: s for s in out}
-    for g in groups:
-        techs = (g.get("technique") or "").split(",")
-        key = next((k for k, _, _ in _SECTIONS if k and k in techs), "")
-        by_key[key]["groups"].append(g)
+    out = []
+    for key, label, color in _SECTIONS:
+        if key:
+            members = [g for g in groups if key in (g.get("technique") or "").split(",")]
+        else:
+            members = [g for g in groups
+                       if not any(k in (g.get("technique") or "").split(",")
+                                  for k, _, _ in _SECTIONS if k)]
+        out.append({"key": key, "label": label, "color": color, "groups": members})
     return out
 
 
