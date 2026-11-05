@@ -421,6 +421,27 @@ class MongoESAFRepository(ESAFRepository):
             {"$limit": 30},
         ]))
 
+        # Career stage (users.employment_level, copied in by the SQLite migration);
+        # users without one are grouped as 'Unknown'.
+        by_employment = list(self._esafs().aggregate([
+            {"$match": _approved},
+            {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
+            {"$group": {
+                "_id": {"$cond": [
+                    {"$in": [{"$ifNull": ["$users.employment_level", ""]}, ["", " "]]},
+                    "Unknown", "$users.employment_level"]},
+                "unique_users": {"$addToSet": "$users.badge"},
+                "esaf_slots":   {"$sum": 1},
+            }},
+            {"$project": {
+                "employment_level": "$_id",
+                "unique_users":     {"$size": "$unique_users"},
+                "esaf_slots":       1,
+                "_id": 0,
+            }},
+            {"$sort": {"unique_users": -1}},
+        ]))
+
         by_funding = list(self._esafs().aggregate([
             {"$match": _approved},
             {"$unwind": {"path": "$funding_sources", "preserveNullAndEmptyArrays": False}},
@@ -452,6 +473,7 @@ class MongoESAFRepository(ESAFRepository):
             "by_beamline":         by_beamline,
             "by_status":           by_status,
             "by_institution":      by_institution,
+            "by_employment":       by_employment,
             "by_funding":          by_funding,
             "top_users":           top_users,
             "all_years":           all_years,
@@ -499,6 +521,7 @@ class MongoESAFRepository(ESAFRepository):
             "state":       u.get("state", ""),
             "email":       u.get("email", ""),
             "orcid_id":    u.get("orcid_id", ""),
+            "employment_level": u.get("employment_level", ""),
             "esafs":       esafs,
             "is_beamline_scientist": False,
         }
@@ -527,6 +550,7 @@ class MongoESAFRepository(ESAFRepository):
                 "institution":     {"$first": "$users.institution"},
                 "country":         {"$first": "$users.country"},
                 "email":           {"$first": "$users.email"},
+                "employment_level": {"$max": "$users.employment_level"},   # "" sorts below any real value
                 "techniques":      {"$addToSet": "$technique"},
                 "esaf_count":      {"$sum": 1},
                 "first_experiment": {"$min": "$start_date"},

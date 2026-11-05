@@ -31,6 +31,16 @@
     </select>
     {% endif %}
 
+    {% if employment_levels %}
+    <select name="employment_level" class="form-select form-select-sm ms-2" style="width:auto"
+            title="Career stage (from the master-file import)">
+      <option value="">All career stages</option>
+      {% for l in employment_levels %}
+        <option value="{{ l }}" {% if employment_level == l %}selected{% endif %}>{{ l }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
     <div class="form-check form-check-inline ms-1 mb-0">
       <input class="form-check-input" type="checkbox" name="exclude_scientists" value="1"
              id="exc-sci" {% if exclude_scientists %}checked{% endif %}>
@@ -54,6 +64,7 @@
     across all years
   {% endif %}
   {% if technique %} · technique <strong>{{ technique }}</strong>{% endif %}
+  {% if employment_level %} · career stage <strong>{{ employment_level }}</strong>{% endif %}
   {% if exclude_scientists %} · <em>beamline scientists excluded</em>{% endif %}
   — <strong>{{ users | length }}</strong> users found.
 </p>
@@ -77,6 +88,7 @@
         <th>Name</th>
         <th>Institution</th>
         <th>Country</th>
+        <th title="Career stage — Employment Level from the master-file import">Career stage</th>
         <th>Email</th>
         <th>Techniques</th>
         <th class="text-end" title="Number of Approved ESAFs this person is listed on"># ESAFs</th>
@@ -96,6 +108,7 @@
         <td>{{ u.name }}</td>
         <td>{{ u.institution or '—' }}</td>
         <td>{{ u.country or '—' }}</td>
+        <td class="text-nowrap">{{ (u.employment_level or '').strip() or '—' }}</td>
         <td>
           {% if u.email %}
             <a href="mailto:{{ u.email }}" class="text-decoration-none small"
@@ -126,10 +139,10 @@
           <span class="float-end text-muted small expand-icon">▶</span>
         </td>
       </tr>
-      <tr class="user-detail-row" data-follow-prev><td colspan="9" class="p-0"></td></tr>
+      <tr class="user-detail-row" data-follow-prev><td colspan="10" class="p-0"></td></tr>
     {% else %}
       <tr>
-        <td colspan="9" class="text-muted text-center py-4">
+        <td colspan="10" class="text-muted text-center py-4">
           No users found for the selected filters.
         </td>
       </tr>

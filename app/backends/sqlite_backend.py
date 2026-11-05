@@ -915,6 +915,23 @@ class SQLiteESAFRepository(ESAFRepository):
                     join_params,
                 ).fetchall()
             ]
+            # Career stage ("Employment Level" from the master-file import);
+            # users without one are grouped as 'Unknown'.
+            by_employment = [
+                dict(r) for r in conn.execute(
+                    f"""SELECT COALESCE(NULLIF(TRIM(u.employment_level), ''), 'Unknown')
+                                   AS employment_level,
+                               COUNT(DISTINCT u.badge) AS unique_users,
+                               COUNT(eu.esaf_id)       AS esaf_slots
+                        FROM users u
+                        JOIN esaf_users eu ON u.badge    = eu.badge
+                        JOIN esafs e       ON eu.esaf_id = e.esaf_id
+                        WHERE e.status = 'Approved'{join_clause}{sci_u}
+                        GROUP BY 1
+                        ORDER BY unique_users DESC""",
+                    join_params,
+                ).fetchall()
+            ]
             by_funding = [
                 dict(r) for r in conn.execute(
                     f"""SELECT fs.source, COUNT(*) AS count
@@ -958,6 +975,7 @@ class SQLiteESAFRepository(ESAFRepository):
             "by_beamline":         by_beamline,
             "by_status":           by_status,
             "by_institution":      by_institution,
+            "by_employment":       by_employment,
             "by_funding":          by_funding,
             "top_users":           top_users,
             "all_years":           all_years,
@@ -999,6 +1017,7 @@ class SQLiteESAFRepository(ESAFRepository):
             SELECT u.badge,
                    u.first_name || ' ' || u.last_name AS name,
                    u.institution, u.country, u.state, u.email,
+                   COALESCE(u.employment_level, '') AS employment_level,
                    GROUP_CONCAT(DISTINCT e.technique) AS techniques,
                    COUNT(DISTINCT e.esaf_id) AS esaf_count,
                    MIN(e.start_date) AS first_experiment,

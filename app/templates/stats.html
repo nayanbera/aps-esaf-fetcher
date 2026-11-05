@@ -156,6 +156,44 @@
     </div>
   </div>
 
+  <!-- Users by career stage -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">
+        Users by Career Stage
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Career stage</th>
+              <th class="text-end">Unique users</th>
+              <th class="text-end"
+                  title="Total (user, ESAF) assignments for users at this career stage. One user on 5 ESAFs counts as 5.">
+                Participation Slots
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for row in stats.by_employment %}
+            <tr>
+              <td>{% if row.employment_level == 'Unknown' %}<span class="text-muted">Unknown</span>{% else %}{{ row.employment_level }}{% endif %}</td>
+              <td class="text-end">{{ row.unique_users }}</td>
+              <td class="text-end">{{ row.esaf_slots }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="text-muted text-center py-2">No data</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer text-muted small">
+        Career stage is the <em>Employment Level</em> from the master-file import;
+        users not in that file show as Unknown.
+      </div>
+    </div>
+  </div>
+
   <!-- Funding sources -->
   <div class="col-md-4">
     <div class="card h-100">

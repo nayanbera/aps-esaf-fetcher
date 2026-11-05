@@ -1,4 +1,4 @@
-<td colspan="9" class="p-0">
+<td colspan="10" class="p-0">
   <div class="p-3 bg-light border-top border-bottom">
 
     <!-- User profile -->
@@ -26,6 +26,8 @@
                     <td>{{ user.country or '—' }}</td></tr>
                 <tr><th class="ps-3">State</th>
                     <td>{{ user.state or '—' }}</td></tr>
+                <tr><th class="ps-3">Career stage</th>
+                    <td>{{ (user.employment_level or '').strip() or '—' }}</td></tr>
                 <tr><th class="ps-3">Email</th>
                     <td>
                       {% if user.email %}

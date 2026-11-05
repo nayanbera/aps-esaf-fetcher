@@ -29,6 +29,7 @@ def users_page(
     to_year:            Optional[str] = None,
     technique:          Optional[str] = None,
     exclude_scientists: Optional[str] = None,
+    employment_level:   Optional[str] = None,
 ):
     from_yr = _parse_year(from_year)
     to_yr   = _parse_year(to_year)
@@ -39,6 +40,14 @@ def users_page(
         year_from=from_yr, year_to=to_yr,
         technique=tech, exclude_scientists=exc_sci,
     )
+    # Career-stage filter: options come from the unfiltered list; blank = "Unknown".
+    def _level(u: dict) -> str:
+        return (u.get("employment_level") or "").strip() or "Unknown"
+
+    levels = sorted({_level(u) for u in users}, key=lambda x: (x == "Unknown", x.lower()))
+    if employment_level:
+        users = [u for u in users if _level(u) == employment_level]
+
     _meta = db.get_stats(year_from=None, year_to=None)
     all_techniques = _meta.get("all_techniques", [])
     all_years      = _meta.get("all_years", [])
@@ -50,6 +59,8 @@ def users_page(
         "to_year":            to_yr,
         "technique":          tech,
         "exclude_scientists": exc_sci,
+        "employment_level":   employment_level or "",
+        "employment_levels":  levels,
         "all_years":          all_years,
         "all_techniques":     all_techniques,
     })

@@ -128,7 +128,7 @@
       <table class="table table-sm mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Badge</th><th>Name</th><th>Institution</th><th>Country</th><th>State</th><th>Email</th><th>Role</th><th>ORCID</th><th>Affiliation</th>
+            <th>Badge</th><th>Name</th><th>Institution</th><th>Country</th><th>State</th><th>Email</th><th>Role</th><th>Career stage</th><th>ORCID</th><th>Affiliation</th>
           </tr>
         </thead>
         <tbody>
@@ -147,6 +147,7 @@
                 <span class="badge bg-light text-dark border">{{ u.role }}</span>
               {% endif %}
             </td>
+            <td class="text-nowrap">{{ (u.employment_level or '').strip() or '—' }}</td>
             <td>
               {% if u.orcid_id %}
                 <a href="https://orcid.org/{{ u.orcid_id }}" target="_blank"
@@ -177,7 +178,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="9" class="text-muted text-center py-3">No users recorded.</td></tr>
+          <tr><td colspan="10" class="text-muted text-center py-3">No users recorded.</td></tr>
         {% endfor %}
         </tbody>
       </table>
