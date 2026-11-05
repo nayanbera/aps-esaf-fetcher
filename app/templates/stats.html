@@ -210,18 +210,25 @@
           </thead>
           {% for g in stats.funding_groups %}
           {% set gi = loop.index %}
-          {% set has_subs = g.subgroups|length > 1 or (g.subgroups and g.subgroups[0].name) %}
           <tbody>
-            <tr class="table-light fw-semibold"{% if has_subs %} role="button" data-bs-toggle="collapse" data-bs-target=".fund-sub-{{ gi }}" title="Click to show / hide the breakdown"{% endif %}>
-              <td>{% if has_subs %}<i class="bi bi-chevron-right small me-1"></i>{% endif %}{{ g.agency }}</td>
+            <tr class="table-light fw-semibold" role="button" data-bs-toggle="collapse" data-bs-target=".fund-sub-{{ gi }}" title="Click to show / hide the breakdown">
+              <td><i class="bi bi-chevron-right small me-1"></i>{{ g.agency }}</td>
               <td class="text-end">{{ g.count }}</td>
             </tr>
-            {% if has_subs %}{% for sub in g.subgroups %}
+            {% for sub in g.subgroups %}
+            {% if sub.name %}
             <tr class="collapse fund-sub-{{ gi }}">
-              <td class="ps-4" title="{% for l, n in sub.labels[:8] %}{{ l }} ({{ n }})&#10;{% endfor %}">{{ sub.name or 'General' }}</td>
+              <td class="ps-4 fw-medium">{{ sub.name }}</td>
               <td class="text-end">{{ sub.count }}</td>
             </tr>
-            {% endfor %}{% endif %}
+            {% endif %}
+            {% for l, n in sub.labels %}
+            <tr class="collapse fund-sub-{{ gi }}">
+              <td class="{{ 'ps-5' if sub.name else 'ps-4' }} small text-muted">{{ l }}</td>
+              <td class="text-end small text-muted">{{ n }}</td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
           </tbody>
           {% else %}
           <tbody><tr><td colspan="2" class="text-muted text-center py-2">No funding sources recorded.</td></tr></tbody>
@@ -230,7 +237,7 @@
       </div>
       {% if stats.funding_groups %}
       <div class="card-footer text-muted small">
-        Grouped by agency; click a row to see its divisions / offices (hover for the original labels). Each ESAF counts once per group.
+        Grouped by agency; click an agency to see its divisions / offices and the individual labels. Each ESAF counts once per group and subgroup.
       </div>
       {% endif %}
     </div>
