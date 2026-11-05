@@ -39,6 +39,16 @@ def institutions_list() -> list[str]:
     return db.list_distinct_institutions()
 
 
+def _split_email_orcid(pi_email: str, orcid_id: str) -> tuple[str, str]:
+    """An email typed into the ORCID box (it used to sit under the Email column) moves to the email field."""
+    pi_email, orcid_id = pi_email.strip(), orcid_id.strip()
+    if "@" in orcid_id:
+        if not pi_email:
+            pi_email = orcid_id
+        orcid_id = ""
+    return pi_email, orcid_id
+
+
 _VALID_TECHNIQUES = {"", "Surf", "Xtal", "ASWAXS", "Beamline"}
 
 
@@ -88,12 +98,13 @@ def create_pi_group(
     if not name:
         raise HTTPException(422, "PI Group name is required")
     pi_name = pi_name.strip()
-    db.upsert_pi_group(name, pi_name, pi_email.strip(),
+    pi_email, orcid_id = _split_email_orcid(pi_email, orcid_id)
+    db.upsert_pi_group(name, pi_name, pi_email,
                        institution.strip(), country.strip().upper(),
-                       state.strip(), orcid_id.strip())
-    pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email.strip(),
+                       state.strip(), orcid_id)
+    pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email,
           "institution": institution.strip(), "country": country.strip().upper(),
-          "state": state.strip(), "orcid_id": orcid_id.strip(),
+          "state": state.strip(), "orcid_id": orcid_id,
           "technique": "", "created_at": ""}
     return templates.TemplateResponse("partials/pi_group_row_view.html",
                                       {"request": request, "pg": pg})
@@ -173,15 +184,16 @@ def update_pi_group(
             db.rename_pi_group(name, new_name)
         except Exception:
             raise HTTPException(409, f"A PI Group named '{new_name}' already exists.")
-    db.upsert_pi_group(new_name, pi_name.strip(), pi_email.strip(),
+    pi_email, orcid_id = _split_email_orcid(pi_email, orcid_id)
+    db.upsert_pi_group(new_name, pi_name.strip(), pi_email,
                        institution.strip(), country.strip().upper(),
-                       state.strip(), orcid_id.strip())
+                       state.strip(), orcid_id)
     # Technique is managed independently by toggle-technique; read back from DB.
     groups = {g["name"]: g for g in db.list_pi_groups()}
     pg = groups.get(new_name) or {
-        "name": new_name, "pi_name": pi_name.strip(), "pi_email": pi_email.strip(),
+        "name": new_name, "pi_name": pi_name.strip(), "pi_email": pi_email,
         "institution": institution.strip(), "country": country.strip().upper(),
-        "state": state.strip(), "orcid_id": orcid_id.strip(), "technique": "",
+        "state": state.strip(), "orcid_id": orcid_id, "technique": "",
     }
     return templates.TemplateResponse("partials/pi_group_row_view.html",
                                       {"request": request, "pg": pg})

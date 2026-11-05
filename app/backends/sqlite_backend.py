@@ -282,6 +282,11 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
+            # Repair: emails that were typed into the ORCID box land in pi_email
+            conn.execute("""UPDATE pi_groups SET pi_email = orcid_id, orcid_id = ''
+                            WHERE orcid_id LIKE '%@%' AND pi_email = ''""")
+            conn.execute("UPDATE pi_groups SET orcid_id = '' WHERE orcid_id LIKE '%@%'")
+            conn.commit()
             # technique column (user-assigned classification)
             for tbl in ("esafs", "gups", "pi_groups"):
                 try:

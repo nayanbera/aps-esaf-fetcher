@@ -37,11 +37,14 @@
            placeholder="IL">
   </td>
   <td>
+    <input type="email" name="pi_email"
+           value="{{ pg.pi_email }}" class="form-control form-control-sm mb-1"
+           data-pi-field="pi_email"
+           placeholder="email@example.com">
     <input type="text" name="orcid_id"
            value="{{ pg.orcid_id }}" class="form-control form-control-sm"
            data-pi-field="orcid_id"
-           placeholder="0000-0000-0000-0000">
-    <input type="hidden" name="pi_email" value="{{ pg.pi_email }}">
+           placeholder="ORCID 0000-0000-0000-0000">
   </td>
   <td>
     {% set technique = pg.technique or '' %}

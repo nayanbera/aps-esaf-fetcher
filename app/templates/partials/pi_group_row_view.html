@@ -12,6 +12,7 @@
     {% else %}
       —
     {% endif %}
+    {% if pg.orcid_id %}<div class="small text-muted" title="ORCID">{{ pg.orcid_id }}</div>{% endif %}
   </td>
   <td>
     {% set technique = pg.technique or '' %}
