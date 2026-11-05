@@ -454,6 +454,12 @@ class MongoESAFRepository(ESAFRepository):
             {"$project": {"source": "$_id", "count": 1, "_id": 0}},
         ]))
 
+        funding_pairs = list(self._esafs().aggregate([
+            {"$match": _approved},
+            {"$unwind": {"path": "$funding_sources", "preserveNullAndEmptyArrays": False}},
+            {"$project": {"source": "$funding_sources", "esaf_id": 1, "_id": 0}},
+        ]))
+
         top_users = list(self._esafs().aggregate([
             {"$match": _approved},
             {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
@@ -479,6 +485,7 @@ class MongoESAFRepository(ESAFRepository):
             "by_institution":      by_institution,
             "by_employment":       by_employment,
             "by_funding":          by_funding,
+            "funding_pairs":       funding_pairs,
             "top_users":           top_users,
             "all_years":           all_years,
             "all_techniques":      all_techniques,

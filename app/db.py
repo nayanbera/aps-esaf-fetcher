@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from .funding_groups import group_funding
 from .repository import ESAFRepository
 
 _repo: ESAFRepository | None = None
@@ -148,10 +149,12 @@ def get_stats(
     technique: Optional[str] = None,
     exclude_scientists: bool = False,
 ) -> dict:
-    return _r().get_stats(
+    stats = _r().get_stats(
         year_from=year_from, year_to=year_to,
         technique=technique, exclude_scientists=exclude_scientists,
     )
+    stats["funding_groups"] = group_funding(stats.pop("funding_pairs", []))
+    return stats
 
 
 def list_users(q: str = "", badge: str = "", institution: str = "",

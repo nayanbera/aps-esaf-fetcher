@@ -952,6 +952,15 @@ class SQLiteESAFRepository(ESAFRepository):
                     join_params,
                 ).fetchall()
             ]
+            funding_pairs = [
+                dict(r) for r in conn.execute(
+                    f"""SELECT fs.source, fs.esaf_id
+                        FROM funding_sources fs
+                        JOIN esafs e ON fs.esaf_id = e.esaf_id
+                        WHERE e.status = 'Approved'{join_clause}""",
+                    join_params,
+                ).fetchall()
+            ]
             top_users = [
                 dict(r) for r in conn.execute(
                     f"""SELECT u.first_name || ' ' || u.last_name AS name,
@@ -987,6 +996,7 @@ class SQLiteESAFRepository(ESAFRepository):
             "by_institution":      by_institution,
             "by_employment":       by_employment,
             "by_funding":          by_funding,
+            "funding_pairs":       funding_pairs,
             "top_users":           top_users,
             "all_years":           all_years,
             "all_techniques":      all_techniques,

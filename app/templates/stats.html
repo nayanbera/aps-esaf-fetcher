@@ -208,18 +208,29 @@
               <th class="text-end" title="Number of Approved ESAFs carrying this funding source">ESAFs</th>
             </tr>
           </thead>
+          {% for g in stats.funding_groups %}
+          {% set gi = loop.index %}
+          {% set has_subs = g.subgroups|length > 1 or (g.subgroups and g.subgroups[0].name) %}
           <tbody>
-          {% for row in stats.by_funding %}
-            <tr><td>{{ row.source }}</td><td class="text-end">{{ row.count }}</td></tr>
-          {% else %}
-            <tr><td colspan="2" class="text-muted text-center py-2">No funding sources recorded.</td></tr>
-          {% endfor %}
+            <tr class="table-light fw-semibold"{% if has_subs %} role="button" data-bs-toggle="collapse" data-bs-target=".fund-sub-{{ gi }}" title="Click to show / hide the breakdown"{% endif %}>
+              <td>{% if has_subs %}<i class="bi bi-chevron-right small me-1"></i>{% endif %}{{ g.agency }}</td>
+              <td class="text-end">{{ g.count }}</td>
+            </tr>
+            {% if has_subs %}{% for sub in g.subgroups %}
+            <tr class="collapse fund-sub-{{ gi }}">
+              <td class="ps-4" title="{% for l, n in sub.labels[:8] %}{{ l }} ({{ n }})&#10;{% endfor %}">{{ sub.name or 'General' }}</td>
+              <td class="text-end">{{ sub.count }}</td>
+            </tr>
+            {% endfor %}{% endif %}
           </tbody>
+          {% else %}
+          <tbody><tr><td colspan="2" class="text-muted text-center py-2">No funding sources recorded.</td></tr></tbody>
+          {% endfor %}
         </table>
       </div>
-      {% if stats.by_funding %}
+      {% if stats.funding_groups %}
       <div class="card-footer text-muted small">
-        Counts Approved ESAFs carrying each funding label.
+        Grouped by agency; click a row to see its divisions / offices (hover for the original labels). Each ESAF counts once per group.
       </div>
       {% endif %}
     </div>
