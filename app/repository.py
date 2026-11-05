@@ -227,8 +227,16 @@ class ESAFRepository(ABC):
 
     @abstractmethod
     def update_esaf_pdf(self, esaf_id: str, gup_id: str, pdf_path: str) -> None:
-        """Set gup_id and pdf_path on an ESAF record."""
+        """Set pdf_path on an ESAF record, and gup_id when non-empty (never blanks it)."""
         ...
+
+    @abstractmethod
+    def list_esaf_gup_rows(self) -> list[dict]:
+        """Every ESAF as {esaf_id, title, pi_name, year, gup_id} (for GUP inference)."""
+        ...
+
+    @abstractmethod
+    def set_esaf_gup(self, esaf_id: str, gup_id: str) -> None: ...
 
     @abstractmethod
     def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:

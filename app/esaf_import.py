@@ -12,6 +12,7 @@ from . import db
 from .esaf_pdf_parser import parse_esaf_pdf
 from .folder_import import FolderImporter
 from .gup_import import propagate_funding
+from .gup_inference import fill_gup_from_siblings
 
 log = logging.getLogger(__name__)
 
@@ -21,9 +22,9 @@ def _process(pdf_path: str, now: str) -> str:
     ex = result["extracted"]
     esaf_id = ex.get("esaf_id", "").strip()
     if not esaf_id:
-        return "ignored"
+        return "ignored", "no ESAF ID found in PDF"
     if db.get_esaf(esaf_id) is None:
-        return "skipped"
+        return "skipped", f"ESAF {esaf_id} not in database"
     gup_id = ex.get("gup_id", "").strip()
     db.update_esaf_pdf(esaf_id, gup_id, pdf_path)
     if gup_id:
@@ -37,6 +38,7 @@ importer = FolderImporter(
     "esaf", _process, managed_subdir="esafs",
     updated_label="matched", skipped_label="skipped (no ESAF ID, or ESAF not in database)",
     has_added=False,
+    after_import=fill_gup_from_siblings,
 )
 load_settings = importer.load_settings
 configure = importer.configure

@@ -273,6 +273,14 @@ def update_esaf_pdf(esaf_id: str, gup_id: str, pdf_path: str) -> None:
     _r().update_esaf_pdf(esaf_id, gup_id, pdf_path)
 
 
+def list_esaf_gup_rows() -> list[dict]:
+    return _r().list_esaf_gup_rows()
+
+
+def set_esaf_gup(esaf_id: str, gup_id: str) -> None:
+    _r().set_esaf_gup(esaf_id, gup_id)
+
+
 def propagate_gup_funding(gup_id: str, funding_strings: list[str]) -> int:
     return _r().propagate_gup_funding(gup_id, funding_strings)
 

@@ -59,7 +59,7 @@ def _process(pdf_path: str, now: str) -> str:
     result = parse_gup_pdf(pdf_path)
     data = build_gup_data(result, pdf_path)
     if not data["gup_id"]:
-        return "ignored"
+        return "ignored", "no GUP ID found in PDF"
     action = db.upsert_gup(data, now)
     propagate_funding(data["gup_id"], data["funding_sources"])
     return action

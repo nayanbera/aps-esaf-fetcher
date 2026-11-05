@@ -747,10 +747,18 @@ class MongoESAFRepository(ESAFRepository):
         return list(docs)
 
     def update_esaf_pdf(self, esaf_id: str, gup_id: str, pdf_path: str) -> None:
+        fields = {"pdf_path": pdf_path, "updated_at": _now_iso()}
+        if gup_id:  # never blank an existing GUP link
+            fields["gup_id"] = gup_id
+        self._esafs().update_one({"esaf_id": esaf_id}, {"$set": fields})
+
+    def list_esaf_gup_rows(self) -> list[dict]:
+        return list(self._esafs().find(
+            {}, {"_id": 0, "esaf_id": 1, "title": 1, "pi_name": 1, "year": 1, "gup_id": 1}))
+
+    def set_esaf_gup(self, esaf_id: str, gup_id: str) -> None:
         self._esafs().update_one(
-            {"esaf_id": esaf_id},
-            {"$set": {"gup_id": gup_id, "pdf_path": pdf_path, "updated_at": _now_iso()}},
-        )
+            {"esaf_id": esaf_id}, {"$set": {"gup_id": gup_id, "updated_at": _now_iso()}})
 
     def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:
         result = self._esafs().update_many(

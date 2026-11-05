@@ -1385,8 +1385,23 @@ class SQLiteESAFRepository(ESAFRepository):
     def update_esaf_pdf(self, esaf_id: str, gup_id: str, pdf_path: str) -> None:
         with self._db() as conn:
             conn.execute(
-                "UPDATE esafs SET gup_id=?, pdf_path=?, updated_at=datetime('now') WHERE esaf_id=?",
+                "UPDATE esafs SET gup_id=COALESCE(NULLIF(?, ''), gup_id), pdf_path=?, "
+                "updated_at=datetime('now') WHERE esaf_id=?",
                 (gup_id, pdf_path, esaf_id),
+            )
+
+    def list_esaf_gup_rows(self) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT esaf_id, title, pi_name, year, gup_id FROM esafs"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def set_esaf_gup(self, esaf_id: str, gup_id: str) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "UPDATE esafs SET gup_id=?, updated_at=datetime('now') WHERE esaf_id=?",
+                (gup_id, esaf_id),
             )
 
     def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:

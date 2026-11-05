@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 #   "added" / "updated" — stored in the DB
 #   "ignored"           — not a PDF of this kind; remembered, never re-parsed
 #   "skipped"           — could not be used *yet* (e.g. ESAF not synced); retried next run
+# It may instead return (outcome, reason); the reason is shown next to skipped files.
 _MAX_LISTED = 25
 
 _DEFAULTS = {
@@ -43,11 +44,12 @@ class FolderImporter:
     def __init__(
         self,
         name: str,
-        process: Callable[[str, str], str],
+        process: Callable[[str, str], "str | tuple[str, str]"],
         managed_subdir: str,
         updated_label: str = "updated",
         skipped_label: str = "skipped",
         has_added: bool = True,
+        after_import: "Callable[[], tuple[str, list[str]]] | None" = None,
     ):
         self.name = name
         self._process = process
@@ -55,6 +57,7 @@ class FolderImporter:
         self._updated_label = updated_label
         self._skipped_label = skipped_label
         self._has_added = has_added
+        self._after_import = after_import
         self._job_id = f"{name}_folder_import"
         self._scheduler: BackgroundScheduler | None = None
         self._run_lock = threading.Lock()
@@ -135,12 +138,16 @@ class FolderImporter:
                         counts["unchanged"] += 1
                         continue
                     outcome = self._process(key, now)
+                    reason = ""
+                    if isinstance(outcome, tuple):
+                        outcome, reason = outcome
                     if outcome in ("added", "updated"):
                         counts[outcome] += 1
                         manifest[key] = sig
                     else:
                         counts["skipped"] += 1
-                        skipped_files.append(str(pdf.relative_to(root)))
+                        rel = str(pdf.relative_to(root))
+                        skipped_files.append(f"{rel} — {reason}" if reason else rel)
                         if outcome == "ignored":
                             manifest[key] = sig
                 except Exception as exc:
@@ -157,6 +164,15 @@ class FolderImporter:
             parts.append(f"{counts['skipped']} {self._skipped_label},")
             parts.append(f"{len(errors)} errors")
             summary = " ".join(parts)
+            counts["notes"] = []
+            if self._after_import:
+                try:
+                    short, details = self._after_import()
+                    if short:
+                        summary += f" · {short}"
+                    counts["notes"] = details
+                except Exception:
+                    log.exception("Post-import step failed for %s", self.name)
 
             # Re-read so a settings change made during the run isn't clobbered;
             # only record the manifest if the watched folder is still this one.
@@ -182,6 +198,7 @@ class FolderImporter:
 
         errors = counts.get("errors") or []
         body = (html.escape(counts["summary"])
+                + listing("", counts.get("notes") or [])
                 + listing("Errors:", errors)
                 + listing("Skipped files:", counts.get("skipped_files") or []))
         return f'<div class="alert alert-{"warning" if errors else "success"}">{body}</div>'
