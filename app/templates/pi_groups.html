@@ -75,6 +75,14 @@
         </div>
       </div>
 
+      <div class="mb-3">
+        <label class="form-label fw-semibold mb-1 d-block">Technique <span class="text-muted fw-normal small">(choose any number)</span></label>
+        {% for t, cls in [('Surf', 'primary'), ('Xtal', 'success'), ('ASWAXS', 'warning'), ('Beamline', 'info')] %}
+        <input type="checkbox" class="btn-check" name="technique" value="{{ t }}" id="new-tech-{{ t }}" autocomplete="off">
+        <label class="btn btn-outline-{{ cls }} btn-sm py-0 px-2 me-1" for="new-tech-{{ t }}">{{ t }}</label>
+        {% endfor %}
+      </div>
+
       <button type="submit" class="btn btn-primary btn-sm">
         <i class="bi bi-plus-lg me-1"></i>Add PI Group
       </button>

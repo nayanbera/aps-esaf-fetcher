@@ -114,6 +114,7 @@ def create_pi_group(
     country:     str = Form(""),
     state:       str = Form(""),
     orcid_id:    str = Form(""),
+    technique:   list[str] = Form([]),
 ):
     name = name.strip()
     if not name:
@@ -123,10 +124,13 @@ def create_pi_group(
     db.upsert_pi_group(name, pi_name, pi_email,
                        institution.strip(), country.strip().upper(),
                        state.strip(), orcid_id)
+    techniques = ",".join(k for k, _, _ in _SECTIONS if k and k in technique)
+    if techniques:
+        db.set_pi_group_technique(name, techniques)
     pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email,
           "institution": institution.strip(), "country": country.strip().upper(),
           "state": state.strip(), "orcid_id": orcid_id,
-          "technique": "", "created_at": ""}
+          "technique": techniques, "created_at": ""}
     return templates.TemplateResponse("partials/pi_group_row_view.html",
                                       {"request": request, "pg": pg})
 
