@@ -15,12 +15,32 @@ router = APIRouter()
 # Management page
 # ---------------------------------------------------------------------------
 
+# One table per technique.  A group with several techniques is listed under the
+# first of these (the same priority that picks its row colour).
+_SECTIONS = [("Surf", "Surf", "primary"), ("Xtal", "Xtal", "success"),
+             ("ASWAXS", "ASWAXS", "warning"), ("Beamline", "Beamline", "info"),
+             ("", "No technique assigned", "secondary")]
+
+
+def _sections(groups: list[dict]) -> list[dict]:
+    out = [{"key": k, "label": label, "color": color, "groups": []}
+           for k, label, color in _SECTIONS]
+    by_key = {s["key"]: s for s in out}
+    for g in groups:
+        techs = (g.get("technique") or "").split(",")
+        key = next((k for k, _, _ in _SECTIONS if k and k in techs), "")
+        by_key[key]["groups"].append(g)
+    return out
+
+
 @router.get("/pi-groups", response_class=HTMLResponse)
 def pi_groups_page(request: Request):
     users = db.list_users_for_lookup()
+    groups = db.list_pi_groups()
     return templates.TemplateResponse("pi_groups.html", {
         "request": request,
-        "pi_groups": db.list_pi_groups(),
+        "pi_groups": groups,
+        "sections": _sections(groups),
         "all_users": users,
     })
 

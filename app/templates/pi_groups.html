@@ -87,20 +87,29 @@
   <div class="input-group input-group-sm" style="max-width:420px">
     <span class="input-group-text text-muted"><i class="bi bi-regex"></i></span>
     <input type="text" class="form-control table-regex-filter"
-           data-target="pi-groups-table"
+           data-target="pi-groups-table-Surf,pi-groups-table-Xtal,pi-groups-table-ASWAXS,pi-groups-table-Beamline,pi-groups-table-none"
            placeholder="Regex filter… e.g. ^Smith, Chicago, Surf">
     <button class="btn btn-outline-secondary filter-clear" type="button" tabindex="-1">✕</button>
   </div>
   <span class="filter-count text-muted small"></span>
 </div>
 
-<div class="card">
+<p class="text-muted small mb-2">
+  <span id="pg-count">{{ pi_groups | length }}</span> PI Groups, one table per technique.
+  A group with several techniques is listed under the first of Surf, Xtal, ASWAXS, Beamline.
+</p>
+
+{% for sec in sections %}
+<div class="card mb-3 pg-section{% if not sec.groups and not sec.key %} d-none{% endif %}" data-section="{{ sec.key }}">
   <div class="card-header fw-semibold">
-    <i class="bi bi-list-ul me-1"></i>Existing PI Groups (<span id="pg-count">{{ pi_groups | length }}</span>)
+    <span class="badge text-bg-{{ sec.color }} me-2">{{ sec.label }}</span>
+    <span class="pg-section-count text-muted fw-normal small">{{ sec.groups | length }}</span>
   </div>
   <div class="card-body p-0">
+    <div class="pg-empty-msg text-muted small p-3{% if sec.groups %} d-none{% endif %}">No PI Groups here.</div>
     <div class="table-responsive">
-      <table id="pi-groups-table" data-col-reorder class="table table-sm align-middle mb-0">
+      <table id="pi-groups-table-{{ sec.key or 'none' }}" data-col-reorder data-col-key="pi-groups"
+             class="table table-sm align-middle mb-0 pg-table">
         <thead class="table-light">
           <tr>
             <th>Group Name</th>
@@ -113,19 +122,16 @@
             <th></th>
           </tr>
         </thead>
-        <tbody id="pg-tbody">
-          {% for pg in pi_groups %}
+        <tbody{% if not sec.key %} id="pg-tbody"{% endif %}>
+          {% for pg in sec.groups %}
             {% include "partials/pi_group_row_view.html" %}
-          {% else %}
-            <tr id="pg-empty"><td colspan="8" class="text-center text-muted py-3">
-              No PI Groups yet. Add one above.
-            </td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 </div>
+{% endfor %}
 
 <!-- User lookup data for auto-fill (always present for edit rows too) -->
 <script id="users-json" type="application/json">{{ all_users | tojson }}</script>
@@ -215,20 +221,41 @@
   (function () {
     var TECHNIQUE_ROW = {Surf: 'table-primary', Xtal: 'table-success', ASWAXS: 'table-warning', Beamline: 'table-info'};
     var ROW_CLASSES = Object.values(TECHNIQUE_ROW);
+    var ORDER = ['Surf', 'Xtal', 'ASWAXS', 'Beamline'];
+
+    function refreshSections() {
+      var total = 0;
+      document.querySelectorAll('.pg-section').forEach(function (sec) {
+        var n = sec.querySelectorAll('tbody > tr').length;
+        total += n;
+        sec.querySelector('.pg-section-count').textContent = n;
+        sec.querySelector('.pg-empty-msg').classList.toggle('d-none', n > 0);
+        sec.querySelector('.table-responsive').classList.toggle('d-none', n === 0);
+        // the "no technique" table only shows while it has rows
+        if (sec.dataset.section === '') sec.classList.toggle('d-none', n === 0);
+      });
+      var c = document.getElementById('pg-count');
+      if (c) c.textContent = total;
+    }
+
     document.body.addEventListener('htmx:afterSwap', function (e) {
       var target = e.detail && e.detail.target;
-      if (!target) return;
-      var container = target.querySelector && target.querySelector('[data-techniques]');
-      if (!container) return;
-      var techniques = (container.dataset.techniques || '').split(',').filter(Boolean);
-      var tr = target.closest('tr');
-      if (!tr) return;
-      ROW_CLASSES.forEach(function (c) { tr.classList.remove(c); });
-      if (techniques.indexOf('Surf') !== -1) tr.classList.add('table-primary');
-      else if (techniques.indexOf('Xtal') !== -1) tr.classList.add('table-success');
-      else if (techniques.indexOf('ASWAXS') !== -1) tr.classList.add('table-warning');
-      else if (techniques.indexOf('Beamline') !== -1) tr.classList.add('table-info');
+      if (target && target.querySelector) {
+        var container = target.querySelector('[data-techniques]');
+        var tr = container && target.closest('tr');
+        if (container && tr) {
+          var techniques = (container.dataset.techniques || '').split(',').filter(Boolean);
+          ROW_CLASSES.forEach(function (c) { tr.classList.remove(c); });
+          var first = ORDER.filter(function (t) { return techniques.indexOf(t) !== -1; })[0] || '';
+          if (first) tr.classList.add(TECHNIQUE_ROW[first]);
+          // move the row into the table for its first technique
+          var dest = document.querySelector('.pg-section[data-section="' + first + '"] tbody');
+          if (dest && tr.parentNode !== dest) dest.insertBefore(tr, dest.firstChild);
+        }
+      }
+      refreshSections();
     });
+    refreshSections();
   })();
 })();
 </script>

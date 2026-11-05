@@ -22,6 +22,9 @@
 
   var drag = null;   // {table, ci} while a header is being dragged
 
+  // Tables sharing data-col-key (e.g. one table per group) share one saved order.
+  function key(t) { return t.getAttribute('data-col-key') || t.id; }
+
   function load(id) {
     try { return JSON.parse(localStorage.getItem(PREFIX + id)) || null; } catch (e) { return null; }
   }
@@ -86,7 +89,7 @@
     btn.hidden = true;
     btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Reset column order';
     btn.addEventListener('click', function () {
-      clear(t.id);
+      clear(key(t));
       t._cr.saved = null;
       apply(t);
     });
@@ -106,7 +109,7 @@
         seen[id] = true;
         return id;
       });
-      t._cr = { ids: ids, n: ths.length, saved: load(t.id), resetBtn: null };
+      t._cr = { ids: ids, n: ths.length, saved: load(key(t)), resetBtn: null };
       ths.forEach(function (th, i) {
         th.setAttribute('data-ci', i);
         th.draggable = true;
@@ -149,7 +152,7 @@
       if (from >= 0 && to >= 0 && from !== to) {
         order.splice(to, 0, order.splice(from, 1)[0]);
         t._cr.saved = order.map(function (ci) { return t._cr.ids[ci]; });
-        save(t.id, t._cr.saved);
+        save(key(t), t._cr.saved);
         apply(t);
       }
       clearMarks();

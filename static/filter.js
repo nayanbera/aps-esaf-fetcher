@@ -1,13 +1,15 @@
 /* Regex table filter — auto-initialised for any .table-regex-filter input.
- * data-target="<table-element-id>" on the input tells it which table to filter.
+ * data-target="<table-element-id>" on the input tells it which table to filter;
+ * a comma-separated list filters several tables with one box.
  */
 (function () {
   'use strict';
 
   function applyFilter(input) {
-    var tableId = input.dataset.target;
-    var table   = tableId ? document.getElementById(tableId) : null;
-    if (!table) return;
+    var tables = (input.dataset.target || '').split(',').map(function (id) {
+      return document.getElementById(id.trim());
+    }).filter(Boolean);
+    if (!tables.length) return;
 
     var pattern = input.value;
     var re      = null;
@@ -29,7 +31,10 @@
       input.classList.remove('is-invalid', 'is-valid');
     }
 
-    var rows    = table.querySelectorAll('tbody > tr');
+    var rows = [];
+    tables.forEach(function (t) {
+      rows = rows.concat(Array.prototype.slice.call(t.querySelectorAll('tbody > tr')));
+    });
     var visible = 0;
     var total   = 0;
 
