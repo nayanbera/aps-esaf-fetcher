@@ -4,6 +4,11 @@
     <input type="text" name="new_name"
            value="{{ pg.name }}" class="form-control form-control-sm fw-semibold"
            required placeholder="Group name">
+    <div class="mt-1">
+      {% set technique = pg.technique or '' %}
+      {% set post_url = "/pi-groups/" ~ (pg.name | urlencode | replace('+', '%20')) ~ "/toggle-technique" %}
+      {% include "partials/pi_group_technique_toggles.html" %}
+    </div>
   </td>
   <td>
     <input type="text" name="pi_name"
@@ -44,11 +49,6 @@
            value="{{ pg.orcid_id }}" class="form-control form-control-sm"
            data-pi-field="orcid_id"
            placeholder="ORCID 0000-0000-0000-0000">
-  </td>
-  <td>
-    {% set technique = pg.technique or '' %}
-    {% set post_url = "/pi-groups/" ~ (pg.name | urlencode | replace('+', '%20')) ~ "/toggle-technique" %}
-    {% include "partials/pi_group_technique_toggles.html" %}
   </td>
   <td class="text-end text-nowrap">
     <button type="button" class="btn btn-success btn-sm py-0 me-1"

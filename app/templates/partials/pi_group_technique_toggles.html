@@ -5,7 +5,7 @@
             class="btn btn-sm py-0 px-2 {{ 'btn-' ~ cls if t in _techs else 'btn-outline-' ~ cls }}"
             hx-post="{{ post_url }}"
             hx-vals='{"technique": "{{ t }}"}'
-            hx-target="closest td"
-            hx-swap="innerHTML">{{ t }}</button>
+            hx-target="closest [data-techniques]"
+            hx-swap="outerHTML">{{ t }}</button>
   {% endfor %}
 </div>

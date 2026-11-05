@@ -96,7 +96,7 @@
 
 <p class="text-muted small mb-2">
   <span id="pg-count">{{ pi_groups | length }}</span> PI Groups, one table per technique.
-  A group using several techniques is listed in each of them.
+  Techniques are set with the edit (pencil) button. A group using several techniques is listed in each of them.
 </p>
 
 <div id="pg-sections">
@@ -119,7 +119,6 @@
             <th>Country</th>
             <th>State</th>
             <th>Email</th>
-            <th>Technique</th>
             <th></th>
           </tr>
         </thead>
@@ -285,7 +284,7 @@
       var toggled = target.querySelector && target.querySelector('[data-techniques]');
       if (toggled && inTable) {
         window.pgReloadSections();
-      } else if (isAdd || removed) {
+      } else if (isAdd || removed || target.tagName === 'TR') {  // add, delete, edit/cancel
         window.pgReloadSections();
       }
     });

@@ -13,11 +13,6 @@
     {% endif %}
     {% if pg.orcid_id %}<div class="small text-muted" title="ORCID">{{ pg.orcid_id }}</div>{% endif %}
   </td>
-  <td>
-    {% set technique = pg.technique or '' %}
-    {% set post_url = "/pi-groups/" ~ (pg.name | urlencode | replace('+', '%20')) ~ "/toggle-technique" %}
-    {% include "partials/pi_group_technique_toggles.html" %}
-  </td>
   <td class="text-end text-nowrap">
     <span class="small me-2 pg-row-result"></span>
     {% if pg.pi_name %}
