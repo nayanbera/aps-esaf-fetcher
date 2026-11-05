@@ -31,15 +31,11 @@ _DOE_OFFICES = (
 OTHER = "Other"
 
 
-def classify(label: str) -> tuple[str, str]:
-    """Return (agency, subgroup) for one funding label; subgroup may be ''."""
-    s = " ".join((label or "").split())
-    low = s.lower()
-    if (low.startswith("foreign") or "deutsche forschung" in low or "nserc" in low
-            or re.search(r"\bDFG\b", s)):
-        return "Foreign agencies", ""
-    if low.startswith("other"):
-        return OTHER, ""
+JOINT = "Joint with foreign"
+
+
+def _us_agency(s: str) -> tuple[str, str] | None:
+    """(agency, subgroup) if the label names a US agency, else None."""
     if re.search(r"National Science Foundation|\bNSF\b", s):
         m = _NSF_DIV_NUM_RE.search(s)
         if m and re.fullmatch(_NSF_DIVISIONS, m.group(1)):
@@ -57,7 +53,28 @@ def classify(label: str) -> tuple[str, str]:
         return "NIH", ""
     if re.search(r"\bNASA\b", s):
         return "NASA", ""
-    return OTHER, ""
+    return None
+
+
+def classify(label: str) -> tuple[str, str]:
+    """Return (agency, subgroup) for one funding label; subgroup may be ''.
+
+    A label naming both a foreign funder and a US agency (e.g. a joint
+    NSF-DFG project) goes under the US agency, in the "Joint with foreign"
+    subgroup.
+    """
+    s = " ".join((label or "").split())
+    low = s.lower()
+    foreign = (low.startswith("foreign") or "deutsche forschung" in low or "nserc" in low
+               or bool(re.search(r"\bDFG\b", s)))
+    if low.startswith("other") and not foreign:
+        return OTHER, ""
+    us = _us_agency(s)
+    if foreign:
+        return (us[0], JOINT) if us else ("Foreign agencies", "")
+    if low.startswith("other"):
+        return OTHER, ""
+    return us or (OTHER, "")
 
 
 def group_funding(pairs: list[dict]) -> list[dict]:
@@ -82,7 +99,7 @@ def group_funding(pairs: list[dict]) -> list[dict]:
             "labels": sorted(((l, len(e)) for l, e in n["labels"].items()),
                              key=lambda x: -x[1]),
         } for name, n in subs.items()]
-        sublist.sort(key=lambda x: (x["name"].endswith("not given"), -x["count"], x["name"]))
+        sublist.sort(key=lambda x: (x["name"].endswith("not given") or x["name"] == JOINT, -x["count"], x["name"]))
         groups.append({"agency": agency, "count": len(all_esafs), "subgroups": sublist})
     groups.sort(key=lambda g: (g["agency"] == OTHER, -g["count"], g["agency"]))
     return groups
