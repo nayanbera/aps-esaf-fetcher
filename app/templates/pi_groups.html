@@ -125,6 +125,7 @@
         </thead>
         <tbody{% if not sec.key %} id="pg-tbody"{% endif %}>
           {% for pg in sec.groups %}
+            {% set row_tech = sec.key %}
             {% include "partials/pi_group_row_view.html" %}
           {% endfor %}
         </tbody>
@@ -184,6 +185,7 @@
           row.replaceWith(newRow);
           htmx.process(newRow);
         }
+        if (window.pgRecolor) window.pgRecolor();
         window.pgReloadSections();
       });
   });
@@ -244,6 +246,7 @@
           htmx.process(cur);
           document.body.dispatchEvent(new Event('htmx:afterSettle', {bubbles: true}));
           updateCounts();
+          recolor();
         })
         .catch(function () {})
         .then(function () { reloading = false; });
@@ -258,22 +261,29 @@
       if (c) c.textContent = Object.keys(names).length;
     }
 
+    // Row colour comes from the table it sits in, not from the group's techniques.
+    function recolor() {
+      document.querySelectorAll('#pg-sections .pg-section').forEach(function (sec) {
+        var cls = TECHNIQUE_ROW[sec.dataset.section] || '';
+        sec.querySelectorAll('tbody > tr').forEach(function (tr) {
+          ROW_CLASSES.forEach(function (c) { tr.classList.remove(c); });
+          if (cls) tr.classList.add(cls);
+        });
+      });
+    }
+
+    window.pgRecolor = recolor;
+
     document.body.addEventListener('htmx:afterSwap', function (e) {
       var target = e.detail && e.detail.target;
       if (!target) return;
+      recolor();
       var inTable = target.closest && target.closest('#pg-sections');
       var isAdd = target.id === 'pg-tbody';
       var removed = !target.isConnected && e.detail.requestConfig &&
                     e.detail.requestConfig.verb === 'delete';
       var toggled = target.querySelector && target.querySelector('[data-techniques]');
       if (toggled && inTable) {
-        var tr = target.closest('tr');
-        var techniques = (toggled.dataset.techniques || '').split(',').filter(Boolean);
-        var first = ['Surf', 'Xtal', 'ASWAXS', 'Beamline'].filter(function (t) {
-          return techniques.indexOf(t) !== -1;
-        })[0];
-        ROW_CLASSES.forEach(function (c) { tr.classList.remove(c); });
-        if (first) tr.classList.add(TECHNIQUE_ROW[first]);
         window.pgReloadSections();
       } else if (isAdd || removed) {
         window.pgReloadSections();
