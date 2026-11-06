@@ -538,6 +538,7 @@ def find_existing(doi: str, title: str) -> dict | None:
     return None
 
 
+_APS_DOI_RE = re.compile(r"10\.46936/aps-(\d+)/", re.I)
 _ESAF_NO_RE = re.compile(r"\bESAF(?:\s*(?:No\.?|number|ID|#))?[\s:#-]*(\d{4,8})\b", re.I)
 
 
@@ -559,6 +560,9 @@ def link_esafs(text: str) -> dict:
     hits: list[dict] = []
     for d in find_dois(text):
         e = by_doi.get(d)
+        if e is None:                              # APS beam-time DOIs are 10.46936/APS-<ESAF no.>/<OSTI no.>
+            m = _APS_DOI_RE.match(d)
+            e = by_id.get(m[1]) if m else None
         if e and e not in hits:
             hits.append(e)
     for m in _ESAF_NO_RE.findall(text):
