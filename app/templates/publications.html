@@ -76,6 +76,52 @@
     </div>
   </div>
 </div>
+<!-- Search the literature -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold"><i class="bi bi-search me-1"></i>Search OpenAlex / Crossref</div>
+  <div class="card-body">
+    <form class="row g-2 align-items-end" hx-post="/publications/search" hx-target="#pub-search-results"
+          hx-indicator="#pub-search-spin">
+      <div class="col-md-4">
+        <label class="form-label small mb-0">Search for</label>
+        <input type="text" name="q" class="form-control form-control-sm" required
+               placeholder="ChemMatCARS, an award number, an author name or an ORCID">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">Search in</label>
+        <select name="mode" class="form-select form-select-sm">
+          <option value="fulltext">Full text (acknowledgments)</option>
+          <option value="keyword">Title / abstract keywords</option>
+          <option value="award">Award number</option>
+          <option value="author">Author name</option>
+          <option value="orcid">Author ORCID</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">Published from</label>
+        <input type="text" name="from_date" class="form-control form-control-sm" placeholder="2024-09-01">
+      </div>
+      <div class="col-md-3 d-flex align-items-center gap-3">
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" name="source" value="openalex" id="src-oa" checked>
+          <label class="form-check-label small" for="src-oa">OpenAlex</label>
+        </div>
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" name="source" value="crossref" id="src-cr" checked>
+          <label class="form-check-label small" for="src-cr">Crossref</label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm ms-auto">Search</button>
+        <span id="pub-search-spin" class="htmx-indicator spinner-border spinner-border-sm text-secondary"></span>
+      </div>
+    </form>
+    <div class="form-text">
+      <strong>Full text</strong> and <strong>Award number</strong> work best with OpenAlex; Crossref has no
+      full-text search (it falls back to metadata) but finds award numbers recorded by publishers.
+      Searching both merges the results by DOI.
+    </div>
+    <div id="pub-search-results" class="mt-2"></div>
+  </div>
+</div>
 <span id="pub-spin" class="htmx-indicator spinner-border spinner-border-sm text-secondary mb-2"></span>
 <div id="pub-result"></div>
 

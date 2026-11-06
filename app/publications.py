@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import logging
 import re
+import time
 import unicodedata
 import uuid
 from urllib.parse import unquote
@@ -539,6 +540,128 @@ def build_report_workbook(py: int) -> bytes:
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Literature search (OpenAlex + Crossref)
+# ---------------------------------------------------------------------------
+
+_OPENALEX = "https://api.openalex.org/works"
+SEARCH_MODES = {
+    "keyword": "Title / abstract keywords",
+    "fulltext": "Full text (acknowledgments)",
+    "award": "Award number",
+    "author": "Author name",
+    "orcid": "Author ORCID",
+}
+
+
+def _openalex_params(mode: str, query: str, from_date: str) -> dict:
+    flt = []
+    params = {"per-page": "50", "sort": "publication_date:desc"}
+    if mode == "keyword":
+        params["search"] = query
+    elif mode == "fulltext":
+        flt.append("fulltext.search:" + query.replace(",", " "))
+    elif mode == "award":
+        flt.append("awards.funder_award_id:" + canon_award(query))
+    elif mode == "author":
+        flt.append("raw_author_name.search:" + query.replace(",", " "))
+    elif mode == "orcid":
+        flt.append("author.orcid:" + re.sub(r"^.*orcid\.org/", "", query.strip()))
+    if from_date:
+        flt.append("from_publication_date:" + from_date)
+    if flt:
+        params["filter"] = ",".join(flt)
+    if mode == "keyword":
+        params.pop("sort")                       # keep relevance order for keyword search
+    return params
+
+
+def search_openalex(mode: str, query: str, from_date: str = "") -> list[dict]:
+    r = requests.get(_OPENALEX, headers=_UA, timeout=30,
+                     params={**_openalex_params(mode, query, from_date),
+                             "select": "doi,title,publication_date,publication_year,authorships,"
+                                       "primary_location,cited_by_count,type"})
+    r.raise_for_status()
+    out = []
+    for w in r.json().get("results", []):
+        doi = norm_doi(w.get("doi") or "")
+        if not doi:
+            continue
+        src = ((w.get("primary_location") or {}).get("source") or {}).get("display_name") or ""
+        names = [(a.get("author") or {}).get("display_name", "") for a in w.get("authorships", [])]
+        out.append({"doi": doi, "title": _strip_tags(w.get("title") or ""), "venue": src,
+                    "date": w.get("publication_date") or str(w.get("publication_year") or ""),
+                    "authors": "; ".join(n for n in names if n), "cited": w.get("cited_by_count") or 0,
+                    "source": "OpenAlex"})
+    return out
+
+
+def search_crossref(mode: str, query: str, from_date: str = "") -> list[dict]:
+    params = {"rows": "50", "select": "DOI,title,author,container-title,issued,published,is-referenced-by-count"}
+    flt = []
+    if mode == "keyword":
+        params["query.bibliographic"] = query
+    elif mode == "fulltext":
+        params["query"] = query                  # Crossref has no full-text index; this matches metadata
+    elif mode == "author":
+        params["query.author"] = query
+    elif mode == "award":
+        flt.append("award.number:" + canon_award(query))
+    elif mode == "orcid":
+        flt.append("orcid:" + re.sub(r"^.*orcid\.org/", "", query.strip()))
+    if from_date:
+        flt.append("from-pub-date:" + from_date)
+    if flt:
+        params["filter"] = ",".join(flt)
+    if mode in ("award", "orcid", "author"):
+        params["sort"], params["order"] = "published", "desc"
+    for attempt in range(3):                     # Crossref rate-limits bursts with 429
+        r = requests.get("https://api.crossref.org/works", headers=_UA, timeout=30, params=params)
+        if r.status_code != 429:
+            break
+        time.sleep(2 * (attempt + 1))
+    r.raise_for_status()
+    out = []
+    for it in r.json()["message"].get("items", []):
+        doi = norm_doi(it.get("DOI", ""))
+        if not doi:
+            continue
+        names = [f'{a["family"]}, {a.get("given", "")}'.strip(", ") if a.get("family") else a.get("name", "")
+                 for a in it.get("author", [])]
+        out.append({"doi": doi, "title": _strip_tags((it.get("title") or [""])[0]),
+                    "venue": _strip_tags((it.get("container-title") or [""])[0]),
+                    "date": _date_parts(it), "authors": "; ".join(n for n in names if n),
+                    "cited": it.get("is-referenced-by-count") or 0, "source": "Crossref"})
+    return out
+
+
+def search_literature(mode: str, query: str, sources: list[str], from_date: str = "") -> tuple[list[dict], list[str]]:
+    """Merge results from the chosen sources by DOI.  Returns (results, problems)."""
+    funcs = {"openalex": search_openalex, "crossref": search_crossref}
+    merged: dict[str, dict] = {}
+    problems: list[str] = []
+    for src in sources:
+        fn = funcs.get(src)
+        if not fn:
+            continue
+        try:
+            hits = fn(mode, query, from_date)
+        except Exception as exc:
+            problems.append(f"{src}: {exc}")
+            continue
+        for h in hits:
+            cur = merged.get(h["doi"])
+            if cur is None:
+                merged[h["doi"]] = h
+            else:
+                cur["source"] += " + " + h["source"]
+                for k in ("title", "venue", "date", "authors"):
+                    cur[k] = cur[k] or h[k]
+                cur["cited"] = max(cur["cited"], h["cited"])
+    results = sorted(merged.values(), key=lambda h: h["date"], reverse=True)
+    return results, problems
 
 
 # ---------------------------------------------------------------------------

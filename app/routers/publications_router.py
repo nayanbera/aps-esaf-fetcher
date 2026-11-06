@@ -81,6 +81,41 @@ async def add_dois(text: str = Form("")):
     return await run_in_threadpool(_run_items, items, "doi")
 
 
+@router.post("/publications/search", response_class=HTMLResponse)
+async def search_publications(request: Request, q: str = Form(""), mode: str = Form("keyword"),
+                              source: list[str] = Form([]), from_date: str = Form("")):
+    q = q.strip()
+    if not q:
+        return HTMLResponse('<div class="alert alert-warning mb-2">Enter something to search for.</div>')
+    if mode not in pubs.SEARCH_MODES:
+        mode = "keyword"
+    from_date = from_date.strip()
+    if from_date and not re.fullmatch(r"\d{4}(-\d{2}(-\d{2})?)?", from_date):
+        return HTMLResponse('<div class="alert alert-warning mb-2">"From" must look like 2025 or 2025-09-01.</div>')
+    if re.fullmatch(r"\d{4}-\d{2}", from_date):
+        from_date += "-01"
+    elif re.fullmatch(r"\d{4}", from_date):
+        from_date += "-01-01"
+    results, problems = await run_in_threadpool(pubs.search_literature, mode, q,
+                                                source or ["openalex", "crossref"], from_date)
+    known = {norm for p in db.list_records(pubs.PUBS) if (norm := pubs.norm_doi(p.get("doi", "")))}
+    for h in results:
+        h["known"] = h["doi"] in known
+    return templates.TemplateResponse("partials/pub_search_results.html", {
+        "request": request, "results": results, "problems": problems})
+
+
+@router.post("/publications/add-selected", response_class=HTMLResponse)
+async def add_selected(doi: list[str] = Form([])):
+    dois = [d for d in dict.fromkeys(pubs.norm_doi(d) for d in doi) if d]
+    if not dois:
+        return HTMLResponse('<div class="alert alert-warning mb-2">Tick at least one paper.</div>')
+    items = [(d, (lambda d=d: ({"doi": d, "title": "", "authors": "", "year": "", "pub_date": "",
+                                "url": "", "type": "", "venue": "", "notes": "", "abstract": ""}, "")))
+             for d in dois]
+    return await run_in_threadpool(_run_items, items, "search")
+
+
 @router.post("/publications/import-file", response_class=HTMLResponse)
 async def import_reference_file(files: list[UploadFile] = File(...)):
     items = []
