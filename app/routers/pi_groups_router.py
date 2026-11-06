@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
-from .. import db
+import html
+
+from starlette.concurrency import run_in_threadpool
+
+from .. import db, pi_id_import
 from ..templates_env import templates
 
 router = APIRouter()
@@ -196,6 +200,42 @@ def clear_pi_group_assignments(name: str):
             f'<i class="bi bi-x-lg me-1"></i>Cleared {count} ESAF(s).</span>'
         )
     return HTMLResponse('<span class="text-muted">No ESAFs were assigned to this group.</span>')
+
+
+@router.post("/pi-groups/import-ids", response_class=HTMLResponse)
+async def import_pi_ids(excel_file: UploadFile = File(...)):
+    """Fill PI IDs from the Teams sheet of the user-reporting Excel file."""
+    data = await excel_file.read()
+    try:
+        teams = await run_in_threadpool(pi_id_import.read_teams, data)
+    except Exception as exc:
+        return HTMLResponse(f'<div class="alert alert-danger">Could not read the Excel file: '
+                            f'{html.escape(str(exc))}</div>')
+    if not teams:
+        return HTMLResponse('<div class="alert alert-warning">No team rows (IDs like AC-01) '
+                            'found in the Teams sheet.</div>')
+    groups = db.list_pi_groups()
+    res = pi_id_import.match_ids(teams, groups)
+    by_name = {g["name"]: g for g in groups}
+    for name, ids in res["assign"].items():
+        g = by_name[name]
+        db.upsert_pi_group(name, g.get("pi_name", ""), g.get("pi_email", ""),
+                           g.get("institution", ""), g.get("country", ""),
+                           g.get("state", ""), g.get("orcid_id", ""), ", ".join(ids))
+
+    def listing(title: str, items: list[str], limit: int = 25) -> str:
+        if not items:
+            return ""
+        li = "".join(f"<li>{html.escape(i)}</li>" for i in items[:limit])
+        more = f"<li>… and {len(items) - limit} more</li>" if len(items) > limit else ""
+        return f"<br>{title}<ul class='mb-0'>{li}{more}</ul>"
+
+    pending = [g["name"] for g in groups if g["name"] not in res["assign"]]
+    body = (f"{len(res['assign'])} of {len(groups)} PI Groups got PI IDs from {len(teams)} teams in the file."
+            + listing("PI Groups with no match in the file (unchanged):", pending)
+            + listing("Teams matching more than one PI Group (skipped):", res["ambiguous"])
+            + listing(f"Teams in the file with no PI Group ({len(res['unmatched'])}):", res["unmatched"], 10))
+    return HTMLResponse(f'<div class="alert alert-success">{body}</div>')
 
 
 @router.post("/pi-groups/{name}", response_class=HTMLResponse)

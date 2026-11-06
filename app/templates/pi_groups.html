@@ -96,6 +96,23 @@
   </div>
 </div>
 
+<!-- Import PI IDs from the user-reporting Excel file -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form hx-post="/pi-groups/import-ids" hx-encoding="multipart/form-data"
+          hx-target="#pi-id-import-result" hx-indicator="#pi-id-import-spin"
+          hx-on::after-request="if (window.pgReloadSections) window.pgReloadSections()"
+          class="d-flex align-items-center gap-2 flex-wrap">
+      <label class="fw-semibold small mb-0"><i class="bi bi-file-earmark-excel me-1"></i>Import PI IDs from Excel:</label>
+      <input type="file" name="excel_file" accept=".xlsx" class="form-control form-control-sm" style="max-width:340px" required>
+      <button type="submit" class="btn btn-outline-success btn-sm">Import</button>
+      <span id="pi-id-import-spin" class="htmx-indicator spinner-border spinner-border-sm text-secondary"></span>
+      <span class="text-muted small">Reads the <em>Teams</em> sheet and matches each team lead to a PI Group by name.</span>
+    </form>
+    <div id="pi-id-import-result" class="mt-2 small"></div>
+  </div>
+</div>
+
 <!-- PI Groups table -->
 <div class="filter-wrap d-flex align-items-center gap-2 mb-2">
   <div class="input-group input-group-sm" style="max-width:420px">
