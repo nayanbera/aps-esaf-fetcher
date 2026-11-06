@@ -7,7 +7,13 @@
 
   <!-- Filters -->
   <form method="get" action="/stats" class="d-flex align-items-center gap-2 flex-wrap">
-    <label class="form-label mb-0 small fw-semibold text-nowrap">Year range:</label>
+    <label class="form-label mb-0 small fw-semibold text-nowrap">From:</label>
+    <select name="from_month" class="form-select form-select-sm" style="width:auto" title="Month (optional)">
+      <option value="">Month</option>
+      {% for m in months %}
+        <option value="{{ loop.index }}" {% if from_month == loop.index %}selected{% endif %}>{{ m[:3] }}</option>
+      {% endfor %}
+    </select>
     <select name="from_year" class="form-select form-select-sm" style="width:auto">
       <option value="">All years</option>
       {% for y in stats.all_years %}
@@ -15,6 +21,12 @@
       {% endfor %}
     </select>
     <span class="text-muted small">to</span>
+    <select name="to_month" class="form-select form-select-sm" style="width:auto" title="Month (optional)">
+      <option value="">Month</option>
+      {% for m in months %}
+        <option value="{{ loop.index }}" {% if to_month == loop.index %}selected{% endif %}>{{ m[:3] }}</option>
+      {% endfor %}
+    </select>
     <select name="to_year" class="form-select form-select-sm" style="width:auto">
       <option value="">Present</option>
       {% for y in stats.all_years %}
@@ -56,12 +68,14 @@
 
 <p class="text-muted small mb-4">
   Showing <strong>Approved</strong> ESAFs
+  {% set fm = months[from_month - 1] ~ ' ' if from_month else '' %}
+  {% set tm = months[to_month - 1] ~ ' ' if to_month else '' %}
   {% if from_year and to_year %}
-    from <strong>{{ from_year }}</strong> to <strong>{{ to_year }}</strong>
+    from <strong>{{ fm }}{{ from_year }}</strong> to <strong>{{ tm }}{{ to_year }}</strong>
   {% elif from_year %}
-    from <strong>{{ from_year }}</strong> to present
+    from <strong>{{ fm }}{{ from_year }}</strong> to present
   {% elif to_year %}
-    up to <strong>{{ to_year }}</strong>
+    up to <strong>{{ tm }}{{ to_year }}</strong>
   {% else %}
     across all years
   {% endif %}

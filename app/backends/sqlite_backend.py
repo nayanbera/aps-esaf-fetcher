@@ -829,6 +829,8 @@ class SQLiteESAFRepository(ESAFRepository):
         year_to:   Optional[int] = None,
         technique: Optional[str] = None,
         exclude_scientists: bool = False,
+        start_from:   Optional[str] = None,
+        start_before: Optional[str] = None,
     ) -> dict:
         # Build shared WHERE clause fragments
         direct_clause = ""   # for direct esafs table (no alias)
@@ -842,6 +844,13 @@ class SQLiteESAFRepository(ESAFRepository):
         if year_to is not None:
             direct_clause += " AND year <= ?";   direct_params.append(year_to)
             join_clause   += " AND e.year <= ?";  join_params.append(year_to)
+        # start_from (inclusive) / start_before (exclusive): ISO date prefixes on the ESAF start date
+        if start_from:
+            direct_clause += " AND start_date >= ?";   direct_params.append(start_from)
+            join_clause   += " AND e.start_date >= ?"; join_params.append(start_from)
+        if start_before:
+            direct_clause += " AND start_date < ?";    direct_params.append(start_before)
+            join_clause   += " AND e.start_date < ?";  join_params.append(start_before)
         if technique:
             direct_clause += " AND technique = ?";   direct_params.append(technique)
             join_clause   += " AND e.technique = ?"; join_params.append(technique)
@@ -1007,6 +1016,8 @@ class SQLiteESAFRepository(ESAFRepository):
             "all_techniques":      all_techniques,
             "year_from":           year_from,
             "year_to":             year_to,
+            "start_from":          start_from,
+            "start_before":        start_before,
             "technique":           technique,
             "exclude_scientists":  exclude_scientists,
         }

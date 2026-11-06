@@ -116,6 +116,8 @@ class ESAFRepository(ABC):
         year_to:   Optional[int] = None,
         technique: Optional[str] = None,
         exclude_scientists: bool = False,
+        start_from:   Optional[str] = None,
+        start_before: Optional[str] = None,
     ) -> dict: ...
 
     @abstractmethod

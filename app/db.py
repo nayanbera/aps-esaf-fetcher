@@ -155,10 +155,13 @@ def get_stats(
     year_to:   Optional[int] = None,
     technique: Optional[str] = None,
     exclude_scientists: bool = False,
+    start_from:   Optional[str] = None,
+    start_before: Optional[str] = None,
 ) -> dict:
     stats = _r().get_stats(
         year_from=year_from, year_to=year_to,
         technique=technique, exclude_scientists=exclude_scientists,
+        start_from=start_from, start_before=start_before,
     )
     stats["funding_groups"] = group_funding(stats.pop("funding_pairs", []))
     return stats

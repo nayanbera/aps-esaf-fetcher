@@ -346,12 +346,18 @@ class MongoESAFRepository(ESAFRepository):
         year_to:   Optional[int] = None,
         technique: Optional[str] = None,
         exclude_scientists: bool = False,
+        start_from:   Optional[str] = None,
+        start_before: Optional[str] = None,
     ) -> dict:
         yr: dict = {}
         if year_from is not None:
             yr.setdefault("year", {})["$gte"] = year_from
         if year_to is not None:
             yr.setdefault("year", {})["$lte"] = year_to
+        if start_from:
+            yr.setdefault("start_date", {})["$gte"] = start_from
+        if start_before:
+            yr.setdefault("start_date", {})["$lt"] = start_before
 
         _approved   = {"status": "Approved", **yr}
         _any_status = {**yr}
@@ -491,6 +497,8 @@ class MongoESAFRepository(ESAFRepository):
             "all_techniques":      all_techniques,
             "year_from":           year_from,
             "year_to":             year_to,
+            "start_from":          start_from,
+            "start_before":        start_before,
             "technique":           technique,
             "exclude_scientists":  exclude_scientists,
         }
