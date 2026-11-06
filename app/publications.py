@@ -827,7 +827,7 @@ def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "",
     if existing is None:
         db.save_record(PUBS, new_id(), rec)
         return "added", rec
-    if source == "pdf" or extra_text:         # a PDF / full text adds acknowledgment evidence to a known paper
+    if source == "pdf" or extra_text or meta.get("link_text"):         # a PDF / full text adds acknowledgment evidence to a known paper
         merged = dict(existing)
         merged["facility_ack"] = _union(existing.get("facility_ack"), rec["facility_ack"], ",")
         merged["nsf_awards"] = _union(existing.get("nsf_awards"), rec["nsf_awards"], ";")
