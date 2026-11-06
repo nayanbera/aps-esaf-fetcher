@@ -73,9 +73,9 @@ def publications_page(request: Request, py: str = ""):
 
 @router.post("/publications/add-dois", response_class=HTMLResponse)
 async def add_dois(text: str = Form(""), fulltext: str = Form("")):
-    dois = pubs.find_dois(text)
+    dois = [d for d in pubs.find_dois(text) if not d.startswith("10.46936/")]   # 10.46936 = APS beam-time awards, not papers
     if not dois:
-        return HTMLResponse('<div class="alert alert-warning mb-2">No DOIs found in the text.</div>')
+        return HTMLResponse('<div class="alert alert-warning mb-2">No paper DOIs found in the text.</div>')
     items = [(d, (lambda d=d: ({"doi": d, "title": "", "authors": "", "year": "", "pub_date": "",
                                 "url": "", "type": "", "venue": "", "notes": "", "abstract": ""}, "")))
              for d in dois]
@@ -304,6 +304,22 @@ async def publication_read_online(pid: str):
     ok, why = await run_in_threadpool(pubs.read_online, p)
     q = "read" if ok else "unreachable&why=" + quote(why)
     return RedirectResponse(f"/publications/{pid}/edit?saved={q}", status_code=303)
+
+
+@router.post("/publications/{pid}/analyze-text")
+async def publication_analyze_text(pid: str, ack_paste: str = Form("")):
+    p = db.get_record(pubs.PUBS, pid)
+    if not p:
+        raise HTTPException(404)
+    text = ack_paste.strip()
+    if not text:
+        return RedirectResponse(f"/publications/{pid}/edit", status_code=303)
+    if not re.search(r"acknowledg|funding", text, re.I):
+        text = "Acknowledgements\n" + text
+    await run_in_threadpool(
+        pubs.ingest, {"doi": p.get("doi", ""), "title": p.get("title", ""), "authors": p.get("authors", ""),
+                      "link_text": text}, "text", False, text)
+    return RedirectResponse(f"/publications/{pid}/edit?saved=read", status_code=303)
 
 
 @router.post("/publications/{pid}/delete")

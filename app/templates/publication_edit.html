@@ -9,7 +9,7 @@
 
 {% if saved %}<div class="alert alert-success py-2">Saved.</div>{% endif %}
 {% if read %}<div class="alert alert-success py-2">Paper read — awards, ESAF and Team IDs updated.</div>{% endif %}
-{% if unreachable %}<div class="alert alert-warning py-2">Could not read the paper online ({{ why }}). Import its PDF instead.</div>{% endif %}
+{% if unreachable %}<div class="alert alert-warning py-2">Could not read the paper online ({{ why }}). Paste its acknowledgments below, or import its PDF.</div>{% endif %}
 
 <form method="post" action="/publications/{{ p.id }}">
   <div class="card mb-3">
@@ -90,6 +90,11 @@
           <label class="form-label fw-semibold mb-1">Notes</label>
           <textarea name="notes" rows="2" class="form-control">{{ p.notes }}</textarea>
         </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold mb-1">Paste the acknowledgments from the paper</label>
+          <textarea name="ack_paste" rows="3" class="form-control"
+                    placeholder="When the paper can't be read online, copy its Acknowledgments paragraph here and click “Read pasted text”"></textarea>
+        </div>
         {% if p.ack_text %}
         <div class="col-12">
           <label class="form-label fw-semibold mb-1">Acknowledgments read from the PDF</label>
@@ -102,6 +107,8 @@
 
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
+    <button type="submit" formaction="/publications/{{ p.id }}/analyze-text" class="btn btn-outline-secondary"
+            title="Find award numbers, ESAF DOIs and ESAF numbers in the pasted acknowledgments"><i class="bi bi-clipboard-check me-1"></i>Read pasted text</button>
     {% if p.doi %}
     <button type="submit" formaction="/publications/{{ p.id }}/refresh" class="btn btn-outline-secondary"
             title="Re-read title, authors, date and funders from Crossref"><i class="bi bi-arrow-repeat me-1"></i>Refresh from Crossref</button>
