@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS pi_groups (
     country     TEXT NOT NULL DEFAULT '',
     state       TEXT NOT NULL DEFAULT '',
     orcid_id    TEXT NOT NULL DEFAULT '',
+    pi_id       TEXT NOT NULL DEFAULT '',
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
@@ -265,6 +266,7 @@ class SQLiteESAFRepository(ESAFRepository):
                     country     TEXT NOT NULL DEFAULT '',
                     state       TEXT NOT NULL DEFAULT '',
                     orcid_id    TEXT NOT NULL DEFAULT '',
+                    pi_id       TEXT NOT NULL DEFAULT '',
                     created_at  TEXT DEFAULT (datetime('now'))
                 )
             """)
@@ -276,6 +278,7 @@ class SQLiteESAFRepository(ESAFRepository):
                 ("country",     "TEXT NOT NULL DEFAULT ''"),
                 ("state",       "TEXT NOT NULL DEFAULT ''"),
                 ("orcid_id",    "TEXT NOT NULL DEFAULT ''"),
+                ("pi_id",       "TEXT NOT NULL DEFAULT ''"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE pi_groups ADD COLUMN {col} {defn}")
@@ -619,18 +622,21 @@ class SQLiteESAFRepository(ESAFRepository):
 
     def upsert_pi_group(
         self, name: str, pi_name: str = "", pi_email: str = "",
-        institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+        institution: str = "", country: str = "", state: str = "", orcid_id: str = "",
+        pi_id: Optional[str] = None,
     ) -> None:
         with self._db() as conn:
             conn.execute(
                 """INSERT INTO pi_groups (name, pi_name, pi_email, institution,
-                       country, state, orcid_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                       country, state, orcid_id, pi_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(name) DO UPDATE SET
                        pi_name=excluded.pi_name, pi_email=excluded.pi_email,
                        institution=excluded.institution, country=excluded.country,
-                       state=excluded.state, orcid_id=excluded.orcid_id""",
-                (name, pi_name, pi_email, institution, country, state, orcid_id),
+                       state=excluded.state, orcid_id=excluded.orcid_id,
+                       pi_id=CASE WHEN ? IS NULL THEN pi_id ELSE excluded.pi_id END""",
+                (name, pi_name, pi_email, institution, country, state, orcid_id,
+                 pi_id or "", pi_id),
             )
 
     def delete_pi_group(self, name: str) -> bool:

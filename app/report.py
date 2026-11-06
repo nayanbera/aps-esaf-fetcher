@@ -109,23 +109,43 @@ def access_type(users: list[dict]) -> str:
 def build_report_data(py: int) -> dict:
     start, end = project_year_range(py)
 
-    # Teams: one per (PI group, technique), numbered in creation order per prefix.
+    # Teams: one per (PI group, technique).  A team ID entered on the PI Group
+    # (field "PI ID", one ID per technique) is used as is; groups without one get
+    # the next free number for their prefix, in creation order.
     groups = db.list_pi_groups()
     groups.sort(key=lambda g: (str(g.get("created_at") or "~"), g["name"]))
+
+    def stored_ids(g) -> list[str]:
+        return [t.strip().upper() for t in re.split(r"[,;\s]+", g.get("pi_id") or "") if t.strip()]
+
+    used = {i for g in groups for i in stored_ids(g)}
     teams, team_id = [], {}
     counters = {p: 0 for p in _PREFIX_ORDER}
+
+    def next_free(prefix: str) -> str:
+        while True:
+            counters[prefix] += 1
+            tid = f"{prefix}-{counters[prefix]:02d}"
+            if tid not in used:
+                used.add(tid)
+                return tid
+
     for g in groups:
         for tech in (g.get("technique") or "").split(","):
             if tech not in TECHNIQUES:
                 continue
             prefix = TECHNIQUES[tech][0]
-            counters[prefix] += 1
-            tid = f"{prefix}-{counters[prefix]:02d}"
+            tid = next((i for i in stored_ids(g) if i.startswith(prefix + "-")), None) \
+                or next_free(prefix)
             team_id[(g["name"], tech)] = tid
             last, first = split_name(g.get("pi_name") or "")
             teams.append({"prefix": prefix, "id": tid, "last": last, "first": first,
                           "institution": g.get("institution") or ""})
-    teams.sort(key=lambda t: (_PREFIX_ORDER.index(t["prefix"]), t["id"]))
+
+    def _num(t):
+        m = re.search(r"(\d+)$", t["id"])
+        return int(m[1]) if m else 0
+    teams.sort(key=lambda t: (_PREFIX_ORDER.index(t["prefix"]), _num(t), t["id"]))
 
     group_techs = {g["name"]: [t for t in (g.get("technique") or "").split(",") if t in TECHNIQUES]
                    for g in groups}

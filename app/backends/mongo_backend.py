@@ -163,15 +163,15 @@ class MongoESAFRepository(ESAFRepository):
 
     def upsert_pi_group(
         self, name: str, pi_name: str = "", pi_email: str = "",
-        institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+        institution: str = "", country: str = "", state: str = "", orcid_id: str = "",
+        pi_id: Optional[str] = None,
     ) -> None:
-        self._pi_groups().update_one(
-            {"name": name},
-            {"$set": {"pi_name": pi_name, "pi_email": pi_email,
-                      "institution": institution, "country": country,
-                      "state": state, "orcid_id": orcid_id}},
-            upsert=True,
-        )
+        fields = {"pi_name": pi_name, "pi_email": pi_email,
+                  "institution": institution, "country": country,
+                  "state": state, "orcid_id": orcid_id}
+        if pi_id is not None:
+            fields["pi_id"] = pi_id
+        self._pi_groups().update_one({"name": name}, {"$set": fields}, upsert=True)
 
     def delete_pi_group(self, name: str) -> bool:
         return self._pi_groups().delete_one({"name": name}).deleted_count > 0

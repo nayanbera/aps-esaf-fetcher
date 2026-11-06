@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
@@ -60,6 +62,12 @@ def institutions_list() -> list[str]:
     return db.list_distinct_institutions()
 
 
+def _clean_pi_id(raw: str) -> str:
+    """'ac-50 ; as-08' -> 'AC-50, AS-08' (one ID per technique the group uses)."""
+    ids = [t for t in re.split(r"[\s,;]+", (raw or "").upper()) if t]
+    return ", ".join(dict.fromkeys(ids))
+
+
 def _split_email_orcid(pi_email: str, orcid_id: str) -> tuple[str, str]:
     """An email typed into the ORCID box (it used to sit under the Email column) moves to the email field."""
     pi_email, orcid_id = pi_email.strip(), orcid_id.strip()
@@ -115,6 +123,7 @@ def create_pi_group(
     state:       str = Form(""),
     orcid_id:    str = Form(""),
     technique:   list[str] = Form([]),
+    pi_id:       str = Form(""),
 ):
     name = name.strip()
     if not name:
@@ -123,14 +132,14 @@ def create_pi_group(
     pi_email, orcid_id = _split_email_orcid(pi_email, orcid_id)
     db.upsert_pi_group(name, pi_name, pi_email,
                        institution.strip(), country.strip().upper(),
-                       state.strip(), orcid_id)
+                       state.strip(), orcid_id, _clean_pi_id(pi_id))
     techniques = ",".join(k for k, _, _ in _SECTIONS if k and k in technique)
     if techniques:
         db.set_pi_group_technique(name, techniques)
     pg = {"name": name, "pi_name": pi_name, "pi_email": pi_email,
           "institution": institution.strip(), "country": country.strip().upper(),
           "state": state.strip(), "orcid_id": orcid_id,
-          "technique": techniques, "created_at": ""}
+          "pi_id": _clean_pi_id(pi_id), "technique": techniques, "created_at": ""}
     return templates.TemplateResponse("partials/pi_group_row_view.html",
                                       {"request": request, "pg": pg})
 
@@ -200,6 +209,7 @@ def update_pi_group(
     country:     str = Form(""),
     state:       str = Form(""),
     orcid_id:    str = Form(""),
+    pi_id:       str = Form(""),
 ):
     new_name = new_name.strip() or name
     if not new_name:
@@ -212,13 +222,14 @@ def update_pi_group(
     pi_email, orcid_id = _split_email_orcid(pi_email, orcid_id)
     db.upsert_pi_group(new_name, pi_name.strip(), pi_email,
                        institution.strip(), country.strip().upper(),
-                       state.strip(), orcid_id)
+                       state.strip(), orcid_id, _clean_pi_id(pi_id))
     # Technique is managed independently by toggle-technique; read back from DB.
     groups = {g["name"]: g for g in db.list_pi_groups()}
     pg = groups.get(new_name) or {
         "name": new_name, "pi_name": pi_name.strip(), "pi_email": pi_email,
         "institution": institution.strip(), "country": country.strip().upper(),
-        "state": state.strip(), "orcid_id": orcid_id, "technique": "",
+        "state": state.strip(), "orcid_id": orcid_id,
+        "pi_id": _clean_pi_id(pi_id), "technique": "",
     }
     return templates.TemplateResponse("partials/pi_group_row_view.html",
                                       {"request": request, "pg": pg})

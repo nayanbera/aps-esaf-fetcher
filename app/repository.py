@@ -58,7 +58,8 @@ class ESAFRepository(ABC):
     @abstractmethod
     def upsert_pi_group(
         self, name: str, pi_name: str = "", pi_email: str = "",
-        institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+        institution: str = "", country: str = "", state: str = "", orcid_id: str = "",
+        pi_id: Optional[str] = None,
     ) -> None: ...
 
     @abstractmethod

@@ -199,6 +199,7 @@ def migrate(sqlite_path: str, mongo_uri: str, mongo_db: str, dry_run: bool = Fal
                 country=row.get("country", ""),
                 state=row.get("state", ""),
                 orcid_id=row.get("orcid_id", ""),
+                pi_id=row.get("pi_id", ""),
             )
             if row.get("technique"):
                 mg.set_pi_group_technique(row["name"], row["technique"])

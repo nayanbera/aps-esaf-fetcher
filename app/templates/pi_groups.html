@@ -18,12 +18,12 @@
           hx-on::after-request="this.reset(); this.querySelector('[data-pi-fill-hint]').textContent=''">
 
       <div class="row g-2 mb-2">
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label fw-semibold mb-1">PI Group Name <span class="text-danger">*</span></label>
           <input type="text" name="name" class="form-control" required
                  placeholder="e.g. Smith Lab">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label fw-semibold mb-1">PI Name</label>
           <input type="text" name="pi_name" class="form-control"
                  list="pg-users-list"
@@ -36,11 +36,17 @@
           </datalist>
           <div class="form-text" data-pi-fill-hint></div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label fw-semibold mb-1">PI Email</label>
           <input type="text" name="pi_email" class="form-control"
                  data-pi-field="pi_email"
                  placeholder="email@example.com">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold mb-1">PI ID</label>
+          <input type="text" name="pi_id" class="form-control"
+                 placeholder="e.g. AC-50, AS-08"
+                 title="Team ID(s) from the user-reporting Excel file; one per technique, separated by commas">
         </div>
       </div>
 
@@ -122,6 +128,7 @@
         <thead class="table-light">
           <tr>
             <th>Group Name</th>
+            <th title="Team ID(s) from the user-reporting Excel file">PI ID</th>
             <th>PI Name</th>
             <th>Institution</th>
             <th>Country</th>

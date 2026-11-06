@@ -1,6 +1,7 @@
 {% set _rt = row_tech if row_tech is defined else '' %}
 <tr class="{% if _rt == 'Surf' %}table-primary{% elif _rt == 'Xtal' %}table-success{% elif _rt == 'ASWAXS' %}table-warning{% elif _rt == 'Beamline' %}table-info{% endif %}">
   <td class="fw-semibold">{{ pg.name }}</td>
+  <td class="small text-nowrap">{{ pg.pi_id or '—' }}</td>
   <td>{{ pg.pi_name or '—' }}</td>
   <td>{{ pg.institution or '—' }}</td>
   <td>{{ pg.country or '—' }}</td>

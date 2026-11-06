@@ -71,6 +71,7 @@ def update_esaf_fields(
 def list_pi_groups() -> list[dict]:
     groups = _r().list_pi_groups()
     for g in groups:
+        g.setdefault("pi_id", "")
         # An email typed into the ORCID box is shown (and edited) as the email.
         if "@" in (g.get("orcid_id") or ""):
             if not g.get("pi_email"):
@@ -81,9 +82,10 @@ def list_pi_groups() -> list[dict]:
 
 def upsert_pi_group(
     name: str, pi_name: str = "", pi_email: str = "",
-    institution: str = "", country: str = "", state: str = "", orcid_id: str = ""
+    institution: str = "", country: str = "", state: str = "", orcid_id: str = "",
+    pi_id: Optional[str] = None,
 ) -> None:
-    _r().upsert_pi_group(name, pi_name, pi_email, institution, country, state, orcid_id)
+    _r().upsert_pi_group(name, pi_name, pi_email, institution, country, state, orcid_id, pi_id)
 
 
 def delete_pi_group(name: str) -> bool:
