@@ -157,7 +157,7 @@ class MongoESAFRepository(ESAFRepository):
         return [
             {k: d.get(k, "") for k in
              ("name", "pi_name", "pi_email", "institution", "country", "state",
-              "orcid_id", "technique", "created_at")}
+              "orcid_id", "pi_id", "technique", "created_at")}
             for d in docs
         ]
 
