@@ -101,6 +101,14 @@ CREATE TABLE IF NOT EXISTS domain_overrides (
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS records (
+    kind       TEXT NOT NULL,
+    rec_id     TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (kind, rec_id)
+);
+
 CREATE TABLE IF NOT EXISTS gups (
     gup_id           TEXT PRIMARY KEY,
     title            TEXT DEFAULT '',
@@ -2245,3 +2253,48 @@ class SQLiteESAFRepository(ESAFRepository):
                 )
 
         return touched
+
+    # ------------------------------------------------------------------
+    # Generic records (publications, facility awards)
+    # ------------------------------------------------------------------
+
+    def list_records(self, kind: str) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT rec_id, data, created_at FROM records WHERE kind=? ORDER BY created_at, rec_id",
+                (kind,),
+            ).fetchall()
+        out = []
+        for r in rows:
+            d = json.loads(r["data"])
+            d["id"] = r["rec_id"]
+            d.setdefault("created_at", r["created_at"])
+            out.append(d)
+        return out
+
+    def get_record(self, kind: str, rec_id: str) -> Optional[dict]:
+        with self._db() as conn:
+            r = conn.execute(
+                "SELECT rec_id, data, created_at FROM records WHERE kind=? AND rec_id=?",
+                (kind, rec_id),
+            ).fetchone()
+        if not r:
+            return None
+        d = json.loads(r["data"])
+        d["id"] = r["rec_id"]
+        d.setdefault("created_at", r["created_at"])
+        return d
+
+    def save_record(self, kind: str, rec_id: str, data: dict) -> None:
+        data = {k: v for k, v in data.items() if k not in ("id", "created_at")}
+        with self._db() as conn:
+            conn.execute(
+                """INSERT INTO records (kind, rec_id, data) VALUES (?,?,?)
+                   ON CONFLICT(kind, rec_id) DO UPDATE SET data=excluded.data""",
+                (kind, rec_id, json.dumps(data)),
+            )
+
+    def delete_record(self, kind: str, rec_id: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute("DELETE FROM records WHERE kind=? AND rec_id=?", (kind, rec_id))
+        return cur.rowcount > 0

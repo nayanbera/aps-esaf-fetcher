@@ -1028,3 +1028,38 @@ class MongoESAFRepository(ESAFRepository):
 
     def apply_esaf_import(self, records: list[dict]) -> int:
         return 0
+
+    # ------------------------------------------------------------------
+    # Generic records (publications, facility awards)
+    # ------------------------------------------------------------------
+
+    def _records(self, kind: str) -> Collection:
+        return self._client[self._db_name][f"records_{kind}"]
+
+    def list_records(self, kind: str) -> list[dict]:
+        out = []
+        for d in self._records(kind).find({}, {"_id": 0}).sort("created_at", ASCENDING):
+            d["id"] = d.pop("rec_id")
+            out.append(d)
+        return out
+
+    def get_record(self, kind: str, rec_id: str) -> Optional[dict]:
+        d = self._records(kind).find_one({"rec_id": rec_id}, {"_id": 0})
+        if not d:
+            return None
+        d["id"] = d.pop("rec_id")
+        return d
+
+    def save_record(self, kind: str, rec_id: str, data: dict) -> None:
+        from datetime import datetime, timezone
+        data = {k: v for k, v in data.items() if k not in ("id", "rec_id", "created_at")}
+        self._records(kind).update_one(
+            {"rec_id": rec_id},
+            {"$set": data,
+             "$setOnInsert": {"rec_id": rec_id,
+                              "created_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True,
+        )
+
+    def delete_record(self, kind: str, rec_id: str) -> bool:
+        return self._records(kind).delete_one({"rec_id": rec_id}).deleted_count > 0

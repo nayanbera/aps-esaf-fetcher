@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Publications — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h4 class="mb-0"><i class="bi bi-journal-text me-1"></i>Publications</h4>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <a href="/facility-awards" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-award me-1"></i>Facility awards ({{ n_awards }})
+    </a>
+    <form method="get" action="/publications/report.xlsx" class="d-flex align-items-center gap-2">
+      <select name="py" class="form-select form-select-sm" style="width:auto"
+              title="Project years run 1 Sep – 31 Aug; PY1 = Sep 2024 – Aug 2025; by publication date">
+        {% for y in report_years %}
+          <option value="{{ y }}" {% if y == report_default %}selected{% endif %}>Project year {{ y }} (Sep {{ 2023 + y }} – Aug {{ 2024 + y }})</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Download report</button>
+    </form>
+  </div>
+</div>
+
+{% if not n_awards %}
+<div class="alert alert-info py-2 small">
+  No facility awards are defined yet — add them on the <a href="/facility-awards">Facility awards</a> page so the
+  report can fill the facility-award columns and spot them in acknowledgments.
+</div>
+{% endif %}
+
+<!-- Add publications -->
+<div class="row g-3 mb-3">
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-link-45deg me-1"></i>DOIs or pasted text</div>
+      <div class="card-body">
+        <form hx-post="/publications/add-dois" hx-target="#pub-result" hx-indicator="#pub-spin"
+              hx-on::after-request="window.pubRefresh && window.pubRefresh()">
+          <textarea name="text" rows="4" class="form-control form-control-sm mb-2"
+                    placeholder="One DOI per line — or paste a Google Scholar alert e-mail; every DOI / doi.org link in it is picked up"></textarea>
+          <button type="submit" class="btn btn-primary btn-sm">Add</button>
+        </form>
+        <div class="form-text">Metadata and funders are read from Crossref.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-journal-bookmark me-1"></i>EndNote file</div>
+      <div class="card-body">
+        <form hx-post="/publications/import-file" hx-encoding="multipart/form-data"
+              hx-target="#pub-result" hx-indicator="#pub-spin"
+              hx-on::after-request="window.pubRefresh && window.pubRefresh()">
+          <input type="file" name="files" multiple accept=".ris,.xml,.bib,.enw,.txt"
+                 class="form-control form-control-sm mb-2" required>
+          <button type="submit" class="btn btn-primary btn-sm">Import</button>
+        </form>
+        <div class="form-text">In EndNote: <em>File → Export</em> as <strong>RIS</strong>, <strong>EndNote XML</strong>,
+          <strong>BibTeX</strong> or <strong>Refer (.enw)</strong>. References with a DOI are completed from Crossref.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-file-earmark-pdf me-1"></i>PDF of a paper</div>
+      <div class="card-body">
+        <form hx-post="/publications/import-pdf" hx-encoding="multipart/form-data"
+              hx-target="#pub-result" hx-indicator="#pub-spin"
+              hx-on::after-request="window.pubRefresh && window.pubRefresh()">
+          <input type="file" name="files" multiple accept=".pdf"
+                 class="form-control form-control-sm mb-2" required>
+          <button type="submit" class="btn btn-primary btn-sm">Read PDFs</button>
+        </form>
+        <div class="form-text">Reads the DOI and the acknowledgments, so facility and NSF award numbers are picked up.
+          The PDF itself is not stored.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<span id="pub-spin" class="htmx-indicator spinner-border spinner-border-sm text-secondary mb-2"></span>
+<div id="pub-result"></div>
+
+<div id="pub-list">
+<div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+  <div class="filter-wrap d-flex align-items-center gap-2">
+    <div class="input-group input-group-sm" style="max-width:380px">
+      <span class="input-group-text text-muted"><i class="bi bi-regex"></i></span>
+      <input type="text" class="form-control table-regex-filter" data-target="pubs-table"
+             placeholder="Regex filter… e.g. Chen, Matter, 2026">
+      <button class="btn btn-outline-secondary filter-clear" type="button" tabindex="-1">✕</button>
+    </div>
+    <span class="filter-count text-muted small"></span>
+  </div>
+  <form method="get" action="/publications" class="d-flex align-items-center gap-2">
+    <select name="py" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value="">All project years</option>
+      {% for y in report_years %}
+        <option value="{{ y }}" {% if py_sel == y %}selected{% endif %}>Project year {{ y }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-header fw-semibold">Publications ({{ pubs | length }})</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table id="pubs-table" data-col-reorder class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Team ID</th>
+            <th>Authors</th>
+            <th>Title</th>
+            <th>Year</th>
+            <th>DOI</th>
+            <th>Type</th>
+            <th>Publication Name</th>
+            <th title="Facility award acknowledged in the publication">Facility ack.</th>
+            <th>NSF awards</th>
+            <th>Other awards</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in pubs %}
+          <tr>
+            <td class="small text-nowrap">{{ p.team_ids or '—' }}</td>
+            <td class="small text-truncate" style="max-width:220px" title="{{ p.authors }}">{{ p.authors or '—' }}</td>
+            <td style="max-width:320px">{{ p.title or '—' }}</td>
+            <td>{{ p.year or '—' }}</td>
+            <td class="small">{% if p.doi %}<a href="https://doi.org/{{ p.doi }}" target="_blank" rel="noopener">{{ p.doi }}</a>{% else %}—{% endif %}</td>
+            <td class="small">{{ p.type or '—' }}</td>
+            <td class="small">{{ p.venue or '—' }}</td>
+            <td class="small text-nowrap">{{ p.facility_ack or '—' }}</td>
+            <td class="small">{{ p.nsf_awards or '—' }}</td>
+            <td class="small text-truncate" style="max-width:220px" title="{{ p.other_awards }}">{{ p.other_awards or '—' }}</td>
+            <td class="text-end"><a href="/publications/{{ p.id }}/edit" class="btn btn-outline-secondary btn-sm py-0" title="Edit"><i class="bi bi-pencil"></i></a></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="11" class="text-muted text-center py-4">No publications yet — add some above.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// Redraw the list after an import without losing the result message.
+window.pubRefresh = function () {
+  fetch(location.pathname + location.search)
+    .then(function (r) { return r.text(); })
+    .then(function (t) {
+      var doc = new DOMParser().parseFromString(t, 'text/html');
+      var fresh = doc.getElementById('pub-list'), cur = document.getElementById('pub-list');
+      if (fresh && cur) {
+        cur.innerHTML = fresh.innerHTML;
+        document.body.dispatchEvent(new Event('htmx:afterSettle', {bubbles: true}));
+      }
+    });
+};
+</script>
+{% endblock %}

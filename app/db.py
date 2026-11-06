@@ -418,3 +418,23 @@ def preview_esaf_import(records: list[dict]) -> list[dict]:
 
 def apply_esaf_import(records: list[dict]) -> int:
     return _r().apply_esaf_import(records)
+
+
+# ------------------------------------------------------------------
+# Generic records (publications, facility awards)
+# ------------------------------------------------------------------
+
+def list_records(kind: str) -> list[dict]:
+    return _r().list_records(kind)
+
+
+def get_record(kind: str, rec_id: str) -> Optional[dict]:
+    return _r().get_record(kind, rec_id)
+
+
+def save_record(kind: str, rec_id: str, data: dict) -> None:
+    _r().save_record(kind, rec_id, data)
+
+
+def delete_record(kind: str, rec_id: str) -> bool:
+    return _r().delete_record(kind, rec_id)

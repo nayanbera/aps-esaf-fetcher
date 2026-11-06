@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Facility Awards — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0"><i class="bi bi-award me-1"></i>Facility Awards</h4>
+  <a href="/publications" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Publications</a>
+</div>
+
+<p class="text-muted small">
+  The awards that fund the facility, with the dates each one is active (leave <em>End</em> empty while it is ongoing).
+  The publication report uses them to fill <strong>Facility Award (at time of data collection)</strong>
+  (from the start date of the linked ESAFs) and <strong>(at time of publication)</strong> (from the publication date),
+  and to recognise a facility award in a paper's acknowledgments.
+</p>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-plus-circle me-1"></i>Add facility award</div>
+  <div class="card-body">
+    <form method="post" action="/facility-awards" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold mb-1">Award number</label>
+        <input type="text" name="number" class="form-control" placeholder="e.g. CHE-2335833" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold mb-1">Label</label>
+        <input type="text" name="label" class="form-control" placeholder="optional">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold mb-1">Start</label>
+        <input type="date" name="start_date" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold mb-1">End</label>
+        <input type="date" name="end_date" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header fw-semibold">Awards ({{ awards | length }})</div>
+  <div class="card-body p-0">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Award number</th><th>Label</th><th>Start</th><th>End</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for a in awards %}
+        <tr>
+          <td><input form="fa-{{ a.id }}" type="text" name="number" value="{{ a.number }}" class="form-control form-control-sm" required></td>
+          <td><input form="fa-{{ a.id }}" type="text" name="label" value="{{ a.label }}" class="form-control form-control-sm"></td>
+          <td><input form="fa-{{ a.id }}" type="date" name="start_date" value="{{ a.start_date }}" class="form-control form-control-sm"></td>
+          <td><input form="fa-{{ a.id }}" type="date" name="end_date" value="{{ a.end_date }}" class="form-control form-control-sm"></td>
+          <td class="text-end text-nowrap">
+            <button form="fa-{{ a.id }}" type="submit" class="btn btn-success btn-sm py-0" title="Save"><i class="bi bi-check-lg"></i></button>
+            <button form="fa-del-{{ a.id }}" type="submit" class="btn btn-outline-danger btn-sm py-0"
+                    onclick="return confirm('Delete award {{ a.number }}?')" title="Delete"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-muted text-center py-3">No facility awards yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {# the row inputs point at these forms with the form="..." attribute (a <form> cannot sit inside a <tr>) #}
+    {% for a in awards %}
+    <form method="post" action="/facility-awards/{{ a.id }}" id="fa-{{ a.id }}"></form>
+    <form method="post" action="/facility-awards/{{ a.id }}/delete" id="fa-del-{{ a.id }}"></form>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

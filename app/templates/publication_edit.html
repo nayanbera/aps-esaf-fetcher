@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Edit publication — APS ESAF Fetcher{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0"><i class="bi bi-journal-text me-1"></i>Edit publication</h4>
+  <a href="/publications" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Publications</a>
+</div>
+
+{% if saved %}<div class="alert alert-success py-2">Saved.</div>{% endif %}
+
+<form method="post" action="/publications/{{ p.id }}">
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-12">
+          <label class="form-label fw-semibold mb-1">Title</label>
+          <input type="text" name="title" value="{{ p.title }}" class="form-control">
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold mb-1">Authors <span class="text-muted fw-normal small">(Last, First; Last, First; …)</span></label>
+          <textarea name="authors" rows="2" class="form-control">{{ p.authors }}</textarea>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">DOI</label>
+          <input type="text" name="doi" value="{{ p.doi }}" class="form-control">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label fw-semibold mb-1">URL</label>
+          <input type="text" name="url" value="{{ p.url }}" class="form-control">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold mb-1">Year</label>
+          <input type="text" name="year" value="{{ p.year }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold mb-1">Publication date <span class="text-muted fw-normal small">(YYYY-MM-DD)</span></label>
+          <input type="text" name="pub_date" value="{{ p.pub_date }}" class="form-control" placeholder="2026-03-10">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold mb-1">Type</label>
+          <input type="text" name="type" value="{{ p.type }}" class="form-control" list="pub-types">
+          <datalist id="pub-types"><option>Journal Article</option><option>Book Chapter</option><option>Book</option><option>Conference Paper</option><option>Preprint</option><option>Thesis</option></datalist>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">Publication name</label>
+          <input type="text" name="venue" value="{{ p.venue }}" class="form-control">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header fw-semibold">Teams, ESAFs and awards</div>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold mb-1">Team ID(s)</label>
+          <input type="text" name="team_ids" value="{{ p.team_ids }}" class="form-control" placeholder="AC-11, LI-05">
+          <div class="form-text">Suggested from the authors when the paper was added.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold mb-1">ESAF ID(s) of the experiments</label>
+          <input type="text" name="esaf_ids" value="{{ p.esaf_ids }}" class="form-control" placeholder="290332, 290333">
+          <div class="form-text">Used to work out the facility award at the time of data collection.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">Facility award (at time of data collection)</label>
+          <input type="text" value="{{ fac_collected }}" class="form-control" readonly placeholder="from the linked ESAFs">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">Facility award (at time of publication)</label>
+          <input type="text" value="{{ p._fac_pub }}" class="form-control" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1">Facility award acknowledged in publication</label>
+          <input type="text" name="facility_ack" value="{{ p.facility_ack }}" class="form-control" placeholder="CHE-2335833">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold mb-1">NSF awards supporting science</label>
+          <textarea name="nsf_awards" rows="2" class="form-control" placeholder="DMR-2132692; CHE-2400091">{{ p.nsf_awards }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold mb-1">Other agencies award numbers</label>
+          <textarea name="other_awards" rows="2" class="form-control">{{ p.other_awards }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold mb-1">Notes</label>
+          <textarea name="notes" rows="2" class="form-control">{{ p.notes }}</textarea>
+        </div>
+        {% if p.ack_text %}
+        <div class="col-12">
+          <label class="form-label fw-semibold mb-1">Acknowledgments read from the PDF</label>
+          <div class="border rounded p-2 small text-muted" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{ p.ack_text }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
+    {% if p.doi %}
+    <button type="submit" formaction="/publications/{{ p.id }}/refresh" class="btn btn-outline-secondary"
+            title="Re-read title, authors, date and funders from Crossref"><i class="bi bi-arrow-repeat me-1"></i>Refresh from Crossref</button>
+    {% endif %}
+    <button type="submit" formaction="/publications/{{ p.id }}/delete" class="btn btn-outline-danger ms-auto"
+            onclick="return confirm('Delete this publication?')"><i class="bi bi-trash me-1"></i>Delete</button>
+  </div>
+</form>
+{% endblock %}

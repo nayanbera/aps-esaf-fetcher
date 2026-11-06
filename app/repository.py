@@ -376,6 +376,22 @@ class ESAFRepository(ABC):
     @abstractmethod
     def apply_esaf_import(self, records: list[dict]) -> int: ...
 
+    # ------------------------------------------------------------------
+    # Generic records (publications, facility awards): one JSON dict per id
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def list_records(self, kind: str) -> list[dict]: ...
+
+    @abstractmethod
+    def get_record(self, kind: str, rec_id: str) -> Optional[dict]: ...
+
+    @abstractmethod
+    def save_record(self, kind: str, rec_id: str, data: dict) -> None: ...
+
+    @abstractmethod
+    def delete_record(self, kind: str, rec_id: str) -> bool: ...
+
 
 # ---------------------------------------------------------------------------
 # Factory
