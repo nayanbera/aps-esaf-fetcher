@@ -8,7 +8,7 @@
     <button type="button" class="btn btn-outline-secondary btn-sm"
             hx-post="/publications/read-acks" hx-target="#pub-result" hx-indicator="#pub-spin"
             hx-on::after-request="window.pubRefresh && window.pubRefresh()"
-            title="Download each paper that has no acknowledgment stored yet (open-access copy or publisher page) and read it">
+            title="For every paper without an ESAF link: download it by DOI (open-access copy or publisher page), read the acknowledgments and add ESAF / Team IDs">
       <i class="bi bi-cloud-download me-1"></i>Read papers online
     </button>
     <button type="button" class="btn btn-outline-secondary btn-sm"
@@ -174,6 +174,7 @@
         <thead class="table-light">
           <tr>
             <th>Team ID</th>
+            <th title="ESAFs linked to this publication">ESAF ID</th>
             <th>Authors</th>
             <th>Title</th>
             <th>Year</th>
@@ -190,6 +191,7 @@
         {% for p in pubs %}
           <tr>
             <td class="small text-nowrap">{{ p.team_ids or '—' }}</td>
+            <td class="small">{% if p.esaf_ids %}{% for e in p.esaf_ids.replace(';', ',').split(',') if e.strip() %}<a href="/esafs/{{ e.strip() }}" class="text-decoration-none">{{ e.strip() }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}—{% endif %}</td>
             <td class="small text-truncate" style="max-width:220px" title="{{ p.authors }}">{{ p.authors or '—' }}</td>
             <td style="max-width:320px">{{ p.title or '—' }}</td>
             <td>{{ p.year or '—' }}</td>
@@ -202,7 +204,7 @@
             <td class="text-end"><a href="/publications/{{ p.id }}/edit" class="btn btn-outline-secondary btn-sm py-0" title="Edit"><i class="bi bi-pencil"></i></a></td>
           </tr>
         {% else %}
-          <tr><td colspan="11" class="text-muted text-center py-4">No publications yet — add some above.</td></tr>
+          <tr><td colspan="12" class="text-muted text-center py-4">No publications yet — add some above.</td></tr>
         {% endfor %}
         </tbody>
       </table>

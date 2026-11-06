@@ -8,6 +8,8 @@
 </div>
 
 {% if saved %}<div class="alert alert-success py-2">Saved.</div>{% endif %}
+{% if read %}<div class="alert alert-success py-2">Paper read — awards, ESAF and Team IDs updated.</div>{% endif %}
+{% if unreachable %}<div class="alert alert-warning py-2">Could not read the paper online ({{ why }}). Import its PDF instead.</div>{% endif %}
 
 <form method="post" action="/publications/{{ p.id }}">
   <div class="card mb-3">
@@ -103,6 +105,8 @@
     {% if p.doi %}
     <button type="submit" formaction="/publications/{{ p.id }}/refresh" class="btn btn-outline-secondary"
             title="Re-read title, authors, date and funders from Crossref"><i class="bi bi-arrow-repeat me-1"></i>Refresh from Crossref</button>
+    <button type="submit" formaction="/publications/{{ p.id }}/read-online" class="btn btn-outline-secondary"
+            title="Download the paper by DOI, read its acknowledgments and add ESAF / Team IDs"><i class="bi bi-cloud-download me-1"></i>Read paper online</button>
     {% endif %}
     <button type="submit" formaction="/publications/{{ p.id }}/delete" class="btn btn-outline-danger ms-auto"
             onclick="return confirm('Delete this publication?')"><i class="bi bi-trash me-1"></i>Delete</button>

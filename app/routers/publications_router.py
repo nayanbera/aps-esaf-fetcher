@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import re
 from datetime import datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -126,7 +127,7 @@ async def link_esafs_all():
 @router.post("/publications/read-acks", response_class=HTMLResponse)
 async def read_acks_all():
     res = await run_in_threadpool(pubs.read_acknowledgments_all)
-    body = f'{res["updated"]} publication(s) updated from their full text, {res["unchanged"]} read with nothing new'
+    body = (f'{res["read"]} paper(s) read, {res["linked"]} of them now linked to an ESAF')
     cls = "success"
     if res["failed"]:
         cls = "warning"
@@ -237,7 +238,7 @@ _FIELDS = ("doi", "title", "authors", "year", "pub_date", "url", "type", "venue"
 
 
 @router.get("/publications/{pid}/edit", response_class=HTMLResponse)
-def publication_edit(request: Request, pid: str, saved: str = ""):
+def publication_edit(request: Request, pid: str, saved: str = "", why: str = ""):
     p = db.get_record(pubs.PUBS, pid)
     if not p:
         raise HTTPException(404)
@@ -251,7 +252,8 @@ def publication_edit(request: Request, pid: str, saved: str = ""):
                           if a not in collected]
     return templates.TemplateResponse("publication_edit.html", {
         "request": request, "p": row, "fac_collected": ", ".join(collected),
-        "saved": saved == "1", "msg": ""})
+        "saved": saved == "1", "read": saved == "read",
+        "unreachable": saved == "unreachable", "why": why, "msg": ""})
 
 
 @router.post("/publications/{pid}")
@@ -292,6 +294,16 @@ async def publication_refresh(pid: str):
     merged["other_awards"] = p.get("other_awards") or fund["other_awards"]
     db.save_record(pubs.PUBS, pid, merged)
     return RedirectResponse(f"/publications/{pid}/edit?saved=1", status_code=303)
+
+
+@router.post("/publications/{pid}/read-online")
+async def publication_read_online(pid: str):
+    p = db.get_record(pubs.PUBS, pid)
+    if not p or not p.get("doi"):
+        raise HTTPException(404)
+    ok, why = await run_in_threadpool(pubs.read_online, p)
+    q = "read" if ok else "unreachable&why=" + quote(why)
+    return RedirectResponse(f"/publications/{pid}/edit?saved={q}", status_code=303)
 
 
 @router.post("/publications/{pid}/delete")

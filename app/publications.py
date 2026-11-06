@@ -840,25 +840,35 @@ def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "",
     return "duplicate", existing
 
 
+def read_online(p: dict) -> tuple[bool, str]:
+    """Fetch one stored publication's full text and add the awards / ESAF / Team
+    IDs found.  Returns (found-text, reason-if-not)."""
+    text, how = fetch_fulltext(p["doi"])
+    if not text:
+        return False, how
+    ingest({"doi": p["doi"], "title": p.get("title", ""), "authors": p.get("authors", ""),
+            "link_text": text}, "fulltext", enrich=False, extra_text=ack_section(text))
+    return True, how
+
+
 def read_acknowledgments_all() -> dict:
-    """Fetch the full text of every publication that has a DOI but no stored
-    acknowledgment, and add the awards / ESAF / Team IDs found."""
-    out = {"updated": 0, "unchanged": 0, "failed": []}
+    """Read the full text of every publication that has a DOI but no ESAF ID yet
+    (whether or not an acknowledgment is already stored) and add what is found."""
+    out = {"read": 0, "linked": 0, "failed": []}
     for p in db.list_records(PUBS):
-        if not p.get("doi") or p.get("ack_text"):
+        if not p.get("doi") or p.get("esaf_ids"):
             continue
         try:
-            action, _ = ingest({"doi": p["doi"], "title": p.get("title", ""), "authors": p.get("authors", "")},
-                               "fulltext", enrich=False, fulltext=True)
+            ok, why = read_online(p)
         except Exception as exc:
             out["failed"].append(f'{p["doi"]}: {exc}')
             continue
-        if action == "updated":
-            out["updated"] += 1
-        else:
-            out["unchanged"] += 1
-            if not (db.get_record(PUBS, p["id"]) or {}).get("ack_text"):
-                out["failed"].append(f'{p["doi"]}: no accessible full text')
+        if not ok:
+            out["failed"].append(f'{p["doi"]}: {why}')
+            continue
+        out["read"] += 1
+        if (db.get_record(PUBS, p["id"]) or {}).get("esaf_ids"):
+            out["linked"] += 1
     return out
 
 
