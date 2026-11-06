@@ -6,6 +6,12 @@
   <h4 class="mb-0"><i class="bi bi-journal-text me-1"></i>Publications</h4>
   <div class="d-flex align-items-center gap-2 flex-wrap">
     <button type="button" class="btn btn-outline-secondary btn-sm"
+            hx-post="/publications/read-acks" hx-target="#pub-result" hx-indicator="#pub-spin"
+            hx-on::after-request="window.pubRefresh && window.pubRefresh()"
+            title="Download each paper that has no acknowledgment stored yet (open-access copy or publisher page) and read it">
+      <i class="bi bi-cloud-download me-1"></i>Read papers online
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm"
             hx-post="/publications/link-esafs" hx-target="#pub-result"
             hx-on::after-request="window.pubRefresh && window.pubRefresh()"
             title="Look for ESAF DOIs / ESAF numbers in the stored acknowledgments and fill ESAF and Team IDs">
@@ -43,6 +49,10 @@
               hx-on::after-request="window.pubRefresh && window.pubRefresh()">
           <textarea name="text" rows="4" class="form-control form-control-sm mb-2"
                     placeholder="One DOI per line — or paste a Google Scholar alert e-mail; every DOI / doi.org link in it is picked up"></textarea>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="fulltext" value="1" id="ft-a" checked>
+            <label class="form-check-label small" for="ft-a">Also read the paper itself for ESAF / award numbers (slower)</label>
+          </div>
           <button type="submit" class="btn btn-primary btn-sm">Add</button>
         </form>
         <div class="form-text">Metadata and funders are read from Crossref.</div>
@@ -58,7 +68,11 @@
               hx-on::after-request="window.pubRefresh && window.pubRefresh()">
           <input type="file" name="files" multiple accept=".ris,.xml,.bib,.enw,.txt"
                  class="form-control form-control-sm mb-2" required>
-          <button type="submit" class="btn btn-primary btn-sm">Import</button>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="fulltext" value="1" id="ft-b" checked>
+            <label class="form-check-label small" for="ft-b">Also read the paper itself for ESAF / award numbers (slower)</label>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm mt-2">Import</button>
         </form>
         <div class="form-text">In EndNote: <em>File → Export</em> as <strong>RIS</strong>, <strong>EndNote XML</strong>,
           <strong>BibTeX</strong> or <strong>Refer (.enw)</strong>. References with a DOI are completed from Crossref.</div>

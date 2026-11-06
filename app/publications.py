@@ -127,8 +127,11 @@ def analyze_text(text: str, facility_numbers: list[str]) -> dict:
 
 
 def ack_section(text: str, limit: int = 2500) -> str:
-    m = re.search(r"acknowledg(?:e)?ments?|funding|acknowledgements", text or "", re.I)
-    return text[m.start(): m.start() + limit] if m else ""
+    text = text or ""
+    ms = list(re.finditer(r"acknowledg(?:e)?ments?", text, re.I))      # the heading is near the end
+    if not ms:
+        ms = list(re.finditer(r"\bfunding\b", text, re.I))
+    return text[ms[-1].start(): ms[-1].start() + limit] if ms else ""
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +425,82 @@ def read_pdf_text(data: bytes) -> str:
     import pdfplumber
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         return "\n".join((p.extract_text() or "") for p in pdf.pages)
+
+
+# ---------------------------------------------------------------------------
+# Full text of a paper by DOI (open access copies, or whatever the server can reach)
+# ---------------------------------------------------------------------------
+
+_BROWSER = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/124.0 Safari/537.36",
+            "Accept": "application/pdf,text/html;q=0.9,*/*;q=0.8"}
+_META_PDF_RE = re.compile(r'<meta[^>]+name=["\']citation_pdf_url["\'][^>]+content=["\']([^"\']+)', re.I)
+
+
+def _html_text(markup: str) -> str:
+    markup = re.sub(r"(?is)<(script|style|nav|header|footer)[^>]*>.*?</\1>", " ", markup)
+    return unescape_html(re.sub(r"\s+", " ", re.sub(r"(?s)<[^>]+>", " ", markup))).strip()
+
+
+def unescape_html(s: str) -> str:
+    import html
+    return html.unescape(s)
+
+
+def _candidate_urls(doi: str) -> list[str]:
+    urls: list[str] = []
+    try:                                           # OpenAlex lists open-access copies
+        r = requests.get(f"https://api.openalex.org/works/doi:{doi}", headers=_UA, timeout=20,
+                         params={"select": "locations,best_oa_location"})
+        if r.ok:
+            j = r.json()
+            locs = [j.get("best_oa_location")] + (j.get("locations") or [])
+            urls += [l["pdf_url"] for l in locs if l and l.get("pdf_url")]
+            urls += [l["landing_page_url"] for l in locs
+                     if l and l.get("is_oa") and l.get("landing_page_url")]
+    except requests.RequestException:
+        pass
+    urls.append("https://doi.org/" + doi)          # the publisher page (works on institutional networks)
+    return list(dict.fromkeys(urls))
+
+
+def fetch_fulltext(doi: str) -> tuple[str, str]:
+    """Best-effort full text for a DOI.  Returns (text, where-from); ("", reason) if none reachable."""
+    reason = "no accessible full text"
+    tried: set[str] = set()
+    queue = _candidate_urls(doi)
+    while queue and len(tried) < 8:
+        url = queue.pop(0)
+        if url in tried:
+            continue
+        tried.add(url)
+        try:
+            r = requests.get(url, headers=_BROWSER, timeout=40, allow_redirects=True)
+        except requests.RequestException as exc:
+            reason = f"{type(exc).__name__}"
+            continue
+        if r.status_code >= 400:
+            reason = f"HTTP {r.status_code} from {r.url.split('/')[2]}"
+            continue
+        ctype = r.headers.get("content-type", "").lower()
+        if "pdf" in ctype or r.content[:5] == b"%PDF-":
+            try:
+                text = read_pdf_text(r.content)
+            except Exception:
+                reason = "unreadable PDF"
+                continue
+            if len(text) > 1500:
+                return text, "PDF"
+        else:
+            m = _META_PDF_RE.search(r.text)
+            if m:                                   # the page points at its own PDF
+                from urllib.parse import urljoin
+                queue.insert(0, urljoin(r.url, m.group(1)))
+            text = _html_text(r.text)
+            if len(text) > 4000 and re.search(r"acknowledg|funding|data availability", text, re.I):
+                return text, "web page"
+            reason = "only the abstract page is accessible"
+    return "", reason
 
 
 # ---------------------------------------------------------------------------
@@ -721,9 +800,11 @@ def _union(a: str, b: str, sep: str) -> str:
     return f"{sep} ".join(items) if sep != "," else ", ".join(items)
 
 
-def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "") -> tuple[str, dict]:
+def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "",
+           fulltext: bool = False) -> tuple[str, dict]:
     """Add (or enrich) one publication.  Returns (action, record); action is
-    "added", "updated" or "duplicate"."""
+    "added", "updated" or "duplicate".  With *fulltext*, the paper itself is
+    fetched by DOI and its acknowledgments are read."""
     fac_numbers = [a["number"] for a in facility_awards()]
     if enrich and meta.get("doi"):
         try:
@@ -732,12 +813,17 @@ def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "") -
             cr = None
         if cr:
             meta = {**meta, **{k: v for k, v in cr.items() if v}}      # Crossref wins where it has a value
+    if fulltext and meta.get("doi") and not extra_text:
+        text, _ = fetch_fulltext(meta["doi"])
+        if text:
+            meta = {**meta, "link_text": text}
+            extra_text = ack_section(text)
     rec = build_publication(meta, source, fac_numbers, extra_text)
     existing = find_existing(rec["doi"], rec["title"])
     if existing is None:
         db.save_record(PUBS, new_id(), rec)
         return "added", rec
-    if source == "pdf":                       # a PDF adds acknowledgment evidence to a known paper
+    if source == "pdf" or extra_text:         # a PDF / full text adds acknowledgment evidence to a known paper
         merged = dict(existing)
         merged["facility_ack"] = _union(existing.get("facility_ack"), rec["facility_ack"], ",")
         merged["nsf_awards"] = _union(existing.get("nsf_awards"), rec["nsf_awards"], ";")
@@ -748,6 +834,28 @@ def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "") -
             db.save_record(PUBS, existing["id"], merged)
             return "updated", merged
     return "duplicate", existing
+
+
+def read_acknowledgments_all() -> dict:
+    """Fetch the full text of every publication that has a DOI but no stored
+    acknowledgment, and add the awards / ESAF / Team IDs found."""
+    out = {"updated": 0, "unchanged": 0, "failed": []}
+    for p in db.list_records(PUBS):
+        if not p.get("doi") or p.get("ack_text"):
+            continue
+        try:
+            action, _ = ingest({"doi": p["doi"], "title": p.get("title", ""), "authors": p.get("authors", "")},
+                               "fulltext", enrich=False, fulltext=True)
+        except Exception as exc:
+            out["failed"].append(f'{p["doi"]}: {exc}')
+            continue
+        if action == "updated":
+            out["updated"] += 1
+        else:
+            out["unchanged"] += 1
+            if not (db.get_record(PUBS, p["id"]) or {}).get("ack_text"):
+                out["failed"].append(f'{p["doi"]}: no accessible full text')
+    return out
 
 
 def relink_all() -> int:

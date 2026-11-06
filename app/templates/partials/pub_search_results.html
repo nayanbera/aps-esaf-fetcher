@@ -6,7 +6,9 @@
     <span class="small text-muted">{{ results|length }} result(s); papers already listed are greyed out.</span>
     <button type="button" class="btn btn-outline-secondary btn-sm py-0"
             onclick="this.closest('form').querySelectorAll('input[name=doi]:not(:disabled)').forEach(c=>c.checked=true)">Select all</button>
-    <button type="submit" class="btn btn-success btn-sm ms-auto"><i class="bi bi-plus-lg me-1"></i>Add selected</button>
+    <label class="small ms-auto mb-0"><input type="checkbox" name="fulltext" value="1" checked>
+      read each paper for ESAF / award numbers</label>
+    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Add selected</button>
   </div>
   <div class="table-responsive" style="max-height:420px;overflow:auto">
     <table class="table table-sm table-hover align-middle small mb-0">

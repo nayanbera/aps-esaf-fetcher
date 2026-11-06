@@ -27,14 +27,14 @@ def _result(counts: dict, problems: list[str]) -> HTMLResponse:
     return HTMLResponse(f'<div class="alert alert-{"warning" if problems else "success"} mb-2">{body}</div>')
 
 
-def _run_items(items: list[tuple[str, callable]], source: str) -> HTMLResponse:
+def _run_items(items: list[tuple[str, callable]], source: str, fulltext: bool = False) -> HTMLResponse:
     """items: (label, thunk returning (meta, extra_text)); processed sequentially."""
     counts = {"added": 0, "updated": 0, "duplicate": 0}
     problems: list[str] = []
     for label, thunk in items:
         try:
             meta, extra = thunk()
-            action, _ = pubs.ingest(meta, source, True, extra)
+            action, _ = pubs.ingest(meta, source, True, extra, fulltext)
             counts[action] += 1
         except Exception as exc:          # one bad item must not stop the batch
             problems.append(f"{label}: {exc}")
@@ -71,14 +71,14 @@ def publications_page(request: Request, py: str = ""):
 
 
 @router.post("/publications/add-dois", response_class=HTMLResponse)
-async def add_dois(text: str = Form("")):
+async def add_dois(text: str = Form(""), fulltext: str = Form("")):
     dois = pubs.find_dois(text)
     if not dois:
         return HTMLResponse('<div class="alert alert-warning mb-2">No DOIs found in the text.</div>')
     items = [(d, (lambda d=d: ({"doi": d, "title": "", "authors": "", "year": "", "pub_date": "",
                                 "url": "", "type": "", "venue": "", "notes": "", "abstract": ""}, "")))
              for d in dois]
-    return await run_in_threadpool(_run_items, items, "doi")
+    return await run_in_threadpool(_run_items, items, "doi", bool(fulltext))
 
 
 @router.post("/publications/search", response_class=HTMLResponse)
@@ -106,14 +106,14 @@ async def search_publications(request: Request, q: str = Form(""), mode: str = F
 
 
 @router.post("/publications/add-selected", response_class=HTMLResponse)
-async def add_selected(doi: list[str] = Form([])):
+async def add_selected(doi: list[str] = Form([]), fulltext: str = Form("")):
     dois = [d for d in dict.fromkeys(pubs.norm_doi(d) for d in doi) if d]
     if not dois:
         return HTMLResponse('<div class="alert alert-warning mb-2">Tick at least one paper.</div>')
     items = [(d, (lambda d=d: ({"doi": d, "title": "", "authors": "", "year": "", "pub_date": "",
                                 "url": "", "type": "", "venue": "", "notes": "", "abstract": ""}, "")))
              for d in dois]
-    return await run_in_threadpool(_run_items, items, "search")
+    return await run_in_threadpool(_run_items, items, "search", bool(fulltext))
 
 
 @router.post("/publications/link-esafs", response_class=HTMLResponse)
@@ -123,8 +123,21 @@ async def link_esafs_all():
                         f'from their stored acknowledgments.</div>')
 
 
+@router.post("/publications/read-acks", response_class=HTMLResponse)
+async def read_acks_all():
+    res = await run_in_threadpool(pubs.read_acknowledgments_all)
+    body = f'{res["updated"]} publication(s) updated from their full text, {res["unchanged"]} read with nothing new'
+    cls = "success"
+    if res["failed"]:
+        cls = "warning"
+        li = "".join(f"<li>{html.escape(f)}</li>" for f in res["failed"][:25])
+        more = f"<li>… and {len(res['failed']) - 25} more</li>" if len(res["failed"]) > 25 else ""
+        body += f", {len(res['failed'])} not accessible:<ul class='mb-0 mt-1'>{li}{more}</ul>"
+    return HTMLResponse(f'<div class="alert alert-{cls} mb-2">{body}</div>')
+
+
 @router.post("/publications/import-file", response_class=HTMLResponse)
-async def import_reference_file(files: list[UploadFile] = File(...)):
+async def import_reference_file(files: list[UploadFile] = File(...), fulltext: str = Form("")):
     items = []
     problems = []
     for f in files:
@@ -135,7 +148,7 @@ async def import_reference_file(files: list[UploadFile] = File(...)):
             problems.append(f"{f.filename}: {exc}")
             continue
         items += [(r.get("title") or r.get("doi") or f.filename, (lambda r=r: (r, ""))) for r in refs]
-    res = await run_in_threadpool(_run_items, items, "endnote")
+    res = await run_in_threadpool(_run_items, items, "endnote", bool(fulltext))
     if problems:
         extra = "".join(f"<div class='alert alert-warning mb-2'>{html.escape(p)}</div>" for p in problems)
         return HTMLResponse(extra + res.body.decode())
