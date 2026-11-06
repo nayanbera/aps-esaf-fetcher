@@ -459,6 +459,49 @@ def find_existing(doi: str, title: str) -> dict | None:
     return None
 
 
+_ESAF_NO_RE = re.compile(r"\bESAF(?:\s*(?:No\.?|number|ID|#))?[\s:#-]*(\d{4,8})\b", re.I)
+
+
+def _split_ids(s: str) -> list[str]:
+    return [t for t in re.split(r"[,;\s]+", s or "") if t]
+
+
+def link_esafs(text: str) -> dict:
+    """ESAFs cited in text, either by their DOI (the ESAF DOI users are asked to
+    put in the acknowledgments) or as "ESAF 123456".  Also returns the Team IDs
+    (PI IDs) of the PI Groups those ESAFs belong to, using the ESAF's technique
+    to pick the right ID when the group has one per technique."""
+    empty = {"esaf_ids": [], "team_ids": []}
+    if not text:
+        return empty
+    esafs = db.list_esafs(limit=1_000_000)
+    by_doi = {d: e for e in esafs if (d := norm_doi(e.get("doi") or ""))}
+    by_id = {str(e["esaf_id"]): e for e in esafs}
+    hits: list[dict] = []
+    for d in find_dois(text):
+        e = by_doi.get(d)
+        if e and e not in hits:
+            hits.append(e)
+    for m in _ESAF_NO_RE.findall(text):
+        e = by_id.get(m)
+        if e and e not in hits:
+            hits.append(e)
+    if not hits:
+        return empty
+    groups = {g["name"]: g for g in db.list_pi_groups()}
+    teams: list[str] = []
+    for e in hits:
+        g = groups.get(e.get("pi_group") or "")
+        if not g:
+            continue
+        ids = [i.upper() for i in _split_ids(g.get("pi_id", ""))]
+        prefixes = {report.TECHNIQUES[t][0] for t in (e.get("technique") or "").split(",")
+                    if t in report.TECHNIQUES}
+        chosen = [i for i in ids if i.split("-")[0] in prefixes] or ids
+        teams += [i for i in chosen if i not in teams]
+    return {"esaf_ids": [str(e["esaf_id"]) for e in hits], "team_ids": teams}
+
+
 def build_publication(meta: dict, source: str, fac_numbers: list[str],
                       extra_text: str = "") -> dict:
     """Reference/Crossref metadata -> a publication record, with awards pulled from
@@ -470,12 +513,16 @@ def build_publication(meta: dict, source: str, fac_numbers: list[str],
         [a.strip() for a in fund["facility_ack"].split(",") if a.strip()] + found["facility_ack"]))
     nsf = list(dict.fromkeys(
         [a.strip() for a in fund["nsf_awards"].split(";") if a.strip()] + found["nsf"]))
+    scan = " ".join(filter(None, [text, meta.get("link_text", ""),
+                                  " ".join(a for f in meta.get("funders", []) for a in f.get("awards", []))]))
+    linked = link_esafs(scan)
+    team_ids = list(dict.fromkeys(linked["team_ids"] + _split_ids(suggest_teams(meta.get("authors", "")).replace(",", " "))))
     return {
         "doi": meta.get("doi", ""), "title": meta.get("title", ""),
         "authors": meta.get("authors", ""), "year": meta.get("year", ""),
         "pub_date": meta.get("pub_date", ""), "url": meta.get("url", ""),
         "type": meta.get("type", ""), "venue": meta.get("venue", ""),
-        "team_ids": suggest_teams(meta.get("authors", "")), "esaf_ids": "",
+        "team_ids": ", ".join(team_ids), "esaf_ids": ", ".join(linked["esaf_ids"]),
         "facility_ack": ", ".join(facility), "nsf_awards": "; ".join(nsf),
         "other_awards": fund["other_awards"], "ack_text": ack_section(extra_text)[:1500],
         "notes": "", "source": source,
@@ -695,7 +742,25 @@ def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "") -
         merged["facility_ack"] = _union(existing.get("facility_ack"), rec["facility_ack"], ",")
         merged["nsf_awards"] = _union(existing.get("nsf_awards"), rec["nsf_awards"], ";")
         merged["ack_text"] = existing.get("ack_text") or rec["ack_text"]
+        merged["esaf_ids"] = _union(existing.get("esaf_ids"), rec["esaf_ids"], ",")
+        merged["team_ids"] = _union(existing.get("team_ids"), rec["team_ids"], ",")
         if merged != existing:
             db.save_record(PUBS, existing["id"], merged)
             return "updated", merged
     return "duplicate", existing
+
+
+def relink_all() -> int:
+    """Re-scan the stored acknowledgment/notes of every publication for ESAF
+    references and add any ESAF / Team IDs found.  Returns how many changed."""
+    changed = 0
+    for p in db.list_records(PUBS):
+        text = " ".join(filter(None, [p.get("ack_text"), p.get("notes"), p.get("nsf_awards"),
+                                      p.get("other_awards"), p.get("facility_ack")]))
+        linked = link_esafs(text)
+        esaf = _union(p.get("esaf_ids"), ", ".join(linked["esaf_ids"]), ",")
+        team = _union(p.get("team_ids"), ", ".join(linked["team_ids"]), ",")
+        if esaf != (p.get("esaf_ids") or "") or team != (p.get("team_ids") or ""):
+            db.save_record(PUBS, p["id"], {**p, "esaf_ids": esaf, "team_ids": team})
+            changed += 1
+    return changed

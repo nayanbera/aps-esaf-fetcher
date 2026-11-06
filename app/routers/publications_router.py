@@ -116,6 +116,13 @@ async def add_selected(doi: list[str] = Form([])):
     return await run_in_threadpool(_run_items, items, "search")
 
 
+@router.post("/publications/link-esafs", response_class=HTMLResponse)
+async def link_esafs_all():
+    n = await run_in_threadpool(pubs.relink_all)
+    return HTMLResponse(f'<div class="alert alert-success mb-2">ESAF / Team IDs added to {n} publication(s) '
+                        f'from their stored acknowledgments.</div>')
+
+
 @router.post("/publications/import-file", response_class=HTMLResponse)
 async def import_reference_file(files: list[UploadFile] = File(...)):
     items = []
@@ -149,8 +156,8 @@ async def import_pdf(files: list[UploadFile] = File(...)):
                     raise ValueError("no DOI found in the PDF")
                 meta = {"doi": dois[0], "title": "", "authors": "", "year": "", "pub_date": "",
                         "url": "", "type": "", "venue": "", "notes": "", "abstract": ""}
-                ack = pubs.ack_section(text)
-                return meta, ack
+                meta["link_text"] = text                 # ESAF DOIs may sit outside the acknowledgments
+                return meta, pubs.ack_section(text)
             items.append((name, thunk))
         return _run_items(items, "pdf")
 
