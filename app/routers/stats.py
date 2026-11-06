@@ -3,10 +3,11 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse, Response
+from starlette.concurrency import run_in_threadpool
 
-from .. import db
+from .. import db, report
 from ..templates_env import templates
 
 router = APIRouter()
@@ -63,4 +64,20 @@ def stats_page(
         "technique":          tech,
         "exclude_scientists": exc_sci,
         "current_year":       datetime.now().year,
+        "report_years":       list(range(1, report.project_year_of(datetime.now().date()) + 1)),
+        "report_default":     max(1, report.project_year_of(datetime.now().date()) - 1),
     })
+
+
+@router.get("/stats/report.xlsx")
+async def stats_report(py: int):
+    """User report workbook (Teams / Experiments / Users) for one project year."""
+    if py < 1 or py > 50:
+        raise HTTPException(422, "Invalid project year")
+    data = await run_in_threadpool(report.build_report_data, py)
+    content = await run_in_threadpool(report.build_workbook, data)
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="User Reporting_YR{py}.xlsx"'},
+    )

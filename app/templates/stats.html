@@ -42,6 +42,18 @@
   </form>
 </div>
 
+<form method="get" action="/stats/report.xlsx" class="d-flex align-items-center gap-2 mb-3">
+  <label class="form-label mb-0 small fw-semibold text-nowrap" for="rep-py">Excel user report:</label>
+  <select name="py" id="rep-py" class="form-select form-select-sm" style="width:auto"
+          title="Project years run 1 Sep – 31 Aug; PY1 = Sep 2024 – Aug 2025">
+    {% for y in report_years %}
+      <option value="{{ y }}" {% if y == report_default %}selected{% endif %}>Project year {{ y }} (Sep {{ 2023 + y }} – Aug {{ 2024 + y }})</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Download</button>
+  <span class="text-muted small">Teams, Experiments and Users sheets for Approved ESAFs starting in that year.</span>
+</form>
+
 <p class="text-muted small mb-4">
   Showing <strong>Approved</strong> ESAFs
   {% if from_year and to_year %}
