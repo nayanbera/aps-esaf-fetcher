@@ -148,6 +148,11 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
+    def set_user_career_stage(self, esaf_id: str, badge: str, level: str) -> bool:
+        """Set one user's career stage on one ESAF. False if the user is not on that ESAF."""
+        ...
+
+    @abstractmethod
     def preview_career_stage(self, updates: list[dict], since: str = "") -> list[dict]:
         """updates: [{badge, institution, employment_level}] -> same dicts plus esafs, old, targets."""
         ...

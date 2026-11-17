@@ -477,6 +477,17 @@ class MongoESAFRepository(ESAFRepository):
             "exclude_scientists":  exclude_scientists,
         }
 
+    def set_user_career_stage(self, esaf_id: str, badge: str, level: str) -> bool:
+        doc = self._esafs().find_one({"esaf_id": esaf_id}, {"users": 1})
+        users = (doc or {}).get("users") or []
+        hit = [u for u in users if u.get("badge") == badge]
+        if not hit:
+            return False
+        for u in hit:
+            u["employment_level"] = level
+        self._esafs().update_one({"esaf_id": esaf_id}, {"$set": {"users": users, "updated_at": _now_iso()}})
+        return True
+
     def _career_plan(self, updates: list[dict], since: str) -> list[dict]:
         badges = {u["badge"] for u in updates}
         slots = [s for s in self._slots({"users.badge": {"$in": list(badges)}}) if s["badge"] in badges]

@@ -1,0 +1,10 @@
+<span class="d-inline-flex align-items-center gap-1">
+  <select name="level" class="form-select form-select-sm" style="min-width:200px"
+          hx-post="/users/{{ badge }}/esaf/{{ esaf_id }}/career-stage" hx-trigger="change"
+          hx-target="closest span" hx-swap="outerHTML" title="Career stage on this ESAF">
+    <option value="" {{ 'selected' if not level }}>—</option>
+    {% for s in stages %}<option value="{{ s }}" {{ 'selected' if s == level }}>{{ s }}</option>{% endfor %}
+    {% if level and level not in stages %}<option value="{{ level }}" selected>{{ level }}</option>{% endif %}
+  </select>
+  {% if saved %}<i class="bi bi-check-lg text-success" title="Saved"></i>{% endif %}
+</span>

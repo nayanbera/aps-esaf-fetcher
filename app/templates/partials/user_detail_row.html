@@ -155,7 +155,11 @@
                     <span class="badge bg-light text-dark border">{{ e.role or 'user' }}</span>
                   {% endif %}
                 </td>
-                <td class="small text-nowrap">{{ e.employment_level or '—' }}</td>
+                <td class="small text-nowrap">
+                  {% with badge=user.badge, esaf_id=e.esaf_id, level=(e.employment_level or '').strip(), saved=False %}
+                    {% include "partials/career_stage_select.html" %}
+                  {% endwith %}
+                </td>
                 <td class="text-nowrap small">{{ e.start_date or '—' }}</td>
                 <td class="text-nowrap small">{{ e.end_date or '—' }}</td>
               </tr>

@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 
 from .. import db
@@ -66,6 +66,23 @@ def users_page(
     })
 
 
+CAREER_STAGES = ["Undergraduate student", "Graduate student", "Post-doc",
+                 "Faculty / professional staff", "Other", "No information provided"]
+
+
+@router.post("/users/{badge}/esaf/{esaf_id}/career-stage", response_class=HTMLResponse)
+def set_career_stage(request: Request, badge: str, esaf_id: str, level: str = Form("")):
+    """Edit one user's career stage on one ESAF (the stage can differ between ESAFs)."""
+    level = level.strip()
+    if level and level not in CAREER_STAGES:
+        raise HTTPException(400, f"Unknown career stage '{level}'")
+    if not db.set_user_career_stage(esaf_id, badge, level):
+        raise HTTPException(404, "That user is not on that ESAF")
+    return templates.TemplateResponse("partials/career_stage_select.html", {
+        "request": request, "badge": badge, "esaf_id": esaf_id, "level": level,
+        "stages": CAREER_STAGES, "saved": True})
+
+
 @router.get("/users/{badge}/detail", response_class=HTMLResponse)
 def user_detail(badge: str, request: Request, institution: str = ""):
     user = db.get_user_detail(badge, institution)
@@ -74,4 +91,5 @@ def user_detail(badge: str, request: Request, institution: str = ""):
     return templates.TemplateResponse("partials/user_detail_row.html", {
         "request": request,
         "user":    user,
+        "stages":  CAREER_STAGES,
     })

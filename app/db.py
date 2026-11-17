@@ -194,6 +194,10 @@ def merge_stub_into_esaf(stub_id: str, real_id: str) -> bool:
     return _r().merge_stub_into_esaf(stub_id, real_id)
 
 
+def set_user_career_stage(esaf_id: str, badge: str, level: str) -> bool:
+    return _r().set_user_career_stage(esaf_id, badge, level)
+
+
 def preview_career_stage(updates: list[dict], since: str = "") -> list[dict]:
     return _r().preview_career_stage(updates, since)
 

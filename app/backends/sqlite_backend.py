@@ -1069,7 +1069,7 @@ class SQLiteESAFRepository(ESAFRepository):
             SELECT eu.badge, u.first_name || ' ' || u.last_name AS name,
                    COALESCE(NULLIF(eu.institution, ''), u.institution, '') AS institution,
                    COALESCE(u.country, '') AS country, COALESCE(u.email, '') AS email,
-                   COALESCE(NULLIF(eu.employment_level, ''), u.employment_level, '') AS level,
+                   COALESCE(eu.employment_level, '') AS level,
                    e.esaf_id, COALESCE(e.start_date, '') AS start, COALESCE(e.end_date, '') AS end,
                    COALESCE(e.technique, '') AS technique, COALESCE(e.research_subject, '') AS subject
             FROM esaf_users eu
@@ -1077,6 +1077,19 @@ class SQLiteESAFRepository(ESAFRepository):
             JOIN esafs e ON e.esaf_id = eu.esaf_id
             WHERE {where}""", params).fetchall()
         return [dict(r) for r in rows]
+
+    def set_user_career_stage(self, esaf_id: str, badge: str, level: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute("UPDATE esaf_users SET employment_level=? WHERE esaf_id=? AND badge=?",
+                               (level, esaf_id, badge))
+            if cur.rowcount == 0:
+                return False
+            latest = conn.execute(
+                """SELECT eu.employment_level FROM esaf_users eu JOIN esafs e ON e.esaf_id = eu.esaf_id
+                   WHERE eu.badge=? AND eu.employment_level != '' ORDER BY e.start_date DESC LIMIT 1""",
+                (badge,)).fetchone()
+            conn.execute("UPDATE users SET employment_level=? WHERE badge=?", (latest[0] if latest else "", badge))
+        return True
 
     def _career_plan(self, conn, updates: list[dict], since: str) -> list[dict]:
         badges = sorted({u["badge"] for u in updates})
@@ -1136,7 +1149,7 @@ class SQLiteESAFRepository(ESAFRepository):
                           e.beamline, e.status, e.technique, e.research_subject, e.pi_name,
                           eu.role, eu.user_type,
                           COALESCE(NULLIF(eu.institution, ''), u.institution, '') AS slot_institution,
-                          COALESCE(NULLIF(eu.employment_level, ''), u.employment_level, '') AS employment_level
+                          COALESCE(eu.employment_level, '') AS employment_level
                    FROM esafs e
                    JOIN esaf_users eu ON eu.esaf_id = e.esaf_id
                    JOIN users u ON u.badge = eu.badge
