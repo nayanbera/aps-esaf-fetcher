@@ -1111,7 +1111,10 @@ class MongoESAFRepository(ESAFRepository):
         for eid, real in pairs.items():
             self._esafs().update_one({"esaf_id": real}, {"$addToSet": {"experiment_ids": eid}})
 
-    def merge_stub_into_esaf(self, stub_id: str, real_id: str) -> bool:
+    def list_user_slots(self) -> list[dict]:
+        return self._slots({})
+
+    def merge_stub_into_esaf(self, stub_id: str, real_id: str, delete: bool = True) -> bool:
         stub = self._esafs().find_one({"esaf_id": stub_id})
         real = self._esafs().find_one({"esaf_id": real_id})
         if not stub or not real or stub_id == real_id:
@@ -1136,10 +1139,12 @@ class MongoESAFRepository(ESAFRepository):
                         u[f] = su[f]
         sets["users"] = users
         sets["updated_at"] = _now_iso()
-        ids = list(dict.fromkeys([*(real.get("experiment_ids") or []), stub_id, *(stub.get("experiment_ids") or [])]))
-        sets["experiment_ids"] = ids
+        if delete:
+            sets["experiment_ids"] = list(dict.fromkeys(
+                [*(real.get("experiment_ids") or []), stub_id, *(stub.get("experiment_ids") or [])]))
         self._esafs().update_one({"esaf_id": real_id}, {"$set": sets})
-        self._esafs().delete_one({"esaf_id": stub_id})
+        if delete:
+            self._esafs().delete_one({"esaf_id": stub_id})
         return True
 
     # ------------------------------------------------------------------

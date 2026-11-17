@@ -190,8 +190,12 @@ def register_experiments(pairs: dict[str, str]) -> None:
     _r().register_experiments(pairs)
 
 
-def merge_stub_into_esaf(stub_id: str, real_id: str) -> bool:
-    return _r().merge_stub_into_esaf(stub_id, real_id)
+def list_user_slots() -> list[dict]:
+    return _r().list_user_slots()
+
+
+def merge_stub_into_esaf(stub_id: str, real_id: str, delete: bool = True) -> bool:
+    return _r().merge_stub_into_esaf(stub_id, real_id, delete)
 
 
 def set_user_career_stage(esaf_id: str, badge: str, level: str) -> bool:

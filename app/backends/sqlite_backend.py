@@ -1838,7 +1838,11 @@ class SQLiteESAFRepository(ESAFRepository):
             for eid, real in pairs.items():
                 conn.execute("INSERT OR REPLACE INTO esaf_experiments (experiment_id, esaf_id) VALUES (?,?)", (eid, real))
 
-    def merge_stub_into_esaf(self, stub_id: str, real_id: str) -> bool:
+    def list_user_slots(self) -> list[dict]:
+        with self._db() as conn:
+            return self._slots(conn, "1=1", [])
+
+    def merge_stub_into_esaf(self, stub_id: str, real_id: str, delete: bool = True) -> bool:
         if stub_id == real_id:
             return False
         with self._db() as conn:
@@ -1864,6 +1868,8 @@ class SQLiteESAFRepository(ESAFRepository):
                                  WHERE esaf_id=? AND COALESCE({f},'') = ''""", (stub_id, real_id))
             conn.execute("""INSERT OR IGNORE INTO funding_sources (esaf_id, source)
                             SELECT ?, source FROM funding_sources WHERE esaf_id=?""", (real_id, stub_id))
+            if not delete:
+                return True
             conn.execute("UPDATE esaf_experiments SET esaf_id=? WHERE esaf_id=?", (real_id, stub_id))
             conn.execute("INSERT OR REPLACE INTO esaf_experiments (experiment_id, esaf_id) VALUES (?,?)", (stub_id, real_id))
             conn.execute("DELETE FROM esaf_users WHERE esaf_id=?", (stub_id,))

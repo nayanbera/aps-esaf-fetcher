@@ -142,9 +142,14 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
-    def merge_stub_into_esaf(self, stub_id: str, real_id: str) -> bool:
-        """Copy what the imported stub knows onto the real ESAF (blank fields only), register the
-        stub's experiment id on it, and delete the stub."""
+    def list_user_slots(self) -> list[dict]:
+        """Every (user, ESAF) pair as {badge, esaf_id, start, level, institution, ...} (all statuses)."""
+        ...
+
+    @abstractmethod
+    def merge_stub_into_esaf(self, stub_id: str, real_id: str, delete: bool = True) -> bool:
+        """Copy what the imported stub knows onto the real ESAF (blank fields only).  With delete=True
+        also register the stub's experiment id on it and delete the stub."""
         ...
 
     @abstractmethod

@@ -135,7 +135,10 @@ numbered differently from APS ESAF numbers, so the same visit can exist twice (a
 users are on it and the start dates are within 7 days (nearest wins), fills only that ESAF's blank
 fields, and remembers the experiment id so a re-import never recreates the stub. For stubs created
 earlier: `python check_duplicate_esafs.py` reports likely duplicates, and
-`python merge_imported_duplicates.py` (dry run; `--apply` after a backup) merges them.
+`python merge_imported_duplicates.py` (dry run; `--apply` after a backup) merges them; add `--ties`
+to also merge stubs whose nearest real ESAFs are tied (twin ESAFs of one visit). Blank career
+stages that sit between two identical known stages of the same person can be filled with
+`python backfill_career_stage.py` (dry run; `--apply` after a backup).
 
 ### C — User list (career stage only)
 

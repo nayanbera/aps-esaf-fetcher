@@ -59,6 +59,20 @@ class Index:
         return (top.pop(), "ok") if len(top) == 1 else (None, "ambiguous")
 
 
+def tied_matches(index: "Index", badges: set[str], start, days: int = DAYS) -> list[str]:
+    """The real ESAFs tied for nearest (the 'twin' ESAFs of one visit) when match() says ambiguous."""
+    d = parse_date(start) if not isinstance(start, date) else start
+    badges = {b for b in badges if b}
+    if not badges or d is None:
+        return []
+    ok = [r for r in index.by_badge.get(next(iter(badges)), [])
+          if badges <= r["badges"] and abs((r["start"] - d).days) <= days]
+    if not ok:
+        return []
+    best = min(abs((r["start"] - d).days) for r in ok)
+    return sorted({r["esaf_id"] for r in ok if abs((r["start"] - d).days) == best})
+
+
 def resolve_experiments(normed: list[dict], esafs: list[dict], registry: dict[str, str]) -> tuple[list[dict], dict[str, str]]:
     """Point master-file rows at the ESAF they belong to.
 

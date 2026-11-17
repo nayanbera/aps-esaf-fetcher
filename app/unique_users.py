@@ -128,3 +128,25 @@ def plan_career(slots: list[dict], updates: list[dict], since: str = "") -> list
                     "old": sorted({s["level"].strip() for s in scope if low(s.get("level"))}),
                     "targets": [s["esaf_id"] for s in scope if low(s.get("level")) != new.lower()]})
     return out
+
+
+def plan_backfill(slots: list[dict]) -> list[dict]:
+    """Blank career stages that can be filled safely: the same person's nearest known stage before
+    and after (any ESAF, any institution) is identical.  -> [{esaf_id, badge, level, start}]"""
+    by_badge: dict[str, list[dict]] = {}
+    for s in slots:
+        if s.get("start"):
+            by_badge.setdefault(s["badge"], []).append(s)
+    out = []
+    for badge, ss in by_badge.items():
+        known = sorted((s["start"], s["level"].strip()) for s in ss if (s.get("level") or "").strip())
+        if not known:
+            continue
+        for s in ss:
+            if (s.get("level") or "").strip():
+                continue
+            before = [lv for st, lv in known if st <= s["start"]]
+            after = [lv for st, lv in known if st >= s["start"]]
+            if before and after and before[-1].lower() == after[0].lower():
+                out.append({"esaf_id": s["esaf_id"], "badge": badge, "level": before[-1], "start": s["start"]})
+    return out
