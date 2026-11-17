@@ -101,7 +101,7 @@
     {% for u in users %}
       <tr class="user-row" style="cursor:pointer"
           data-badge="{{ u.badge }}"
-          hx-get="/users/{{ u.badge }}/detail"
+          hx-get="/users/{{ u.badge }}/detail?institution={{ (u.institution or '') | urlencode }}"
           hx-target="next tr.user-detail-row"
           hx-swap="innerHTML"
           hx-trigger="expand">

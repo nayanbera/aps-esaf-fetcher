@@ -1093,7 +1093,7 @@ class SQLiteESAFRepository(ESAFRepository):
             result.append(d)
         return result
 
-    def get_user_detail(self, badge: str) -> Optional[dict]:
+    def get_user_detail(self, badge: str, institution: str = "") -> Optional[dict]:
         with self._db() as conn:
             user_row = conn.execute(
                 """SELECT u.*,

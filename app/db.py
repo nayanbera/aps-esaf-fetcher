@@ -174,8 +174,8 @@ def list_users(q: str = "", badge: str = "", institution: str = "",
     return _r().list_users(q=q, badge=badge, institution=institution,
                            limit=limit, offset=offset)
 
-def get_user_detail(badge: str) -> Optional[dict]:
-    return _r().get_user_detail(badge)
+def get_user_detail(badge: str, institution: str = "") -> Optional[dict]:
+    return _r().get_user_detail(badge, institution)
 
 
 def list_unique_users(

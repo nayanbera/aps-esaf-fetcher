@@ -11,6 +11,26 @@ from pymongo.collection import Collection
 from ..repository import ESAFRepository
 
 
+import re
+import unicodedata
+
+_INST_STOP = {"the", "of", "at", "in", "for", "and"}
+
+
+def inst_key(name: str) -> str:
+    """Institution name reduced to a comparison key ("The University of Chicago" ==
+    "University of Chicago", "Univ. of Illinois at Chicago" == "Univ of Illinois Chicago")."""
+    t = unicodedata.normalize("NFKD", name or "")
+    t = "".join(c for c in t if not unicodedata.combining(c)).lower()
+    return " ".join(w for w in re.split(r"[^a-z0-9]+", t) if w and w not in _INST_STOP)
+
+
+def _latest(levels: list[dict]) -> str:
+    """Career stage from the most recent ESAF that has one."""
+    got = [(x.get("d") or "", x["v"]) for x in levels if (x.get("v") or "").strip()]
+    return max(got)[1] if got else ""
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -506,23 +526,32 @@ class MongoESAFRepository(ESAFRepository):
             "exclude_scientists":  exclude_scientists,
         }
 
-    def get_user_detail(self, badge: str) -> Optional[dict]:
-        # Find one ESAF that contains this user to get their profile
-        doc = self._esafs().find_one(
-            {"users.badge": badge}, {"users.$": 1}
-        )
-        if not doc:
-            return None
-        u = doc["users"][0]
-        esafs_cursor = self._esafs().find(
+    def get_user_detail(self, badge: str, institution: str = "") -> Optional[dict]:
+        # Only the ESAFs under this institution (spelling variants and blanks included):
+        # the same badge at another institution is a different unique user.
+        want = inst_key(institution)
+        cursor = self._esafs().find(
             {"users.badge": badge},
             {"esaf_id": 1, "title": 1, "year": 1, "start_date": 1, "end_date": 1,
              "beamline": 1, "status": 1, "technique": 1, "research_subject": 1,
-             "pi_name": 1, "users.$": 1},
+             "pi_name": 1, "users": 1},
         ).sort("start_date", -1)
-        esafs = []
-        for e in esafs_cursor:
-            role = e["users"][0].get("role", "user") if e.get("users") else "user"
+        found = [(e, next((x for x in e.get("users") or [] if x.get("badge") == badge), None)) for e in cursor]
+        found = [(e, eu) for e, eu in found if eu is not None]
+        # ESAFs without an institution belong to the badge's main institution
+        counts: dict[str, int] = {}
+        for _e, eu in found:
+            k = inst_key(eu.get("institution", ""))
+            if k:
+                counts[k] = counts.get(k, 0) + 1
+        main = max(counts, key=counts.get) if counts else ""
+        want = want or main
+        esafs, u = [], None
+        for e, eu in found:
+            k = inst_key(eu.get("institution", ""))
+            if k != want and not (k == "" and want == main):
+                continue
+            u = u if u is not None and u.get("institution") else eu
             esafs.append({
                 "esaf_id":    e.get("esaf_id"),
                 "title":      e.get("title"),
@@ -534,8 +563,11 @@ class MongoESAFRepository(ESAFRepository):
                 "technique":  e.get("technique"),
                 "research_subject": e.get("research_subject"),
                 "pi_name":    e.get("pi_name"),
-                "role":       role,
+                "role":       eu.get("role", "user"),
+                "employment_level": eu.get("employment_level", ""),
             })
+        if u is None:
+            return None
         return {
             "badge":       badge,
             "first_name":  u.get("first_name", ""),
@@ -565,31 +597,73 @@ class MongoESAFRepository(ESAFRepository):
             match.setdefault("year", {})["$lte"] = year_to
         if technique:
             match["technique"] = technique
+        # A unique user is a badge at one institution: the same badge under a different
+        # institution is a different unique user.  Group by the raw institution here and
+        # merge spelling variants (and blank institutions) below.
         pipeline = [
             {"$match": match},
             {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
             {"$group": {
-                "_id":             "$users.badge",
+                "_id":             {"badge": "$users.badge", "inst": {"$ifNull": ["$users.institution", ""]}},
                 "name":            {"$first": {"$concat": ["$users.first_name", " ", "$users.last_name"]}},
-                "institution":     {"$first": "$users.institution"},
-                "country":         {"$first": "$users.country"},
-                "email":           {"$first": "$users.email"},
-                "employment_level": {"$max": "$users.employment_level"},   # "" sorts below any real value
+                "country":         {"$max": "$users.country"},
+                "email":           {"$max": "$users.email"},
+                "levels":          {"$push": {"d": "$start_date", "v": "$users.employment_level"}},
                 "techniques":      {"$addToSet": "$technique"},
                 "research_subjects": {"$addToSet": "$research_subject"},
                 "esaf_count":      {"$sum": 1},
                 "first_experiment": {"$min": "$start_date"},
                 "last_experiment":  {"$max": "$end_date"},
             }},
-            {"$sort": {"name": 1}},
         ]
-        results = []
+        groups: dict[tuple, dict] = {}
         for doc in self._esafs().aggregate(pipeline):
-            doc["badge"] = doc.pop("_id")
-            doc["techniques"] = sorted(t for t in doc.get("techniques", []) if t)
-            doc["research_subjects"] = sorted({s.strip() for v in doc.get("research_subjects", []) if v
-                                               for s in v.split(",") if s.strip()})
-            results.append(doc)
+            badge, inst = doc["_id"]["badge"], (doc["_id"]["inst"] or "").strip()
+            key = (badge, inst_key(inst))
+            g = groups.get(key)
+            if g is None:
+                groups[key] = {"badge": badge, "name": doc["name"], "institution": inst,
+                               "_insts": {inst: doc["esaf_count"]}, "country": doc.get("country") or "",
+                               "email": doc.get("email") or "", "levels": list(doc["levels"]),
+                               "techniques": set(doc["techniques"]), "subjects": set(doc["research_subjects"]),
+                               "esaf_count": doc["esaf_count"], "first_experiment": doc["first_experiment"],
+                               "last_experiment": doc["last_experiment"]}
+                continue
+            g["_insts"][inst] = g["_insts"].get(inst, 0) + doc["esaf_count"]
+            g["esaf_count"] += doc["esaf_count"]
+            g["levels"] += doc["levels"]
+            g["techniques"] |= set(doc["techniques"]); g["subjects"] |= set(doc["research_subjects"])
+            g["country"] = g["country"] or doc.get("country") or ""
+            g["email"] = max(g["email"], doc.get("email") or "")
+            g["first_experiment"] = min((x for x in (g["first_experiment"], doc["first_experiment"]) if x), default=None)
+            g["last_experiment"] = max((x for x in (g["last_experiment"], doc["last_experiment"]) if x), default=None)
+
+        # ESAFs that list the badge without an institution join that badge's biggest institution
+        by_badge: dict[str, list] = {}
+        for (badge, k), g in groups.items():
+            by_badge.setdefault(badge, []).append((k, g))
+        for badge, items in by_badge.items():
+            blank = next((g for k, g in items if k == ""), None)
+            named = [g for k, g in items if k != ""]
+            if blank and named:
+                host = max(named, key=lambda g: g["esaf_count"])
+                host["esaf_count"] += blank["esaf_count"]; host["levels"] += blank["levels"]
+                host["techniques"] |= blank["techniques"]; host["subjects"] |= blank["subjects"]
+                host["country"] = host["country"] or blank["country"]
+                host["email"] = max(host["email"], blank["email"])
+                host["first_experiment"] = min((x for x in (host["first_experiment"], blank["first_experiment"]) if x), default=None)
+                host["last_experiment"] = max((x for x in (host["last_experiment"], blank["last_experiment"]) if x), default=None)
+                groups.pop((badge, ""))
+
+        results = []
+        for g in groups.values():
+            insts = g.pop("_insts")
+            g["institution"] = max(insts, key=insts.get) if insts else ""
+            g["employment_level"] = _latest(g.pop("levels"))
+            g["techniques"] = sorted(t for t in g["techniques"] if t)
+            g["research_subjects"] = sorted({s.strip() for v in g.pop("subjects") if v for s in v.split(",") if s.strip()})
+            results.append(g)
+        results.sort(key=lambda r: (r["name"] or "").lower())
         return results
 
     def list_beamline_scientists(self) -> list[dict]:

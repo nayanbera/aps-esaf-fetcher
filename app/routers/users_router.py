@@ -67,8 +67,8 @@ def users_page(
 
 
 @router.get("/users/{badge}/detail", response_class=HTMLResponse)
-def user_detail(badge: str, request: Request):
-    user = db.get_user_detail(badge)
+def user_detail(badge: str, request: Request, institution: str = ""):
+    user = db.get_user_detail(badge, institution)
     if user is None:
         return Response(status_code=204)
     return templates.TemplateResponse("partials/user_detail_row.html", {

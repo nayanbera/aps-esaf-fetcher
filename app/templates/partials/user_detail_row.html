@@ -107,6 +107,7 @@
                 <th>Technique</th>
                 <th>PI</th>
                 <th>Role</th>
+                <th>Career stage</th>
                 <th>Start</th>
                 <th>End</th>
               </tr>
@@ -154,12 +155,13 @@
                     <span class="badge bg-light text-dark border">{{ e.role or 'user' }}</span>
                   {% endif %}
                 </td>
+                <td class="small text-nowrap">{{ e.employment_level or '—' }}</td>
                 <td class="text-nowrap small">{{ e.start_date or '—' }}</td>
                 <td class="text-nowrap small">{{ e.end_date or '—' }}</td>
               </tr>
             {% else %}
               <tr>
-                <td colspan="11" class="text-muted text-center py-2">No ESAFs found.</td>
+                <td colspan="12" class="text-muted text-center py-2">No ESAFs found.</td>
               </tr>
             {% endfor %}
             </tbody>
