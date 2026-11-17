@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -202,9 +203,17 @@ def clear_pi_group_assignments(name: str):
     return HTMLResponse('<span class="text-muted">No ESAFs were assigned to this group.</span>')
 
 
+def _listing(title: str, items: list[str], limit: int = 25) -> str:
+    if not items:
+        return ""
+    li = "".join(f"<li>{html.escape(i)}</li>" for i in items[:limit])
+    more = f"<li>… and {len(items) - limit} more</li>" if len(items) > limit else ""
+    return f"<div class='mt-2'><strong>{title}</strong><ul class='mb-0'>{li}{more}</ul></div>"
+
+
 @router.post("/pi-groups/import-ids", response_class=HTMLResponse)
 async def import_pi_ids(excel_file: UploadFile = File(...)):
-    """Fill PI IDs from the Teams sheet of the user-reporting Excel file."""
+    """Step 1: read the Teams sheet and show a report.  Nothing is written until confirmed."""
     data = await excel_file.read()
     try:
         teams = await run_in_threadpool(pi_id_import.read_teams, data)
@@ -217,25 +226,98 @@ async def import_pi_ids(excel_file: UploadFile = File(...)):
     groups = db.list_pi_groups()
     res = pi_id_import.match_ids(teams, groups)
     by_name = {g["name"]: g for g in groups}
-    for name, ids in res["assign"].items():
-        g = by_name[name]
-        db.upsert_pi_group(name, g.get("pi_name", ""), g.get("pi_email", ""),
-                           g.get("institution", ""), g.get("country", ""),
-                           g.get("state", ""), g.get("orcid_id", ""), ", ".join(ids))
 
-    def listing(title: str, items: list[str], limit: int = 25) -> str:
-        if not items:
-            return ""
-        li = "".join(f"<li>{html.escape(i)}</li>" for i in items[:limit])
-        more = f"<li>… and {len(items) - limit} more</li>" if len(items) > limit else ""
-        return f"<br>{title}<ul class='mb-0'>{li}{more}</ul>"
+    new, changed, same = [], [], []
+    for name, ids in res["assign"].items():
+        old = _clean_pi_id(by_name[name].get("pi_id", "")).split(", ") if by_name[name].get("pi_id") else []
+        if not old:
+            new.append(f"{name}: (none) → {', '.join(ids)}")
+        elif set(old) == set(ids):
+            same.append(name)
+        else:
+            lost = [i for i in old if i not in ids]
+            note = f" — <b>not in file: {html.escape(', '.join(lost))}</b>" if lost else ""
+            changed.append(f"{html.escape(name)}: {html.escape(', '.join(old))} → "
+                           f"{html.escape(', '.join(ids))}{note}")
+
+    # Issues: the same Team ID proposed for several groups
+    owners: dict[str, list[str]] = {}
+    for name, ids in res["assign"].items():
+        for i in ids:
+            owners.setdefault(i, []).append(name)
+    dupes = [f"{i} → {', '.join(sorted(n))}" for i, n in owners.items() if len(n) > 1]
 
     pending = [g["name"] for g in groups if g["name"] not in res["assign"]]
-    body = (f"{len(res['assign'])} of {len(groups)} PI Groups got PI IDs from {len(teams)} teams in the file."
-            + listing("PI Groups with no match in the file (unchanged):", pending)
-            + listing("Teams matching more than one PI Group (skipped):", res["ambiguous"])
-            + listing(f"Teams in the file with no PI Group ({len(res['unmatched'])}):", res["unmatched"], 10))
-    return HTMLResponse(f'<div class="alert alert-success">{body}</div>')
+    pending_with_id = [g["name"] for g in groups
+                       if g["name"] not in res["assign"] and g.get("pi_id")]
+    has_issues = bool(res["unmatched"] or res["ambiguous"] or dupes)
+
+    payload = html.escape(json.dumps(res["assign"]), quote=True)
+    changed_li = "".join(f"<li>{c}</li>" for c in changed[:50])
+    changed_html = (f"<div class='mt-2'><strong>Will change ({len(changed)}):</strong>"
+                    f"<ul class='mb-0'>{changed_li}</ul></div>") if changed else ""
+    body = (
+        f"<strong>Preview — nothing has been saved yet.</strong><br>"
+        f"{len(teams)} teams read from the file; {len(res['assign'])} of {len(groups)} PI Groups matched "
+        f"({len(new)} new, {len(changed)} changed, {len(same)} already identical)."
+        + _listing(f"New PI IDs ({len(new)}):", [html.escape(x) for x in new])
+        + changed_html
+        + (_listing("⚠ Same Team ID proposed for several PI Groups (check names):", dupes))
+        + _listing(f"⚠ Teams matching more than one PI Group — will be skipped ({len(res['ambiguous'])}):",
+                   res["ambiguous"])
+        + _listing(f"⚠ Teams in the file with no PI Group — will be skipped ({len(res['unmatched'])}):",
+                   res["unmatched"], 25)
+        + _listing(f"PI Groups with an existing PI ID but no match in the file — will stay unchanged "
+                   f"({len(pending_with_id)}):", pending_with_id)
+        + (f"<div class='mt-2 text-muted'>{len(pending) - len(pending_with_id)} other PI Groups have no "
+           f"match and no PI ID.</div>" if pending else "")
+    )
+    controls = f"""
+<form class="mt-3 d-flex align-items-center gap-3 flex-wrap"
+      hx-post="/pi-groups/import-ids/confirm" hx-target="#pi-id-import-result"
+      hx-on::after-request="if (window.pgReloadSections) window.pgReloadSections()">
+  <input type="hidden" name="assign" value="{payload}">
+  <div class="form-check mb-0">
+    <input class="form-check-input" type="checkbox" name="merge" value="1" id="pi-id-merge">
+    <label class="form-check-label" for="pi-id-merge">Keep existing IDs that are not in the file (merge instead of replace)</label>
+  </div>
+  <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Apply {len(new) + len(changed)} change(s)</button>
+  <button type="button" class="btn btn-outline-secondary btn-sm"
+          onclick="document.getElementById('pi-id-import-result').innerHTML=''">Cancel</button>
+</form>"""
+    cls = "alert-warning" if has_issues else "alert-info"
+    return HTMLResponse(f'<div class="alert {cls}">{body}{controls}</div>')
+
+
+@router.post("/pi-groups/import-ids/confirm", response_class=HTMLResponse)
+async def import_pi_ids_confirm(assign: str = Form(...), merge: str = Form("")):
+    """Step 2: write the previewed PI IDs."""
+    try:
+        proposed = json.loads(assign)
+        assert isinstance(proposed, dict)
+    except Exception:
+        return HTMLResponse('<div class="alert alert-danger">Invalid import data — please upload the file again.</div>')
+    by_name = {g["name"]: g for g in db.list_pi_groups()}
+    done = skipped = 0
+    for name, ids in proposed.items():
+        g = by_name.get(name)
+        if g is None or not isinstance(ids, list):
+            skipped += 1
+            continue
+        ids = [str(i) for i in ids]
+        if merge:
+            ids = list(dict.fromkeys(
+                [t for t in re.split(r"[\s,;]+", (g.get("pi_id") or "").upper()) if t] + ids))
+        new_id = _clean_pi_id(", ".join(ids))
+        if new_id == _clean_pi_id(g.get("pi_id", "")):
+            continue
+        db.upsert_pi_group(name, g.get("pi_name", ""), g.get("pi_email", ""),
+                           g.get("institution", ""), g.get("country", ""),
+                           g.get("state", ""), g.get("orcid_id", ""), new_id)
+        done += 1
+    extra = f" {skipped} group(s) no longer exist and were skipped." if skipped else ""
+    return HTMLResponse(f'<div class="alert alert-success">Applied: {done} PI Group(s) updated '
+                        f'({"merged with existing IDs" if merge else "existing IDs replaced"}).{extra}</div>')
 
 
 @router.post("/pi-groups/{name}", response_class=HTMLResponse)
