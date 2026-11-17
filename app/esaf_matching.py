@@ -70,7 +70,10 @@ def tied_matches(index: "Index", badges: set[str], start, days: int = DAYS) -> l
     if not ok:
         return []
     best = min(abs((r["start"] - d).days) for r in ok)
-    return sorted({r["esaf_id"] for r in ok if abs((r["start"] - d).days) == best})
+    top = [r for r in ok if abs((r["start"] - d).days) == best]
+    if len({r["start"] for r in top}) > 1:          # equally far but on different days: not twins
+        return []
+    return sorted({r["esaf_id"] for r in top})
 
 
 def resolve_experiments(normed: list[dict], esafs: list[dict], registry: dict[str, str]) -> tuple[list[dict], dict[str, str]]:

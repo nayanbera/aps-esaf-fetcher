@@ -40,7 +40,10 @@ def main():
             plan.append((s, real))
         elif reason == "ambiguous" and a.ties:
             tied = esaf_matching.tied_matches(idx, set(s["badges"]), s["start_date"], a.days)
-            tie_plan.append((s, tied))
+            if tied:
+                tie_plan.append((s, tied))
+            else:
+                why["ambiguous"] += 1       # tied on different days: not twins, left alone
         else:
             why[reason] += 1
 
