@@ -96,6 +96,19 @@
   </div>
 </div>
 
+<!-- Link all PI Groups to their ESAFs -->
+<div class="card mb-3">
+  <div class="card-body py-2 d-flex align-items-center gap-2 flex-wrap">
+    <button class="btn btn-outline-primary btn-sm" hx-post="/pi-groups/propagate-all"
+            hx-target="#propagate-all-result" hx-indicator="#propagate-all-spin"
+            hx-confirm="Link every PI Group to the ESAFs of its PI that have no group yet?">
+      <i class="bi bi-diagram-3 me-1"></i>Link all PI Groups to ESAFs</button>
+    <span id="propagate-all-spin" class="htmx-indicator spinner-border spinner-border-sm text-secondary"></span>
+    <span id="propagate-all-result" class="small"></span>
+    <span class="text-muted small">Matches by PI name and institution; only ESAFs without a PI Group are changed.</span>
+  </div>
+</div>
+
 <!-- Import PI IDs from the user-reporting Excel file -->
 <div class="card mb-3">
   <div class="card-body py-2">

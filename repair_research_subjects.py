@@ -13,7 +13,8 @@ cannot be recovered from the live data.  Options for the techniques that were lo
                      from (esaf.db) - holds techniques as of the migration
   --guess-from-pi-group
                      fall back to the ESAF's PI Group technique when the group has
-                     exactly one technique (a guess - review the report)
+                     exactly one technique (a guess - review the report).  Also fills
+                     ESAFs whose technique is already empty (e.g. after an earlier run).
 Without either option those ESAFs are left with an empty technique.
 
 Dry run by default; pass --apply to write.  Uses the same MongoDB settings as the app (MONGODB_URI / MONGODB_ESAF_DB).
@@ -54,16 +55,18 @@ def main():
     groups = {g["name"]: split(g.get("technique")) for g in db["pi_groups"].find({}, {"name": 1, "technique": 1})}
 
     ops, stats = [], dict(moved=0, kept=0, from_backup=0, from_group=0, empty=0)
-    for d in db["esafs"].find({"technique": {"$nin": ["", None]}},
-                              {"esaf_id": 1, "technique": 1, "research_subject": 1, "pi_group": 1}):
-        toks = split(d["technique"])
+    query = {"technique": {"$nin": ["", None]}}
+    if a.guess_from_pi_group:
+        query = {"$or": [query, {"pi_group": {"$nin": ["", None]}}]}
+    for d in db["esafs"].find(query, {"esaf_id": 1, "technique": 1, "research_subject": 1, "pi_group": 1}):
+        toks = split(d.get("technique"))
         bad = [t for t in toks if t not in VALID]
-        if not bad:
+        if toks and not bad:
             stats["kept"] += 1
             continue
         good = [t for t in toks if t in VALID]
-        subject = d.get("research_subject") or ", ".join(bad)
-        if not good:                                   # the manual technique was overwritten
+        subject = ", ".join(bad) or d.get("research_subject") or ""
+        if not good:                                   # technique overwritten, or empty
             if backup is not None:
                 old = backup.find_one({"esaf_id": d["esaf_id"]}, {"technique": 1}) or {}
                 good = [t for t in split(old.get("technique")) if t in VALID]
@@ -79,6 +82,8 @@ def main():
             if not good:
                 stats["empty"] += 1
         new_tech = ",".join(t for t in ORDER if t in good)
+        if new_tech == (d.get("technique") or "") and subject == (d.get("research_subject") or ""):
+            continue
         stats["moved"] += 1
         ops.append(UpdateOne({"_id": d["_id"]}, {"$set": {"technique": new_tech, "research_subject": subject}}))
 

@@ -211,6 +211,20 @@ def _listing(title: str, items: list[str], limit: int = 25) -> str:
     return f"<div class='mt-2'><strong>{title}</strong><ul class='mb-0'>{li}{more}</ul></div>"
 
 
+@router.post("/pi-groups/propagate-all", response_class=HTMLResponse)
+def propagate_all_pi_groups():
+    """Link every PI Group to the ESAFs of its PI that have no PI Group yet."""
+    total, touched = 0, 0
+    for g in db.list_pi_groups():
+        if not g.get("pi_name"):
+            continue
+        n = db.propagate_pi_group_by_pi_name(g["name"], g["pi_name"], g.get("institution", ""))
+        total += n
+        touched += bool(n)
+    return HTMLResponse(f'<span class="text-success"><i class="bi bi-check-lg me-1"></i>Linked {total} ESAF(s) '
+                        f'across {touched} PI Group(s). ESAFs that already had a group were not changed.</span>')
+
+
 @router.post("/pi-groups/import-ids", response_class=HTMLResponse)
 async def import_pi_ids(excel_file: UploadFile = File(...)):
     """Step 1: read the Teams sheet and show a report.  Nothing is written until confirmed."""
