@@ -210,7 +210,7 @@ class MongoESAFRepository(ESAFRepository):
         )
         return result.modified_count
 
-    def list_users_for_lookup(self, q: str = "") -> list[dict]:
+    def list_users_for_lookup(self, q: str = "", limit: int = 0) -> list[dict]:
         filt = {}
         if q:
             filt = {"$or": [
@@ -229,15 +229,16 @@ class MongoESAFRepository(ESAFRepository):
                         "institution": {"$first": "$institution"},
                         "country":     {"$first": "$country"},
                         "state":       {"$first": "$state"},
-                        "email":       {"$first": "$email"},
+                        "email":       {"$max": "$email"},
+                        "employment_level": {"$max": "$employment_level"},
                         "orcid_id":    {"$first": "$orcid_id"}}},
             {"$sort": {"last_name": 1, "first_name": 1}},
-            {"$limit": 50 if q else 500},
+            {"$limit": limit or (50 if q else 500)},
         ]
         return [
             {k: d.get(k, "") for k in
              ("badge", "first_name", "last_name", "institution",
-              "country", "state", "email", "orcid_id")}
+              "country", "state", "email", "orcid_id", "employment_level")}
             for d in self._esafs().aggregate(pipeline)
         ]
 
@@ -1024,11 +1025,65 @@ class MongoESAFRepository(ESAFRepository):
     # Master file import (stubs)
     # ------------------------------------------------------------------
 
+    _USER_IMPORT_FIELDS = ("first_name", "last_name", "institution", "country", "state",
+                           "email", "orcid_id", "gender", "employment_level")
+
+    def _user_import_plan(self, records: list[dict]) -> list[dict]:
+        """One entry per badge already in the database: the fields that differ.
+        Users live inside ESAF documents, so a badge not on any ESAF cannot be added."""
+        from .sqlite_backend import SQLiteESAFRepository as _S
+        by_badge: dict[str, dict] = {}
+        for r in (_S._norm_import_record(x) for x in records):
+            if r.get("badge"):
+                by_badge[r["badge"]] = r
+        cur: dict[str, dict] = {}
+        for d in self._esafs().find({"users.badge": {"$in": list(by_badge)}}, {"users": 1}):
+            for u in d.get("users") or []:
+                b = u.get("badge", "")
+                if b in by_badge:
+                    c = cur.setdefault(b, {})
+                    for f in self._USER_IMPORT_FIELDS:
+                        c.setdefault(f, str(u.get(f) or ""))
+                        if not c[f]:
+                            c[f] = str(u.get(f) or "")
+        plan = []
+        for b, rec in by_badge.items():
+            if b not in cur:
+                plan.append({"badge": b, "known": False, "changes": {}, "rec": rec})
+                continue
+            ch = {f: (cur[b].get(f, ""), rec[f]) for f in self._USER_IMPORT_FIELDS
+                  if rec.get(f) and rec[f] != cur[b].get(f, "")}
+            plan.append({"badge": b, "known": True, "changes": ch, "name":
+                         f"{cur[b].get('first_name', '')} {cur[b].get('last_name', '')}".strip()})
+        return plan
+
     def preview_user_import(self, records: list[dict]) -> list[dict]:
-        return []
+        out = []
+        for p in self._user_import_plan(records):
+            if not p["known"]:
+                rec = p["rec"]
+                out.append({"id": p["badge"], "field": "badge", "action": "skipped",
+                            "old_value": "", "new_value": "not on any ESAF - cannot be added on MongoDB",
+                            "name": f"{rec.get('first_name', '')} {rec.get('last_name', '')}".strip()})
+                continue
+            for f, (old, new) in p["changes"].items():
+                out.append({"id": p["badge"], "field": f, "action": "update",
+                            "old_value": old, "new_value": new, "name": p["name"]})
+        return out
 
     def apply_user_import(self, records: list[dict]) -> int:
-        return 0
+        from pymongo import UpdateOne
+        changes = {p["badge"]: {f: new for f, (_old, new) in p["changes"].items()}
+                   for p in self._user_import_plan(records) if p["known"] and p["changes"]}
+        ops = []
+        for d in self._esafs().find({"users.badge": {"$in": list(changes)}}, {"esaf_id": 1, "users": 1}):
+            users = d.get("users") or []
+            for u in users:
+                u.update(changes.get(u.get("badge", ""), {}))
+            ops.append(UpdateOne({"esaf_id": d["esaf_id"]}, {"$set": {"users": users}}))
+        if ops:
+            self._esafs().bulk_write(ops, ordered=False)
+        return len(changes)
 
     # ------------------------------------------------------------------
     # Master-file (ChemMatCARS) ESAF import — same file formats as SQLite.

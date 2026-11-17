@@ -690,9 +690,9 @@ class SQLiteESAFRepository(ESAFRepository):
             )
         return cur.rowcount
 
-    def list_users_for_lookup(self, q: str = "") -> list[dict]:
+    def list_users_for_lookup(self, q: str = "", limit: int = 0) -> list[dict]:
         fields = ("badge", "first_name", "last_name", "institution",
-                  "country", "state", "email", "orcid_id")
+                  "country", "state", "email", "orcid_id", "employment_level")
         with self._db() as conn:
             if q:
                 pat = f"%{q}%"
@@ -700,12 +700,13 @@ class SQLiteESAFRepository(ESAFRepository):
                     """SELECT * FROM users
                        WHERE (first_name || ' ' || last_name) LIKE ?
                           OR last_name LIKE ? OR email LIKE ?
-                       ORDER BY last_name, first_name LIMIT 50""",
-                    (pat, pat, pat),
+                       ORDER BY last_name, first_name LIMIT ?""",
+                    (pat, pat, pat, limit or 50),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT * FROM users ORDER BY last_name, first_name LIMIT 500",
+                    "SELECT * FROM users ORDER BY last_name, first_name LIMIT ?",
+                    (limit or 500,),
                 ).fetchall()
             return [{f: dict(r).get(f, "") for f in fields} for r in rows]
 

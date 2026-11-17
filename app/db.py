@@ -92,8 +92,8 @@ def delete_pi_group(name: str) -> bool:
     return _r().delete_pi_group(name)
 
 
-def list_users_for_lookup(q: str = "") -> list[dict]:
-    return _r().list_users_for_lookup(q)
+def list_users_for_lookup(q: str = "", limit: int = 0) -> list[dict]:
+    return _r().list_users_for_lookup(q, limit)
 
 
 def propagate_pi_group_by_pi_name(
