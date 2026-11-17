@@ -29,6 +29,7 @@ def main():
     ap.add_argument("--show", type=int, default=20)
     a = ap.parse_args()
 
+    db.init_db()          # same connection and (idempotent) schema setup as the app's startup
     rows = db.list_esafs(limit=1_000_000)
     stubs = [r for r in rows if (r.get("title") or "").endswith("(imported)")]
     real = [r for r in rows if r not in stubs]
