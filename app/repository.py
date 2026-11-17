@@ -127,6 +127,27 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
+    def list_esaf_badges(self) -> list[dict]:
+        """Every ESAF as {esaf_id, title, start_date, badges[]} - for matching master-file experiments."""
+        ...
+
+    @abstractmethod
+    def experiment_registry(self) -> dict[str, str]:
+        """{master-file Experiment Id: esaf_id} for experiments attached to a real ESAF."""
+        ...
+
+    @abstractmethod
+    def register_experiments(self, pairs: dict[str, str]) -> None:
+        """Remember that master-file experiment ids belong to the given ESAFs."""
+        ...
+
+    @abstractmethod
+    def merge_stub_into_esaf(self, stub_id: str, real_id: str) -> bool:
+        """Copy what the imported stub knows onto the real ESAF (blank fields only), register the
+        stub's experiment id on it, and delete the stub."""
+        ...
+
+    @abstractmethod
     def preview_career_stage(self, updates: list[dict], since: str = "") -> list[dict]:
         """updates: [{badge, institution, employment_level}] -> same dicts plus esafs, old, targets."""
         ...

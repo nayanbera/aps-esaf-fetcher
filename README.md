@@ -129,6 +129,14 @@ ESAF, so user fields are compared and written per ESAF, and an ESAF that already
 
 Clicking **Preview Changes** shows a diff before committing. Click **Apply** to write.
 
+**Duplicates between the master file and the APS sync.** The master file's *Experiment Id* is
+numbered differently from APS ESAF numbers, so the same visit can exist twice (a synced ESAF and an
+`ESAF <id> (imported)` stub). The import now attaches an experiment to a real ESAF when all of its
+users are on it and the start dates are within 7 days (nearest wins), fills only that ESAF's blank
+fields, and remembers the experiment id so a re-import never recreates the stub. For stubs created
+earlier: `python check_duplicate_esafs.py` reports likely duplicates, and
+`python merge_imported_duplicates.py` (dry run; `--apply` after a backup) merges them.
+
 ### C — User list (career stage only)
 
 A sheet with `Last Name`, `First Name`, optional `E-mail` and `Institutional Role`

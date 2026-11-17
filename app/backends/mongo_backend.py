@@ -12,6 +12,7 @@ from ..repository import ESAFRepository
 
 
 from .. import unique_users as uu_rules
+from .. import esaf_matching
 from ..unique_users import inst_key
 
 
@@ -251,7 +252,7 @@ class MongoESAFRepository(ESAFRepository):
         existing = self._esafs().find_one(
             {"esaf_id": esaf_id},
             # Fetch ALL user-editable fields so replace_one never silently drops them.
-            {"notes": 1, "custom_fields": 1, "technique": 1, "research_subject": 1, "local_id": 1,
+            {"notes": 1, "custom_fields": 1, "technique": 1, "research_subject": 1, "experiment_ids": 1, "local_id": 1,
              "pi_group": 1, "gup_id": 1, "created_at": 1, "users": 1},
         )
 
@@ -284,6 +285,7 @@ class MongoESAFRepository(ESAFRepository):
             doc["custom_fields"] = existing.get("custom_fields", {})
             doc["technique"]     = existing.get("technique", "")
             doc["research_subject"] = existing.get("research_subject", "")
+            doc["experiment_ids"] = existing.get("experiment_ids", [])
             doc["local_id"]      = existing.get("local_id", "")
             doc["pi_group"]      = existing.get("pi_group", "")
             doc["gup_id"]        = existing.get("gup_id", "")
@@ -1081,6 +1083,55 @@ class MongoESAFRepository(ESAFRepository):
         return len(changes)
 
     # ------------------------------------------------------------------
+    # Matching master-file experiments to synced ESAFs
+    # ------------------------------------------------------------------
+
+    def list_esaf_badges(self) -> list[dict]:
+        return [{"esaf_id": d["esaf_id"], "title": d.get("title") or "", "start_date": d.get("start_date") or "",
+                 "badges": [u.get("badge", "") for u in d.get("users") or [] if u.get("badge")]}
+                for d in self._esafs().find({}, {"esaf_id": 1, "title": 1, "start_date": 1, "users": 1})]
+
+    def experiment_registry(self) -> dict[str, str]:
+        return {e: d["esaf_id"] for d in self._esafs().find({"experiment_ids": {"$exists": True}},
+                                                           {"esaf_id": 1, "experiment_ids": 1})
+                for e in d.get("experiment_ids") or []}
+
+    def register_experiments(self, pairs: dict[str, str]) -> None:
+        for eid, real in pairs.items():
+            self._esafs().update_one({"esaf_id": real}, {"$addToSet": {"experiment_ids": eid}})
+
+    def merge_stub_into_esaf(self, stub_id: str, real_id: str) -> bool:
+        stub = self._esafs().find_one({"esaf_id": stub_id})
+        real = self._esafs().find_one({"esaf_id": real_id})
+        if not stub or not real or stub_id == real_id:
+            return False
+        sets: dict = {}
+        for f in ("research_subject", "local_id", "technique", "notes", "pi_group", "gup_id"):
+            if stub.get(f) and not real.get(f):
+                sets[f] = stub[f]
+        cf = {**(stub.get("custom_fields") or {}), **(real.get("custom_fields") or {})}
+        if cf != (real.get("custom_fields") or {}):
+            sets["custom_fields"] = cf
+        fs = list(dict.fromkeys([*(real.get("funding_sources") or []), *(stub.get("funding_sources") or [])]))
+        if fs != (real.get("funding_sources") or []):
+            sets["funding_sources"] = fs
+        stub_users = {u.get("badge"): u for u in stub.get("users") or []}
+        users = [dict(u) for u in real.get("users") or []]
+        for u in users:
+            su = stub_users.get(u.get("badge"))
+            if su:
+                for f in ("institution", "employment_level", "user_type", "gender", "country", "state", "orcid_id", "email"):
+                    if not u.get(f) and su.get(f):
+                        u[f] = su[f]
+        sets["users"] = users
+        sets["updated_at"] = _now_iso()
+        ids = list(dict.fromkeys([*(real.get("experiment_ids") or []), stub_id, *(stub.get("experiment_ids") or [])]))
+        sets["experiment_ids"] = ids
+        self._esafs().update_one({"esaf_id": real_id}, {"$set": sets})
+        self._esafs().delete_one({"esaf_id": stub_id})
+        return True
+
+    # ------------------------------------------------------------------
     # Master-file (ChemMatCARS) ESAF import — same file formats as SQLite.
     # Users are embedded in each ESAF document, so user fields are compared
     # and written per ESAF (the institution a user had at that time).
@@ -1105,6 +1156,7 @@ class MongoESAFRepository(ESAFRepository):
         for eid, rows in by_esaf.items():
             doc = existing.get(eid)
             first = rows[0]
+            attached = bool(first.get("_attached")) and doc is not None     # real (synced) ESAF: fill blanks only
             try:
                 year = int(first.get("year", ""))
             except (ValueError, TypeError):
@@ -1118,6 +1170,8 @@ class MongoESAFRepository(ESAFRepository):
                 if val in ("", None):
                     continue
                 old = str((doc or {}).get(field) or "")
+                if attached and old:
+                    continue                      # the APS value wins
                 if field == "start_date" and old[:10] == str(val)[:10]:
                     continue                      # same day, APS format differs
                 if old != str(val):
@@ -1144,14 +1198,15 @@ class MongoESAFRepository(ESAFRepository):
                               "user_type": r.get("user_type", "")})
                     file_users[b] = u
             cur_users = {u.get("badge", ""): u for u in ((doc or {}).get("users") or [])}
-            user_adds = [u for b, u in file_users.items() if b not in cur_users]
+            user_adds = [] if attached else [u for b, u in file_users.items() if b not in cur_users]
             user_updates: dict[str, dict] = {}
             for b, u in file_users.items():
                 if b not in cur_users:
                     continue
                 ch = {f: (str(cur_users[b].get(f) or ""), u[f])
                       for f in (*self._IMPORT_USER_FIELDS, "user_type")
-                      if u[f] and u[f] != str(cur_users[b].get(f) or "")}
+                      if u[f] and u[f] != str(cur_users[b].get(f) or "")
+                      and not (attached and cur_users[b].get(f))}
                 if ch:
                     user_updates[b] = ch
             plan.append({"esaf_id": eid, "doc": doc, "fields": fields, "fs_add": fs_add,
@@ -1179,6 +1234,7 @@ class MongoESAFRepository(ESAFRepository):
                                         "old_value": str(doc.get(f) or ""), "new_value": new})
             return changes
 
+        normed, _reg = esaf_matching.resolve_experiments(normed, self.list_esaf_badges(), self.experiment_registry())
         for p in self._combined_plan(normed):
             eid, doc = p["esaf_id"], p["doc"]
             action = "update" if doc else "add"
@@ -1229,6 +1285,7 @@ class MongoESAFRepository(ESAFRepository):
                 self._esafs().bulk_write(ops, ordered=False)
             return len(ops)
 
+        normed, reg = esaf_matching.resolve_experiments(normed, self.list_esaf_badges(), self.experiment_registry())
         for p in self._combined_plan(normed):
             eid, doc = p["esaf_id"], p["doc"]
             if doc is None:
@@ -1264,6 +1321,7 @@ class MongoESAFRepository(ESAFRepository):
             touched += 1
         if ops:
             self._esafs().bulk_write(ops, ordered=False)
+        self.register_experiments(reg)
 
         iops = [UpdateOne({"name": inst},
                           {"$set": {"imported_type": itype, "manual_types": [itype]},

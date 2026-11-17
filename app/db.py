@@ -178,6 +178,22 @@ def get_user_detail(badge: str, institution: str = "") -> Optional[dict]:
     return _r().get_user_detail(badge, institution)
 
 
+def list_esaf_badges() -> list[dict]:
+    return _r().list_esaf_badges()
+
+
+def experiment_registry() -> dict[str, str]:
+    return _r().experiment_registry()
+
+
+def register_experiments(pairs: dict[str, str]) -> None:
+    _r().register_experiments(pairs)
+
+
+def merge_stub_into_esaf(stub_id: str, real_id: str) -> bool:
+    return _r().merge_stub_into_esaf(stub_id, real_id)
+
+
 def preview_career_stage(updates: list[dict], since: str = "") -> list[dict]:
     return _r().preview_career_stage(updates, since)
 

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from .. import esaf_matching
 from .. import unique_users as uu_rules
 from ..repository import ESAFRepository
 
@@ -56,6 +57,11 @@ CREATE TABLE IF NOT EXISTS esaf_users (
     badge    TEXT NOT NULL,
     role     TEXT DEFAULT 'user',
     PRIMARY KEY (esaf_id, badge)
+);
+
+CREATE TABLE IF NOT EXISTS esaf_experiments (
+    experiment_id TEXT PRIMARY KEY,
+    esaf_id       TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS funding_sources (
@@ -1797,6 +1803,62 @@ class SQLiteESAFRepository(ESAFRepository):
     # ------------------------------------------------------------------
 
     # ------------------------------------------------------------------
+    # Matching master-file experiments to synced ESAFs
+    # ------------------------------------------------------------------
+
+    def list_esaf_badges(self) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute("""SELECT e.esaf_id, COALESCE(e.title, '') AS title,
+                                          COALESCE(e.start_date, '') AS start_date,
+                                          GROUP_CONCAT(eu.badge, char(31)) AS badges
+                                   FROM esafs e LEFT JOIN esaf_users eu ON eu.esaf_id = e.esaf_id
+                                   GROUP BY e.esaf_id""").fetchall()
+        return [{"esaf_id": r["esaf_id"], "title": r["title"], "start_date": r["start_date"],
+                 "badges": [b for b in (r["badges"] or "").split(chr(31)) if b]} for r in rows]
+
+    def experiment_registry(self) -> dict[str, str]:
+        with self._db() as conn:
+            return {r[0]: r[1] for r in conn.execute("SELECT experiment_id, esaf_id FROM esaf_experiments").fetchall()}
+
+    def register_experiments(self, pairs: dict[str, str]) -> None:
+        with self._db() as conn:
+            for eid, real in pairs.items():
+                conn.execute("INSERT OR REPLACE INTO esaf_experiments (experiment_id, esaf_id) VALUES (?,?)", (eid, real))
+
+    def merge_stub_into_esaf(self, stub_id: str, real_id: str) -> bool:
+        if stub_id == real_id:
+            return False
+        with self._db() as conn:
+            stub = conn.execute("SELECT * FROM esafs WHERE esaf_id=?", (stub_id,)).fetchone()
+            real = conn.execute("SELECT * FROM esafs WHERE esaf_id=?", (real_id,)).fetchone()
+            if not stub or not real:
+                return False
+            stub, real = dict(stub), dict(real)
+            sets = {f: stub[f] for f in ("research_subject", "local_id", "technique", "notes", "pi_group", "gup_id")
+                    if stub.get(f) and not real.get(f)}
+            try:
+                cf = {**json.loads(stub.get("custom_fields") or "{}"), **json.loads(real.get("custom_fields") or "{}")}
+                if cf != json.loads(real.get("custom_fields") or "{}"):
+                    sets["custom_fields"] = json.dumps(cf)
+            except ValueError:
+                pass
+            if sets:
+                conn.execute(f"UPDATE esafs SET {', '.join(f'{k}=?' for k in sets)}, updated_at=datetime('now') WHERE esaf_id=?",
+                             [*sets.values(), real_id])
+            for f in ("institution", "employment_level", "user_type"):
+                conn.execute(f"""UPDATE esaf_users SET {f} = COALESCE((SELECT s.{f} FROM esaf_users s
+                                     WHERE s.esaf_id=? AND s.badge=esaf_users.badge AND COALESCE(s.{f},'') != ''), {f})
+                                 WHERE esaf_id=? AND COALESCE({f},'') = ''""", (stub_id, real_id))
+            conn.execute("""INSERT OR IGNORE INTO funding_sources (esaf_id, source)
+                            SELECT ?, source FROM funding_sources WHERE esaf_id=?""", (real_id, stub_id))
+            conn.execute("UPDATE esaf_experiments SET esaf_id=? WHERE esaf_id=?", (real_id, stub_id))
+            conn.execute("INSERT OR REPLACE INTO esaf_experiments (experiment_id, esaf_id) VALUES (?,?)", (stub_id, real_id))
+            conn.execute("DELETE FROM esaf_users WHERE esaf_id=?", (stub_id,))
+            conn.execute("DELETE FROM funding_sources WHERE esaf_id=?", (stub_id,))
+            conn.execute("DELETE FROM esafs WHERE esaf_id=?", (stub_id,))
+        return True
+
+    # ------------------------------------------------------------------
     # Import helpers
     # ------------------------------------------------------------------
 
@@ -1958,6 +2020,7 @@ class SQLiteESAFRepository(ESAFRepository):
         normed = [self._norm_import_record(r) for r in records]
 
         if self._is_combined_format(records):
+            normed, _reg = esaf_matching.resolve_experiments(normed, self.list_esaf_badges(), self.experiment_registry())
             return self._preview_combined_import(normed)
 
         # Simple format: one row per ESAF with esaf_id + editable fields
@@ -2020,6 +2083,8 @@ class SQLiteESAFRepository(ESAFRepository):
                     if not new_val:
                         continue
                     old_val = str(cur.get(field) or "")
+                    if first.get("_attached") and old_val:
+                        continue                  # real (synced) ESAF: the APS value wins
                     if new_val != old_val:
                         changes.append({
                             "id": esaf_id, "field": f"esaf.{field}",
@@ -2110,7 +2175,10 @@ class SQLiteESAFRepository(ESAFRepository):
         normed = [self._norm_import_record(r) for r in records]
 
         if self._is_combined_format(records):
-            return self._apply_combined_import(normed)
+            normed, reg = esaf_matching.resolve_experiments(normed, self.list_esaf_badges(), self.experiment_registry())
+            touched = self._apply_combined_import(normed)
+            self.register_experiments(reg)
+            return touched
 
         # Simple format
         FIELDS = ("technique", "notes", "pi_group", "local_id")
@@ -2162,6 +2230,7 @@ class SQLiteESAFRepository(ESAFRepository):
                 pi_name = f"{pi_row.get('first_name','')} {pi_row.get('last_name','')}".strip()
                 pi_inst  = pi_row.get("institution", "")
 
+                attached = bool(first.get("_attached")) and existing is not None
                 if existing:
                     updates = {}
                     if first.get("beamline"):   updates["beamline"]   = first["beamline"]
@@ -2173,6 +2242,9 @@ class SQLiteESAFRepository(ESAFRepository):
                         updates["pi_badge"] = pi_badge
                         updates["pi_name"]  = pi_name
                         updates["pi_institution"] = pi_inst
+                    if attached:        # a real (synced) ESAF: the APS values win, only blanks are filled
+                        cur = dict(conn.execute("SELECT * FROM esafs WHERE esaf_id=?", (esaf_id,)).fetchone())
+                        updates = {k: v for k, v in updates.items() if not cur.get(k)}
                     if updates:
                         sets = ", ".join(f"{k}=?" for k in updates)
                         conn.execute(
@@ -2269,6 +2341,15 @@ class SQLiteESAFRepository(ESAFRepository):
                     continue
                 role = "pi" if r.get("spokesperson", "").upper() == "Y" else "user"
                 user_type = r.get("user_type", "")
+                if r.get("_attached"):          # keep APS role/affiliation; fill what is blank
+                    conn.execute(
+                        """UPDATE esaf_users SET
+                               user_type = CASE WHEN COALESCE(user_type,'') = '' THEN ? ELSE user_type END,
+                               institution = CASE WHEN COALESCE(institution,'') = '' THEN ? ELSE institution END,
+                               employment_level = CASE WHEN COALESCE(employment_level,'') = '' THEN ? ELSE employment_level END
+                           WHERE esaf_id=? AND badge=?""",
+                        (user_type, r.get("institution", ""), r.get("employment_level", ""), esaf_id, badge))
+                    continue
                 conn.execute(
                     """INSERT INTO esaf_users (esaf_id, badge, role, user_type, institution, employment_level)
                        VALUES (?,?,?,?,?,?)
