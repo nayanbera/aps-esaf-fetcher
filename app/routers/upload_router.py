@@ -200,11 +200,14 @@ async def preview_userlist(request: Request, file: UploadFile = File(...),
 
     matched = user_list_import.match(people, db.list_unique_users())
     cand = [m for m in matched if m["status"] == "matched" and m["employment_level"]]
-    plans = db.preview_career_stage(
-        [{"badge": m["badge"], "institution": m["matched_institution"], "employment_level": m["employment_level"]}
-         for m in cand], since)
-    for m, p in zip(cand, plans):
-        m["plan"] = p
+    flat = [{"badge": m["badge"], "institution": inst, "employment_level": m["employment_level"]}
+            for m in cand for inst in m["groups"]]
+    plans = iter(db.preview_career_stage(flat, since))
+    for m in cand:
+        ps = [next(plans) for _ in m["groups"]]
+        m["plan"] = {"esafs": sum(p["esafs"] for p in ps), "blank": sum(p["blank"] for p in ps),
+                     "changed": sum(p["changed"] for p in ps), "targets": [t for p in ps for t in p["targets"]],
+                     "old": sorted({o for p in ps for o in p["old"]})}
     _preview_cache[f"userlist:{get_session_user(request)['email']}"] = {"since": since, "matched": matched}
 
     def lst(title, items, limit=40):
@@ -217,19 +220,25 @@ async def preview_userlist(request: Request, file: UploadFile = File(...),
     def label(m):
         return f'{m["first_name"]} {m["last_name"]} ({m["matched_institution"] or m["institution"] or "no institution"})'
 
-    upd = [m for m in cand if m["plan"]["targets"]]
+    chg = [m for m in cand if m["plan"]["changed"]]
+    fill = [m for m in cand if m["plan"]["blank"] and not m["plan"]["changed"]]
     same = [m for m in cand if m["plan"]["esafs"] and not m["plan"]["targets"]]
     none = [m for m in cand if not m["plan"]["esafs"]]
     new = [m for m in matched if m["status"] == "new"]
     amb = [m for m in matched if m["status"] == "ambiguous"]
+    upd = chg + fill
     body = (
         f'<strong>Preview of sheet "{html.escape(name)}", applying to ESAFs from {since} on — nothing saved yet.</strong><br>'
-        f'{len(people)} people: {len(upd)} to update, {len(same)} already correct, {len(none)} with no ESAF since that date, '
+        f'{len(people)} people: {len(chg)} with a different stage, {len(fill)} with only an empty stage to fill, '
+        f'{len(same)} already correct, {len(none)} with no ESAF since that date, '
         f'{len(new)} not in the database, {len(amb)} ambiguous.'
-        + lst(f"Career stage will change ({len(upd)}):",
-              [f'{label(m)} badge {m["badge"]}: {", ".join(m["plan"]["old"]) or "(empty)"} → '
-               f'{m["employment_level"]} on {len(m["plan"]["targets"])} ESAF(s)' for m in upd])
-        + lst(f"⚠ Ambiguous — several users match, skipped ({len(amb)}):",
+        + lst(f"Career stage will CHANGE ({len(chg)}):",
+              [f'{label(m)} badge {m["badge"]}: {", ".join(m["plan"]["old"])} → {m["employment_level"]} '
+               f'(different on {m["plan"]["changed"]} ESAF(s)'
+               + (f', empty on {m["plan"]["blank"]}' if m["plan"]["blank"] else "") + ")" for m in chg])
+        + lst(f"Empty stage will be FILLED, nothing overwritten ({len(fill)}):",
+              [f'{label(m)} badge {m["badge"]}: → {m["employment_level"]} on {m["plan"]["blank"]} ESAF(s)' for m in fill])
+        + lst(f"⚠ Ambiguous — different people match, skipped ({len(amb)}):",
               [f'{label(m)} → {", ".join(m["matches"])}' for m in amb])
         + lst(f"No ESAF from {since} on — nothing to update ({len(none)}):", [label(m) for m in none])
         + lst(f"Not in the database — skipped ({len(new)}):", [label(m) for m in new])
@@ -249,8 +258,8 @@ async def apply_userlist(request: Request):
     pending = _preview_cache.pop(f"userlist:{get_session_user(request)['email']}", None)
     if not pending:
         return HTMLResponse('<div class="alert alert-warning">No pending preview. Please re-upload.</div>')
-    updates = [{"badge": m["badge"], "institution": m["matched_institution"], "employment_level": m["employment_level"]}
-               for m in pending["matched"] if m.get("plan", {}).get("targets")]
+    updates = [{"badge": m["badge"], "institution": inst, "employment_level": m["employment_level"]}
+               for m in pending["matched"] if m.get("plan", {}).get("targets") for inst in m["groups"]]
     n = db.apply_career_stage(updates, pending["since"]) if updates else 0
     log_action(request, "import", "users", "",
                f"User list import: career stage updated for {n} users from {pending['since']}")

@@ -74,10 +74,12 @@ def match(people: list[dict], users: list[dict]) -> list[dict]:
         if len(cands) > 1:
             best = max(_inst_score(p["institution"], u.get("institution", "")) for u in cands)
             cands = [u for u in cands if _inst_score(p["institution"], u.get("institution", "")) == best]
-        q = dict(p, badge="", matched_institution="", status="new", matches=[])
-        if len(cands) > 1:
+        q = dict(p, badge="", matched_institution="", groups=[], status="new", matches=[])
+        if len({u["badge"] for u in cands}) > 1:
             q.update(status="ambiguous", matches=sorted(f'{u["badge"]} ({u.get("institution", "")})' for u in cands))
         elif cands:
-            q.update(status="matched", badge=cands[0]["badge"], matched_institution=cands[0].get("institution", ""))
+            # one person; if the university appears under several spellings, the role applies to all of them
+            q.update(status="matched", badge=cands[0]["badge"], matched_institution=cands[0].get("institution", ""),
+                     groups=[u.get("institution", "") for u in cands])
         out.append(q)
     return out

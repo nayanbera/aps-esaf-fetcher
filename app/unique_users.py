@@ -110,7 +110,10 @@ def plan_career(slots: list[dict], updates: list[dict], since: str = "") -> list
     for u in updates:
         scope = [s for s in slots if in_scope(s, u["badge"], inst_key(u.get("institution", "")), mains, since)]
         new = u["employment_level"].strip()
-        out.append({**u, "esafs": len(scope),
-                    "old": sorted({s["level"].strip() for s in scope if (s.get("level") or "").strip()}),
-                    "targets": [s["esaf_id"] for s in scope if (s.get("level") or "").strip().lower() != new.lower()]})
+        low = lambda x: (x or "").strip().lower()
+        blank = sum(1 for s in scope if not low(s.get("level")))
+        changed = sum(1 for s in scope if low(s.get("level")) and low(s["level"]) != new.lower())
+        out.append({**u, "esafs": len(scope), "blank": blank, "changed": changed,
+                    "old": sorted({s["level"].strip() for s in scope if low(s.get("level"))}),
+                    "targets": [s["esaf_id"] for s in scope if low(s.get("level")) != new.lower()]})
     return out
