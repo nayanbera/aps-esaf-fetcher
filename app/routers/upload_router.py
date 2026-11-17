@@ -8,7 +8,7 @@ import json
 from fastapi import APIRouter, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import db
+from .. import db, excel_table
 from ..auth import get_session_user, log_action
 from ..templates_env import templates
 
@@ -39,14 +39,7 @@ def _parse_file(upload: UploadFile) -> list[dict]:
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
-            return []
-        headers = [str(c).strip() if c is not None else "" for c in rows[0]]
-        result = []
-        for row in rows[1:]:
-            result.append({h: (str(v).strip() if v is not None else "") for h, v in zip(headers, row)})
-        return result
+        return excel_table.rows_to_records(list(ws.iter_rows(values_only=True)))
 
     raise ValueError(f"Unsupported file type: {upload.filename}")
 
