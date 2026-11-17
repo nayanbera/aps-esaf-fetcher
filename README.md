@@ -133,8 +133,10 @@ Clicking **Preview Changes** shows a diff before committing. Click **Apply** to 
 
 A sheet with `Last Name`, `First Name`, optional `E-mail` and `Institutional Role`
 (e.g. sheet `2026-3` of the ChemMatCARS user list). Use **Update career stage from a user
-list** on `/upload`, type the sheet name, optionally the date it applies from (default: start
-of the sheet's run cycle, `2026-3` = 2026-09-01), preview (old → new per user), then apply.
+list** on `/upload`, choose the workbook, tick the sheets to import (each has an "applies from"
+date, default the start of the run cycle: `2026-3` = 2026-09-01), preview (old → new per user,
+and any people the ticked sheets disagree about), then apply. Sheets are applied in workbook
+order, so a later sheet overrides an earlier one where their periods overlap.
 Users are matched by e-mail, then name. Only that unique user's ESAFs from the date on get the
 new career stage; earlier ESAFs keep theirs. People not in the database are skipped.
 

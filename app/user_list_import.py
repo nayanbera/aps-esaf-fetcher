@@ -19,6 +19,10 @@ def _s(v) -> str:
     return "" if v is None else str(v).strip()
 
 
+def sheet_names(data: bytes) -> list[str]:
+    return load_workbook(io.BytesIO(data), read_only=True).sheetnames
+
+
 def read_people(data: bytes, sheet: str = "") -> tuple[str, list[dict]]:
     wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     if sheet and sheet not in wb.sheetnames:

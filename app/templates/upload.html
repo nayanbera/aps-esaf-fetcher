@@ -67,7 +67,7 @@
       </div>
       <div class="card-body">
         <p class="text-muted small">
-          A sheet with <code>Last Name</code>, <code>First Name</code>, <code>E-mail</code> (optional) and
+          Sheets with <code>Last Name</code>, <code>First Name</code>, <code>E-mail</code> (optional) and
           <code>Institutional Role</code> columns (no badge needed). Users are matched by e-mail, then by name,
           and their <strong>career stage</strong> is set from the Institutional Role on that user's ESAFs from the
           cycle start onward. Earlier ESAFs keep the stage they had. People not in the database are skipped.
@@ -75,16 +75,11 @@
         <form hx-post="/upload/preview/userlist" hx-encoding="multipart/form-data"
               hx-target="#preview-userlist" hx-swap="innerHTML" hx-indicator="#userlist-spinner">
           <div class="mb-2">
-            <input type="file" name="file" class="form-control" accept=".xlsx" required>
+            <input type="file" name="file" class="form-control" accept=".xlsx" required
+                   hx-post="/upload/userlist/sheets" hx-trigger="change" hx-encoding="multipart/form-data"
+                   hx-target="#userlist-sheets" hx-swap="innerHTML">
           </div>
-          <div class="mb-2">
-            <input type="text" name="sheet" class="form-control form-control-sm"
-                   placeholder="Sheet name, e.g. 2026-3 (blank = first sheet)">
-          </div>
-          <div class="mb-3">
-            <input type="text" name="since" class="form-control form-control-sm"
-                   placeholder="Applies from, YYYY-MM-DD (blank = start of the sheet's run cycle, e.g. 2026-3 = 2026-09-01)">
-          </div>
+          <div id="userlist-sheets" class="mb-3"></div>
           <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Preview</button>
           <span id="userlist-spinner" class="htmx-indicator ms-2 spinner-border spinner-border-sm text-primary" role="status"></span>
         </form>
