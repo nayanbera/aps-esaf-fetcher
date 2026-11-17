@@ -8,6 +8,7 @@ Institutional Role is used; people who are not in the database are reported, not
 from __future__ import annotations
 
 import io
+import re
 
 from openpyxl import load_workbook
 
@@ -48,13 +49,21 @@ def read_people(data: bytes, sheet: str = "") -> tuple[str, list[dict]]:
     return ws.title, people
 
 
+def cycle_start(sheet: str) -> str:
+    """'2026-3' -> '2026-09-01' (APS run cycles: 1 = Jan-Apr, 2 = May-Aug, 3 = Sep-Dec); '' if not a cycle name."""
+    m = re.fullmatch(r"\s*(\d{4})-([123])\s*", sheet or "")
+    return f"{m.group(1)}-{('01', '05', '09')[int(m.group(2)) - 1]}-01" if m else ""
+
+
 def match(people: list[dict], users: list[dict]) -> list[dict]:
-    """Add 'status' (matched / unchanged / empty / new / ambiguous), 'badge' and 'old' to each person."""
+    """Match each person to a unique user (badge + institution) from list_unique_users().
+
+    Adds 'status' (matched / new / ambiguous), 'badge' and 'matched_institution'."""
     by_email = {}
     for u in users:
         if u.get("email"):
             by_email.setdefault(u["email"].strip().lower(), []).append(u)
-    utoks = [(u, _tokens(u.get("first_name", ""), u.get("last_name", ""))) for u in users]
+    utoks = [(u, _tokens(u.get("name", ""))) for u in users]
 
     out = []
     for p in people:
@@ -62,21 +71,13 @@ def match(people: list[dict], users: list[dict]) -> list[dict]:
         if not cands:
             pt = _tokens(p["first_name"], p["last_name"])
             cands = [u for u, t in utoks if _same_person(pt, t)]
-        if len({u["badge"] for u in cands}) > 1:
+        if len(cands) > 1:
             best = max(_inst_score(p["institution"], u.get("institution", "")) for u in cands)
             cands = [u for u in cands if _inst_score(p["institution"], u.get("institution", "")) == best]
-        badges = {u["badge"] for u in cands}
-        q = dict(p, badge="", old="", status="new", matches=sorted(badges))
-        if len(badges) > 1:
-            q["status"] = "ambiguous"
-        elif badges:
-            u = cands[0]
-            q.update(badge=u["badge"], old=(u.get("employment_level") or "").strip())
-            if not p["employment_level"]:
-                q["status"] = "empty"                   # no role in the sheet - leave the user alone
-            elif p["employment_level"].lower() == q["old"].lower():
-                q["status"] = "unchanged"
-            else:
-                q["status"] = "matched"                 # will be updated
+        q = dict(p, badge="", matched_institution="", status="new", matches=[])
+        if len(cands) > 1:
+            q.update(status="ambiguous", matches=sorted(f'{u["badge"]} ({u.get("institution", "")})' for u in cands))
+        elif cands:
+            q.update(status="matched", badge=cands[0]["badge"], matched_institution=cands[0].get("institution", ""))
         out.append(q)
     return out

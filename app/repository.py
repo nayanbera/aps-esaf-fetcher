@@ -127,6 +127,16 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
+    def preview_career_stage(self, updates: list[dict], since: str = "") -> list[dict]:
+        """updates: [{badge, institution, employment_level}] -> same dicts plus esafs, old, targets."""
+        ...
+
+    @abstractmethod
+    def apply_career_stage(self, updates: list[dict], since: str = "") -> int:
+        """Set the career stage on the ESAFs from `since` on of each unique user (badge + institution)."""
+        ...
+
+    @abstractmethod
     def list_unique_users(
         self,
         year_from: Optional[int] = None,

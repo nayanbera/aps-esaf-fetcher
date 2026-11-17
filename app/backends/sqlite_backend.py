@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from .. import unique_users as uu_rules
 from ..repository import ESAFRepository
 
 
@@ -315,11 +316,21 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.commit()
                 except sqlite3.OperationalError:
                     pass
-            try:
-                conn.execute("ALTER TABLE esaf_users ADD COLUMN user_type TEXT DEFAULT ''")
-                conn.commit()
-            except sqlite3.OperationalError:
-                pass
+            for col in ("user_type", "institution", "employment_level"):
+                try:
+                    conn.execute(f"ALTER TABLE esaf_users ADD COLUMN {col} TEXT DEFAULT ''")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+            # Affiliation and career stage per ESAF (a unique user is badge + institution);
+            # start from the user's current values, a master-file import refines them per ESAF.
+            conn.execute("""UPDATE esaf_users SET institution =
+                              COALESCE((SELECT u.institution FROM users u WHERE u.badge = esaf_users.badge), '')
+                            WHERE institution IS NULL OR institution = ''""")
+            conn.execute("""UPDATE esaf_users SET employment_level =
+                              COALESCE((SELECT u.employment_level FROM users u WHERE u.badge = esaf_users.badge), '')
+                            WHERE employment_level IS NULL OR employment_level = ''""")
+            conn.commit()
             try:
                 conn.execute("ALTER TABLE esafs ADD COLUMN local_id TEXT DEFAULT ''")
                 conn.commit()
@@ -761,12 +772,15 @@ class SQLiteESAFRepository(ESAFRepository):
 
             # user_type (ON-SITE/OFF-SITE) comes from the master-file import, not the
             # APS API, so carry it across the delete-and-reinsert below.
-            prev_user_type = {
-                r[0]: r[1] for r in conn.execute(
-                    "SELECT badge, user_type FROM esaf_users WHERE esaf_id=?",
-                    (data["esaf_id"],),
-                ).fetchall() if r[1]
-            }
+            prev_user_type = {}
+            prev_level, prev_inst = {}, {}
+            for r in conn.execute(
+                "SELECT badge, user_type, employment_level, institution FROM esaf_users WHERE esaf_id=?",
+                (data["esaf_id"],),
+            ).fetchall():
+                if r[1]: prev_user_type[r[0]] = r[1]
+                if r[2]: prev_level[r[0]] = r[2]
+                if r[3]: prev_inst[r[0]] = r[3]
             conn.execute("DELETE FROM esaf_users WHERE esaf_id=?", (data["esaf_id"],))
             conn.execute("DELETE FROM funding_sources WHERE esaf_id=?", (data["esaf_id"],))
 
@@ -795,10 +809,13 @@ class SQLiteESAFRepository(ESAFRepository):
                      u["email"], u.get("orcid_id", ""), json.dumps(u["raw_json"])),
                 )
                 conn.execute(
-                    "INSERT OR IGNORE INTO esaf_users (esaf_id, badge, role, user_type) "
-                    "VALUES (?,?,?,?)",
+                    "INSERT OR IGNORE INTO esaf_users "
+                    "(esaf_id, badge, role, user_type, institution, employment_level) "
+                    "VALUES (?,?,?,?,?,?)",
                     (data["esaf_id"], u["badge"], u["role"],
-                     prev_user_type.get(u["badge"], "")),
+                     prev_user_type.get(u["badge"], ""),
+                     u["institution"] or prev_inst.get(u["badge"], ""),
+                     prev_level.get(u["badge"], "")),
                 )
 
             for src in data.get("funding_sources", []):
@@ -908,12 +925,9 @@ class SQLiteESAFRepository(ESAFRepository):
                     WHERE e.status = 'Approved'{join_clause}{sci_eu}""",
                 join_params,
             )
-            unique_users = scalar(
-                f"""SELECT COUNT(DISTINCT eu.badge) FROM esaf_users eu
-                    JOIN esafs e ON eu.esaf_id = e.esaf_id
-                    WHERE e.status = 'Approved'{join_clause}{sci_eu}""",
-                join_params,
-            )
+            _ustats = uu_rules.stats(self._slots(
+                conn, f"e.status = 'Approved'{join_clause}{sci_u}".replace("u.badge", "eu.badge"), join_params))
+            unique_users = _ustats["unique_users"]
 
             by_year = [
                 dict(r) for r in conn.execute(
@@ -942,36 +956,22 @@ class SQLiteESAFRepository(ESAFRepository):
             ]
             by_institution = [
                 dict(r) for r in conn.execute(
-                    f"""SELECT u.institution,
+                    f"""SELECT COALESCE(NULLIF(eu.institution, ''), u.institution) AS institution,
                                COUNT(DISTINCT u.badge) AS unique_users,
                                COUNT(eu.esaf_id)       AS esaf_slots
                         FROM users u
                         JOIN esaf_users eu ON u.badge    = eu.badge
                         JOIN esafs e       ON eu.esaf_id = e.esaf_id
-                        WHERE u.institution IS NOT NULL AND u.institution != ''
+                        WHERE COALESCE(NULLIF(eu.institution, ''), u.institution) IS NOT NULL
+                          AND COALESCE(NULLIF(eu.institution, ''), u.institution) != ''
                           AND e.status = 'Approved'{join_clause}{sci_u}
-                        GROUP BY u.institution
+                        GROUP BY 1
                         ORDER BY unique_users DESC LIMIT 30""",
                     join_params,
                 ).fetchall()
             ]
-            # Career stage ("Employment Level" from the master-file import);
-            # users without one are grouped as 'Unknown'.
-            by_employment = [
-                dict(r) for r in conn.execute(
-                    f"""SELECT COALESCE(NULLIF(TRIM(u.employment_level), ''), 'Unknown')
-                                   AS employment_level,
-                               COUNT(DISTINCT u.badge) AS unique_users,
-                               COUNT(eu.esaf_id)       AS esaf_slots
-                        FROM users u
-                        JOIN esaf_users eu ON u.badge    = eu.badge
-                        JOIN esafs e       ON eu.esaf_id = e.esaf_id
-                        WHERE e.status = 'Approved'{join_clause}{sci_u}
-                        GROUP BY 1
-                        ORDER BY unique_users DESC""",
-                    join_params,
-                ).fetchall()
-            ]
+            # Career stage per unique user (badge + institution): latest stage; slots keep their own.
+            by_employment = _ustats["by_employment"]
             by_funding = [
                 dict(r) for r in conn.execute(
                     f"""SELECT fs.source, COUNT(*) AS count
@@ -991,18 +991,7 @@ class SQLiteESAFRepository(ESAFRepository):
                     join_params,
                 ).fetchall()
             ]
-            top_users = [
-                dict(r) for r in conn.execute(
-                    f"""SELECT u.first_name || ' ' || u.last_name AS name,
-                               u.institution, COUNT(eu.esaf_id) AS experiments
-                        FROM users u
-                        JOIN esaf_users eu ON u.badge    = eu.badge
-                        JOIN esafs e       ON eu.esaf_id = e.esaf_id
-                        WHERE e.status = 'Approved'{join_clause}{sci_u}
-                        GROUP BY u.badge ORDER BY experiments DESC LIMIT 20""",
-                    join_params,
-                ).fetchall()
-            ]
+            top_users = _ustats["top_users"]
             all_years = [
                 r[0] for r in conn.execute(
                     "SELECT DISTINCT year FROM esafs WHERE year IS NOT NULL ORDER BY year"
@@ -1064,34 +1053,55 @@ class SQLiteESAFRepository(ESAFRepository):
                   AND (bs.start_date = '' OR bs.start_date IS NULL
                        OR e.start_date >= bs.start_date)
             )""")
-        where = " AND ".join(clauses)
-        sql = f"""
-            SELECT u.badge,
-                   u.first_name || ' ' || u.last_name AS name,
-                   u.institution, u.country, u.state, u.email,
-                   COALESCE(u.employment_level, '') AS employment_level,
-                   GROUP_CONCAT(DISTINCT e.technique) AS techniques,
-                   GROUP_CONCAT(DISTINCT e.research_subject) AS research_subjects,
-                   COUNT(DISTINCT e.esaf_id) AS esaf_count,
-                   MIN(e.start_date) AS first_experiment,
-                   MAX(e.end_date)   AS last_experiment
-            FROM users u
-            JOIN esaf_users eu ON u.badge    = eu.badge
-            JOIN esafs e       ON eu.esaf_id = e.esaf_id
-            WHERE {where}
-            GROUP BY u.badge
-            ORDER BY name
-        """
         with self._db() as conn:
-            rows = conn.execute(sql, params).fetchall()
-        result = []
-        for r in rows:
-            d = dict(r)
-            raw = d.get("techniques") or ""
-            d["techniques"] = sorted({t for t in raw.split(",") if t})
-            d["research_subjects"] = sorted({t.strip() for t in (d.get("research_subjects") or "").split(",") if t.strip()})
-            result.append(d)
-        return result
+            return uu_rules.merge(self._slots(conn, " AND ".join(clauses), params))
+
+    @staticmethod
+    def _slots(conn, where: str, params: list) -> list[dict]:
+        """One row per (user, ESAF) - see unique_users.py."""
+        rows = conn.execute(f"""
+            SELECT eu.badge, u.first_name || ' ' || u.last_name AS name,
+                   COALESCE(NULLIF(eu.institution, ''), u.institution, '') AS institution,
+                   COALESCE(u.country, '') AS country, COALESCE(u.email, '') AS email,
+                   COALESCE(NULLIF(eu.employment_level, ''), u.employment_level, '') AS level,
+                   e.esaf_id, COALESCE(e.start_date, '') AS start, COALESCE(e.end_date, '') AS end,
+                   COALESCE(e.technique, '') AS technique, COALESCE(e.research_subject, '') AS subject
+            FROM esaf_users eu
+            JOIN users u ON u.badge = eu.badge
+            JOIN esafs e ON e.esaf_id = eu.esaf_id
+            WHERE {where}""", params).fetchall()
+        return [dict(r) for r in rows]
+
+    def _career_plan(self, conn, updates: list[dict], since: str) -> list[dict]:
+        badges = sorted({u["badge"] for u in updates})
+        if not badges:
+            return []
+        marks = ",".join("?" * len(badges))
+        slots = self._slots(conn, f"eu.badge IN ({marks})", badges)
+        return uu_rules.plan_career(slots, updates, since)
+
+    def preview_career_stage(self, updates: list[dict], since: str = "") -> list[dict]:
+        with self._db() as conn:
+            return self._career_plan(conn, updates, since)
+
+    def apply_career_stage(self, updates: list[dict], since: str = "") -> int:
+        """Set the career stage on the ESAFs (from `since` on) of each unique user. Returns users changed."""
+        changed = 0
+        with self._db() as conn:
+            for p in self._career_plan(conn, updates, since):
+                if not p["targets"]:
+                    continue
+                for eid in p["targets"]:
+                    conn.execute("UPDATE esaf_users SET employment_level=? WHERE esaf_id=? AND badge=?",
+                                 (p["employment_level"], eid, p["badge"]))
+                latest = conn.execute(
+                    """SELECT eu.employment_level FROM esaf_users eu JOIN esafs e ON e.esaf_id = eu.esaf_id
+                       WHERE eu.badge=? AND eu.employment_level != '' ORDER BY e.start_date DESC LIMIT 1""",
+                    (p["badge"],)).fetchone()
+                conn.execute("UPDATE users SET employment_level=? WHERE badge=?",
+                             (latest[0] if latest else p["employment_level"], p["badge"]))
+                changed += 1
+        return changed
 
     def get_user_detail(self, badge: str, institution: str = "") -> Optional[dict]:
         with self._db() as conn:
@@ -1117,15 +1127,25 @@ class SQLiteESAFRepository(ESAFRepository):
             d.pop("inst_imported_type", None)
             esaf_rows = conn.execute(
                 """SELECT e.esaf_id, e.title, e.year, e.start_date, e.end_date,
-                          e.beamline, e.status, e.technique, e.pi_name,
-                          eu.role, eu.user_type
+                          e.beamline, e.status, e.technique, e.research_subject, e.pi_name,
+                          eu.role, eu.user_type,
+                          COALESCE(NULLIF(eu.institution, ''), u.institution, '') AS slot_institution,
+                          COALESCE(NULLIF(eu.employment_level, ''), u.employment_level, '') AS employment_level
                    FROM esafs e
                    JOIN esaf_users eu ON eu.esaf_id = e.esaf_id
+                   JOIN users u ON u.badge = eu.badge
                    WHERE eu.badge = ?
                    ORDER BY e.year DESC, e.start_date DESC""",
                 (badge,),
             ).fetchall()
-            d["esafs"] = [dict(r) for r in esaf_rows]
+            rows = [dict(r) for r in esaf_rows]
+            slots = [{"badge": badge, "institution": r["slot_institution"], "start": r["start_date"] or ""} for r in rows]
+            mains = uu_rules.main_keys(slots)
+            want = uu_rules.inst_key(institution)
+            d["esafs"] = [r for r, sl in zip(rows, slots) if uu_rules.in_scope(sl, badge, want, mains)]
+            if not d["esafs"]:
+                return None
+            d["institution"] = next((r["slot_institution"] for r in d["esafs"] if r["slot_institution"]), d.get("institution", ""))
             is_scientist = conn.execute(
                 "SELECT 1 FROM beamline_scientists WHERE badge = ?", (badge,)
             ).fetchone()
@@ -2250,11 +2270,15 @@ class SQLiteESAFRepository(ESAFRepository):
                 role = "pi" if r.get("spokesperson", "").upper() == "Y" else "user"
                 user_type = r.get("user_type", "")
                 conn.execute(
-                    """INSERT INTO esaf_users (esaf_id, badge, role, user_type)
-                       VALUES (?,?,?,?)
+                    """INSERT INTO esaf_users (esaf_id, badge, role, user_type, institution, employment_level)
+                       VALUES (?,?,?,?,?,?)
                        ON CONFLICT(esaf_id, badge) DO UPDATE SET
-                           role=excluded.role, user_type=excluded.user_type""",
-                    (esaf_id, badge, role, user_type),
+                           role=excluded.role, user_type=excluded.user_type,
+                           institution = CASE WHEN excluded.institution != ''
+                                              THEN excluded.institution ELSE esaf_users.institution END,
+                           employment_level = CASE WHEN excluded.employment_level != ''
+                                              THEN excluded.employment_level ELSE esaf_users.employment_level END""",
+                    (esaf_id, badge, role, user_type, r.get("institution", ""), r.get("employment_level", "")),
                 )
 
         return touched

@@ -11,24 +11,8 @@ from pymongo.collection import Collection
 from ..repository import ESAFRepository
 
 
-import re
-import unicodedata
-
-_INST_STOP = {"the", "of", "at", "in", "for", "and"}
-
-
-def inst_key(name: str) -> str:
-    """Institution name reduced to a comparison key ("The University of Chicago" ==
-    "University of Chicago", "Univ. of Illinois at Chicago" == "Univ of Illinois Chicago")."""
-    t = unicodedata.normalize("NFKD", name or "")
-    t = "".join(c for c in t if not unicodedata.combining(c)).lower()
-    return " ".join(w for w in re.split(r"[^a-z0-9]+", t) if w and w not in _INST_STOP)
-
-
-def _latest(levels: list[dict]) -> str:
-    """Career stage from the most recent ESAF that has one."""
-    got = [(x.get("d") or "", x["v"]) for x in levels if (x.get("v") or "").strip()]
-    return max(got)[1] if got else ""
+from .. import unique_users as uu_rules
+from ..unique_users import inst_key
 
 
 def _now_iso() -> str:
@@ -412,13 +396,8 @@ class MongoESAFRepository(ESAFRepository):
         ]))
         participation_slots = ps[0]["total"] if ps else 0
 
-        uu = list(self._esafs().aggregate([
-            {"$match": _approved},
-            {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
-            {"$group": {"_id": "$users.badge"}},
-            {"$count": "count"},
-        ]))
-        unique_users = uu[0]["count"] if uu else 0
+        _ustats = uu_rules.stats(self._slots(_approved))
+        unique_users = _ustats["unique_users"]
 
         by_beamline = list(self._esafs().aggregate([
             {"$match": _approved},
@@ -454,26 +433,8 @@ class MongoESAFRepository(ESAFRepository):
             {"$limit": 30},
         ]))
 
-        # Career stage (users.employment_level, copied in by the SQLite migration);
-        # users without one are grouped as 'Unknown'.
-        by_employment = list(self._esafs().aggregate([
-            {"$match": _approved},
-            {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
-            {"$group": {
-                "_id": {"$cond": [
-                    {"$in": [{"$ifNull": ["$users.employment_level", ""]}, ["", " "]]},
-                    "Unknown", "$users.employment_level"]},
-                "unique_users": {"$addToSet": "$users.badge"},
-                "esaf_slots":   {"$sum": 1},
-            }},
-            {"$project": {
-                "employment_level": "$_id",
-                "unique_users":     {"$size": "$unique_users"},
-                "esaf_slots":       1,
-                "_id": 0,
-            }},
-            {"$sort": {"unique_users": -1}},
-        ]))
+        # Career stage per unique user (badge + institution): latest stage; slots keep their own.
+        by_employment = _ustats["by_employment"]
 
         by_funding = list(self._esafs().aggregate([
             {"$match": _approved},
@@ -489,19 +450,7 @@ class MongoESAFRepository(ESAFRepository):
             {"$project": {"source": "$funding_sources", "esaf_id": 1, "_id": 0}},
         ]))
 
-        top_users = list(self._esafs().aggregate([
-            {"$match": _approved},
-            {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
-            {"$group": {
-                "_id":         "$users.badge",
-                "name":        {"$first": {"$concat": ["$users.first_name", " ", "$users.last_name"]}},
-                "institution": {"$first": "$users.institution"},
-                "experiments": {"$sum": 1},
-            }},
-            {"$sort": {"experiments": -1}},
-            {"$limit": 20},
-            {"$project": {"name": 1, "institution": 1, "experiments": 1, "_id": 0}},
-        ]))
+        top_users = _ustats["top_users"]
 
         return {
             "total_esafs":         total_esafs,
@@ -526,6 +475,35 @@ class MongoESAFRepository(ESAFRepository):
             "exclude_scientists":  exclude_scientists,
         }
 
+    def _career_plan(self, updates: list[dict], since: str) -> list[dict]:
+        badges = {u["badge"] for u in updates}
+        slots = [s for s in self._slots({"users.badge": {"$in": list(badges)}}) if s["badge"] in badges]
+        return uu_rules.plan_career(slots, updates, since)
+
+    def preview_career_stage(self, updates: list[dict], since: str = "") -> list[dict]:
+        return self._career_plan(updates, since)
+
+    def apply_career_stage(self, updates: list[dict], since: str = "") -> int:
+        """Set the career stage on the ESAFs (from `since` on) of each unique user. Returns users changed."""
+        from pymongo import UpdateOne
+        want: dict[str, dict[str, str]] = {}        # esaf_id -> {badge: new level}
+        changed = 0
+        for p in self._career_plan(updates, since):
+            if p["targets"]:
+                changed += 1
+                for eid in p["targets"]:
+                    want.setdefault(eid, {})[p["badge"]] = p["employment_level"]
+        ops = []
+        for d in self._esafs().find({"esaf_id": {"$in": list(want)}}, {"esaf_id": 1, "users": 1}):
+            users = d.get("users") or []
+            for u in users:
+                if u.get("badge") in want[d["esaf_id"]]:
+                    u["employment_level"] = want[d["esaf_id"]][u["badge"]]
+            ops.append(UpdateOne({"esaf_id": d["esaf_id"]}, {"$set": {"users": users}}))
+        if ops:
+            self._esafs().bulk_write(ops, ordered=False)
+        return changed
+
     def get_user_detail(self, badge: str, institution: str = "") -> Optional[dict]:
         # Only the ESAFs under this institution (spelling variants and blanks included):
         # the same badge at another institution is a different unique user.
@@ -538,18 +516,12 @@ class MongoESAFRepository(ESAFRepository):
         ).sort("start_date", -1)
         found = [(e, next((x for x in e.get("users") or [] if x.get("badge") == badge), None)) for e in cursor]
         found = [(e, eu) for e, eu in found if eu is not None]
-        # ESAFs without an institution belong to the badge's main institution
-        counts: dict[str, int] = {}
-        for _e, eu in found:
-            k = inst_key(eu.get("institution", ""))
-            if k:
-                counts[k] = counts.get(k, 0) + 1
-        main = max(counts, key=counts.get) if counts else ""
-        want = want or main
+        slots = [{"badge": badge, "institution": eu.get("institution", ""), "start": e.get("start_date") or ""}
+                 for e, eu in found]
+        mains = uu_rules.main_keys(slots)
         esafs, u = [], None
-        for e, eu in found:
-            k = inst_key(eu.get("institution", ""))
-            if k != want and not (k == "" and want == main):
+        for (e, eu), slot in zip(found, slots):
+            if not uu_rules.in_scope(slot, badge, want, mains):
                 continue
             u = u if u is not None and u.get("institution") else eu
             esafs.append({
@@ -582,6 +554,22 @@ class MongoESAFRepository(ESAFRepository):
             "is_beamline_scientist": False,
         }
 
+    def _slots(self, match: dict) -> list[dict]:
+        """One row per (user, ESAF) for ESAFs matching `match` - see unique_users.py."""
+        rows = self._esafs().aggregate([
+            {"$match": match},
+            {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
+            {"$project": {"_id": 0, "esaf_id": 1, "start": "$start_date", "end": "$end_date",
+                          "technique": 1, "subject": "$research_subject", "u": "$users"}},
+        ])
+        return [{"badge": r["u"].get("badge", ""),
+                 "name": f'{r["u"].get("first_name", "")} {r["u"].get("last_name", "")}'.strip(),
+                 "institution": r["u"].get("institution") or "", "country": r["u"].get("country") or "",
+                 "email": r["u"].get("email") or "", "level": r["u"].get("employment_level") or "",
+                 "esaf_id": r["esaf_id"], "start": r.get("start") or "", "end": r.get("end") or "",
+                 "technique": r.get("technique") or "", "subject": r.get("subject") or ""}
+                for r in rows if r["u"].get("badge")]
+
     def list_unique_users(
         self,
         year_from: Optional[int] = None,
@@ -597,74 +585,7 @@ class MongoESAFRepository(ESAFRepository):
             match.setdefault("year", {})["$lte"] = year_to
         if technique:
             match["technique"] = technique
-        # A unique user is a badge at one institution: the same badge under a different
-        # institution is a different unique user.  Group by the raw institution here and
-        # merge spelling variants (and blank institutions) below.
-        pipeline = [
-            {"$match": match},
-            {"$unwind": {"path": "$users", "preserveNullAndEmptyArrays": False}},
-            {"$group": {
-                "_id":             {"badge": "$users.badge", "inst": {"$ifNull": ["$users.institution", ""]}},
-                "name":            {"$first": {"$concat": ["$users.first_name", " ", "$users.last_name"]}},
-                "country":         {"$max": "$users.country"},
-                "email":           {"$max": "$users.email"},
-                "levels":          {"$push": {"d": "$start_date", "v": "$users.employment_level"}},
-                "techniques":      {"$addToSet": "$technique"},
-                "research_subjects": {"$addToSet": "$research_subject"},
-                "esaf_count":      {"$sum": 1},
-                "first_experiment": {"$min": "$start_date"},
-                "last_experiment":  {"$max": "$end_date"},
-            }},
-        ]
-        groups: dict[tuple, dict] = {}
-        for doc in self._esafs().aggregate(pipeline):
-            badge, inst = doc["_id"]["badge"], (doc["_id"]["inst"] or "").strip()
-            key = (badge, inst_key(inst))
-            g = groups.get(key)
-            if g is None:
-                groups[key] = {"badge": badge, "name": doc["name"], "institution": inst,
-                               "_insts": {inst: doc["esaf_count"]}, "country": doc.get("country") or "",
-                               "email": doc.get("email") or "", "levels": list(doc["levels"]),
-                               "techniques": set(doc["techniques"]), "subjects": set(doc["research_subjects"]),
-                               "esaf_count": doc["esaf_count"], "first_experiment": doc["first_experiment"],
-                               "last_experiment": doc["last_experiment"]}
-                continue
-            g["_insts"][inst] = g["_insts"].get(inst, 0) + doc["esaf_count"]
-            g["esaf_count"] += doc["esaf_count"]
-            g["levels"] += doc["levels"]
-            g["techniques"] |= set(doc["techniques"]); g["subjects"] |= set(doc["research_subjects"])
-            g["country"] = g["country"] or doc.get("country") or ""
-            g["email"] = max(g["email"], doc.get("email") or "")
-            g["first_experiment"] = min((x for x in (g["first_experiment"], doc["first_experiment"]) if x), default=None)
-            g["last_experiment"] = max((x for x in (g["last_experiment"], doc["last_experiment"]) if x), default=None)
-
-        # ESAFs that list the badge without an institution join that badge's biggest institution
-        by_badge: dict[str, list] = {}
-        for (badge, k), g in groups.items():
-            by_badge.setdefault(badge, []).append((k, g))
-        for badge, items in by_badge.items():
-            blank = next((g for k, g in items if k == ""), None)
-            named = [g for k, g in items if k != ""]
-            if blank and named:
-                host = max(named, key=lambda g: g["esaf_count"])
-                host["esaf_count"] += blank["esaf_count"]; host["levels"] += blank["levels"]
-                host["techniques"] |= blank["techniques"]; host["subjects"] |= blank["subjects"]
-                host["country"] = host["country"] or blank["country"]
-                host["email"] = max(host["email"], blank["email"])
-                host["first_experiment"] = min((x for x in (host["first_experiment"], blank["first_experiment"]) if x), default=None)
-                host["last_experiment"] = max((x for x in (host["last_experiment"], blank["last_experiment"]) if x), default=None)
-                groups.pop((badge, ""))
-
-        results = []
-        for g in groups.values():
-            insts = g.pop("_insts")
-            g["institution"] = max(insts, key=insts.get) if insts else ""
-            g["employment_level"] = _latest(g.pop("levels"))
-            g["techniques"] = sorted(t for t in g["techniques"] if t)
-            g["research_subjects"] = sorted({s.strip() for v in g.pop("subjects") if v for s in v.split(",") if s.strip()})
-            results.append(g)
-        results.sort(key=lambda r: (r["name"] or "").lower())
-        return results
+        return uu_rules.merge(self._slots(match))
 
     def list_beamline_scientists(self) -> list[dict]:
         coll = self._client[self._db_name]["beamline_scientists"]

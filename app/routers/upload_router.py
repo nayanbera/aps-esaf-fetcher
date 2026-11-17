@@ -9,6 +9,7 @@ from fastapi import APIRouter, Form, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 import html
+import re
 
 from starlette.concurrency import run_in_threadpool
 
@@ -166,7 +167,8 @@ async def apply_esafs(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# User list sheet — update career stage (Institutional Role) of existing users
+# User list sheet — update the career stage of unique users (badge + institution)
+# for the ESAFs from the sheet's period on; earlier ESAFs keep the stage they had.
 # ---------------------------------------------------------------------------
 
 _USERLIST_BUTTONS = (
@@ -179,7 +181,8 @@ _USERLIST_BUTTONS = (
 
 
 @router.post("/upload/preview/userlist", response_class=HTMLResponse)
-async def preview_userlist(request: Request, file: UploadFile = File(...), sheet: str = Form("")):
+async def preview_userlist(request: Request, file: UploadFile = File(...),
+                           sheet: str = Form(""), since: str = Form("")):
     redir = _require_admin(request)
     if redir:
         return redir
@@ -190,8 +193,19 @@ async def preview_userlist(request: Request, file: UploadFile = File(...), sheet
         return HTMLResponse(f'<div class="alert alert-danger">{html.escape(str(exc))}</div>')
     if not people:
         return HTMLResponse('<div class="alert alert-warning">No people found in that sheet.</div>')
-    matched = user_list_import.match(people, db.list_users_for_lookup("", 100000))
-    _preview_cache[f"userlist:{get_session_user(request)['email']}"] = matched
+    since = since.strip() or user_list_import.cycle_start(name)
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", since):
+        return HTMLResponse('<div class="alert alert-warning">This sheet name is not a run cycle (like 2026-3), so '
+                            'enter the date the list applies from (YYYY-MM-DD) in the "Applies from" box.</div>')
+
+    matched = user_list_import.match(people, db.list_unique_users())
+    cand = [m for m in matched if m["status"] == "matched" and m["employment_level"]]
+    plans = db.preview_career_stage(
+        [{"badge": m["badge"], "institution": m["matched_institution"], "employment_level": m["employment_level"]}
+         for m in cand], since)
+    for m, p in zip(cand, plans):
+        m["plan"] = p
+    _preview_cache[f"userlist:{get_session_user(request)['email']}"] = {"since": since, "matched": matched}
 
     def lst(title, items, limit=40):
         if not items:
@@ -201,23 +215,26 @@ async def preview_userlist(request: Request, file: UploadFile = File(...), sheet
         return f"<div class='mt-2'><strong>{title}</strong><ul class='mb-0'>{li}{more}</ul></div>"
 
     def label(m):
-        return f'{m["first_name"]} {m["last_name"]} ({m["institution"] or "no institution"})'
+        return f'{m["first_name"]} {m["last_name"]} ({m["matched_institution"] or m["institution"] or "no institution"})'
 
-    upd = [m for m in matched if m["status"] == "matched"]
-    same = [m for m in matched if m["status"] == "unchanged"]
+    upd = [m for m in cand if m["plan"]["targets"]]
+    same = [m for m in cand if m["plan"]["esafs"] and not m["plan"]["targets"]]
+    none = [m for m in cand if not m["plan"]["esafs"]]
     new = [m for m in matched if m["status"] == "new"]
     amb = [m for m in matched if m["status"] == "ambiguous"]
     body = (
-        f'<strong>Preview of sheet "{html.escape(name)}" — nothing saved yet.</strong><br>'
-        f'{len(people)} people: {len(upd)} to update, {len(same)} already correct, '
+        f'<strong>Preview of sheet "{html.escape(name)}", applying to ESAFs from {since} on — nothing saved yet.</strong><br>'
+        f'{len(people)} people: {len(upd)} to update, {len(same)} already correct, {len(none)} with no ESAF since that date, '
         f'{len(new)} not in the database, {len(amb)} ambiguous.'
         + lst(f"Career stage will change ({len(upd)}):",
-              [f'{label(m)} badge {m["badge"]}: {m["old"] or "(empty)"} → {m["employment_level"]}' for m in upd])
-        + lst(f"⚠ Ambiguous name — several users match, skipped ({len(amb)}):",
-              [f'{label(m)} → badges {", ".join(m["matches"])}' for m in amb])
+              [f'{label(m)} badge {m["badge"]}: {", ".join(m["plan"]["old"]) or "(empty)"} → '
+               f'{m["employment_level"]} on {len(m["plan"]["targets"])} ESAF(s)' for m in upd])
+        + lst(f"⚠ Ambiguous — several users match, skipped ({len(amb)}):",
+              [f'{label(m)} → {", ".join(m["matches"])}' for m in amb])
+        + lst(f"No ESAF from {since} on — nothing to update ({len(none)}):", [label(m) for m in none])
         + lst(f"Not in the database — skipped ({len(new)}):", [label(m) for m in new])
-        + '<div class="mt-2 text-muted small">Only the career stage is changed. It is a per-user value, '
-          'so it applies to all of that user\'s ESAFs.</div>'
+        + '<div class="mt-2 text-muted small">A unique user is a badge at one institution. Only that user\'s ESAFs '
+          'from the date above on are changed; earlier ESAFs keep the stage they had.</div>'
     )
     cls = "alert-warning" if amb else "alert-info"
     buttons = _USERLIST_BUTTONS.format(n=len(upd)) if upd else ""
@@ -229,15 +246,16 @@ async def apply_userlist(request: Request):
     redir = _require_admin(request)
     if redir:
         return redir
-    matched = _preview_cache.pop(f"userlist:{get_session_user(request)['email']}", None)
-    if not matched:
+    pending = _preview_cache.pop(f"userlist:{get_session_user(request)['email']}", None)
+    if not pending:
         return HTMLResponse('<div class="alert alert-warning">No pending preview. Please re-upload.</div>')
-    records = [{"badge": m["badge"], "employment_level": m["employment_level"]}
-               for m in matched if m["status"] == "matched"]
-    n = db.apply_user_import(records) if records else 0
-    log_action(request, "import", "users", "", f"User list import: career stage updated for {n} users")
+    updates = [{"badge": m["badge"], "institution": m["matched_institution"], "employment_level": m["employment_level"]}
+               for m in pending["matched"] if m.get("plan", {}).get("targets")]
+    n = db.apply_career_stage(updates, pending["since"]) if updates else 0
+    log_action(request, "import", "users", "",
+               f"User list import: career stage updated for {n} users from {pending['since']}")
     return HTMLResponse(f'<div class="alert alert-success"><i class="bi bi-check-circle me-1"></i>'
-                        f'Career stage updated for {n} user(s).</div>')
+                        f'Career stage updated for {n} user(s) from {pending["since"]} on.</div>')
 
 
 @router.post("/upload/cancel/{import_type}", response_class=HTMLResponse)

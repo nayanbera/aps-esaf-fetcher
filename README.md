@@ -133,9 +133,18 @@ Clicking **Preview Changes** shows a diff before committing. Click **Apply** to 
 
 A sheet with `Last Name`, `First Name`, optional `E-mail` and `Institutional Role`
 (e.g. sheet `2026-3` of the ChemMatCARS user list). Use **Update career stage from a user
-list** on `/upload`, type the sheet name, preview (old → new per user), then apply.
-Users are matched by e-mail, then name; only the career stage is changed, people not in the
-database are skipped, and ambiguous names are reported and skipped.
+list** on `/upload`, type the sheet name, optionally the date it applies from (default: start
+of the sheet's run cycle, `2026-3` = 2026-09-01), preview (old → new per user), then apply.
+Users are matched by e-mail, then name. Only that unique user's ESAFs from the date on get the
+new career stage; earlier ESAFs keep theirs. People not in the database are skipped.
+
+**Unique users.** A unique user is a *badge at one institution*: the same badge under another
+institution is a separate user (Users and Statistics pages, SQLite and MongoDB alike). Institution
+names are compared ignoring case, accents, punctuation and words like "the/of/at"; ESAFs without an
+institution count toward the badge's main institution. Affiliation and career stage are stored
+per ESAF (MongoDB: inside each ESAF's user entry; SQLite: `esaf_users.institution` / `employment_level`),
+so a user's progression stays visible in the expanded Users row. Re-import the master file to fill
+per-ESAF values for older ESAFs on an existing SQLite database.
 
 ### B — Simple ESAF file
 

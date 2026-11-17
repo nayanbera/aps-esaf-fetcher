@@ -178,6 +178,14 @@ def get_user_detail(badge: str, institution: str = "") -> Optional[dict]:
     return _r().get_user_detail(badge, institution)
 
 
+def preview_career_stage(updates: list[dict], since: str = "") -> list[dict]:
+    return _r().preview_career_stage(updates, since)
+
+
+def apply_career_stage(updates: list[dict], since: str = "") -> int:
+    return _r().apply_career_stage(updates, since)
+
+
 def list_unique_users(
     year_from: Optional[int] = None,
     year_to: Optional[int] = None,
