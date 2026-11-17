@@ -246,7 +246,7 @@ class MongoESAFRepository(ESAFRepository):
         existing = self._esafs().find_one(
             {"esaf_id": esaf_id},
             # Fetch ALL user-editable fields so replace_one never silently drops them.
-            {"notes": 1, "custom_fields": 1, "technique": 1, "local_id": 1,
+            {"notes": 1, "custom_fields": 1, "technique": 1, "research_subject": 1, "local_id": 1,
              "pi_group": 1, "gup_id": 1, "created_at": 1, "users": 1},
         )
 
@@ -278,6 +278,7 @@ class MongoESAFRepository(ESAFRepository):
             doc["notes"]         = existing.get("notes", "")
             doc["custom_fields"] = existing.get("custom_fields", {})
             doc["technique"]     = existing.get("technique", "")
+            doc["research_subject"] = existing.get("research_subject", "")
             doc["local_id"]      = existing.get("local_id", "")
             doc["pi_group"]      = existing.get("pi_group", "")
             doc["gup_id"]        = existing.get("gup_id", "")
@@ -304,6 +305,7 @@ class MongoESAFRepository(ESAFRepository):
             doc["notes"]         = ""
             doc["custom_fields"] = {}
             doc["technique"]     = ""
+            doc["research_subject"] = ""
             doc["local_id"]      = ""
             doc["pi_group"]      = ""
             doc["gup_id"]        = ""
@@ -514,7 +516,8 @@ class MongoESAFRepository(ESAFRepository):
         esafs_cursor = self._esafs().find(
             {"users.badge": badge},
             {"esaf_id": 1, "title": 1, "year": 1, "start_date": 1, "end_date": 1,
-             "beamline": 1, "status": 1, "technique": 1, "pi_name": 1, "users.$": 1},
+             "beamline": 1, "status": 1, "technique": 1, "research_subject": 1,
+             "pi_name": 1, "users.$": 1},
         ).sort("start_date", -1)
         esafs = []
         for e in esafs_cursor:
@@ -528,6 +531,7 @@ class MongoESAFRepository(ESAFRepository):
                 "beamline":   e.get("beamline"),
                 "status":     e.get("status"),
                 "technique":  e.get("technique"),
+                "research_subject": e.get("research_subject"),
                 "pi_name":    e.get("pi_name"),
                 "role":       role,
             })
@@ -571,6 +575,7 @@ class MongoESAFRepository(ESAFRepository):
                 "email":           {"$first": "$users.email"},
                 "employment_level": {"$max": "$users.employment_level"},   # "" sorts below any real value
                 "techniques":      {"$addToSet": "$technique"},
+                "research_subjects": {"$addToSet": "$research_subject"},
                 "esaf_count":      {"$sum": 1},
                 "first_experiment": {"$min": "$start_date"},
                 "last_experiment":  {"$max": "$end_date"},
@@ -581,6 +586,8 @@ class MongoESAFRepository(ESAFRepository):
         for doc in self._esafs().aggregate(pipeline):
             doc["badge"] = doc.pop("_id")
             doc["techniques"] = sorted(t for t in doc.get("techniques", []) if t)
+            doc["research_subjects"] = sorted({s.strip() for v in doc.get("research_subjects", []) if v
+                                               for s in v.split(",") if s.strip()})
             results.append(doc)
         return results
 
@@ -1057,7 +1064,7 @@ class MongoESAFRepository(ESAFRepository):
             for field, val in (("beamline", first.get("beamline", "")), ("year", year),
                                ("start_date", first.get("posted_date", "")),
                                ("local_id", first.get("local_id", "")),
-                               ("technique", first.get("technique", ""))):
+                               ("research_subject", first.get("research_subject", ""))):
                 if val in ("", None):
                     continue
                 old = str((doc or {}).get(field) or "")
@@ -1183,7 +1190,8 @@ class MongoESAFRepository(ESAFRepository):
                     "doi": "", "pi_badge": f.get("pi_badge", ""), "pi_name": f.get("pi_name", ""),
                     "pi_institution": f.get("pi_institution", ""), "raw_json": {},
                     "users": list(p["file_users"].values()), "funding_sources": p["fs_add"],
-                    "technique": f.get("technique", ""), "local_id": f.get("local_id", ""),
+                    "technique": "", "research_subject": f.get("research_subject", ""),
+                    "local_id": f.get("local_id", ""),
                     "notes": "", "custom_fields": {}, "pi_group": "", "gup_id": "",
                     "last_synced": now, "created_at": now, "updated_at": now}))
                 touched += 1

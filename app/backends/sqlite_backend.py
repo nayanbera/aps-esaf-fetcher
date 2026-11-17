@@ -339,6 +339,7 @@ class SQLiteESAFRepository(ESAFRepository):
             for col, defn in [
                 ("gup_id",   "TEXT DEFAULT ''"),
                 ("pdf_path", "TEXT DEFAULT ''"),
+                ("research_subject", "TEXT DEFAULT ''"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
@@ -1069,6 +1070,7 @@ class SQLiteESAFRepository(ESAFRepository):
                    u.institution, u.country, u.state, u.email,
                    COALESCE(u.employment_level, '') AS employment_level,
                    GROUP_CONCAT(DISTINCT e.technique) AS techniques,
+                   GROUP_CONCAT(DISTINCT e.research_subject) AS research_subjects,
                    COUNT(DISTINCT e.esaf_id) AS esaf_count,
                    MIN(e.start_date) AS first_experiment,
                    MAX(e.end_date)   AS last_experiment
@@ -1086,6 +1088,7 @@ class SQLiteESAFRepository(ESAFRepository):
             d = dict(r)
             raw = d.get("techniques") or ""
             d["techniques"] = sorted({t for t in raw.split(",") if t})
+            d["research_subjects"] = sorted({t.strip() for t in (d.get("research_subjects") or "").split(",") if t.strip()})
             result.append(d)
         return result
 
@@ -1802,7 +1805,7 @@ class SQLiteESAFRepository(ESAFRepository):
             "pen":              "local_id",
             "beamline name":    "beamline",
             "funding source":   "funding_source",
-            "research subject": "technique",
+            "research subject": "research_subject",
             # Pass-through names already in internal form
             "first_name": "first_name", "last_name": "last_name",
             "institution": "institution", "country": "country",
@@ -1811,6 +1814,7 @@ class SQLiteESAFRepository(ESAFRepository):
             "pi_group": "pi_group", "local_id": "local_id",
             "employment_level": "employment_level",
             "institution_type": "institution_type",
+            "research_subject": "research_subject",
         }
         out: dict = {}
         for k, v in rec.items():
@@ -1978,7 +1982,7 @@ class SQLiteESAFRepository(ESAFRepository):
             for esaf_id, rows in esaf_rows.items():
                 first = rows[0]
                 existing = conn.execute(
-                    "SELECT esaf_id, title, beamline, year, start_date, local_id, technique "
+                    "SELECT esaf_id, title, beamline, year, start_date, local_id, research_subject "
                     "FROM esafs WHERE esaf_id = ?", (esaf_id,)
                 ).fetchone()
                 action = "update" if existing else "add"
@@ -1989,7 +1993,7 @@ class SQLiteESAFRepository(ESAFRepository):
                     ("year",       "year"),
                     ("start_date", "posted_date"),
                     ("local_id",   "local_id"),
-                    ("technique",  "technique"),
+                    ("research_subject", "research_subject"),
                 ]:
                     new_val = first.get(csv_key, "")
                     if not new_val:
@@ -2143,7 +2147,7 @@ class SQLiteESAFRepository(ESAFRepository):
                     if year:                    updates["year"]       = year
                     if first.get("posted_date"):updates["start_date"] = first["posted_date"]
                     if first.get("local_id"):   updates["local_id"]   = first["local_id"]
-                    if first.get("technique"):  updates["technique"]  = first["technique"]
+                    if first.get("research_subject"): updates["research_subject"] = first["research_subject"]
                     if pi_badge:
                         updates["pi_badge"] = pi_badge
                         updates["pi_name"]  = pi_name
@@ -2160,7 +2164,7 @@ class SQLiteESAFRepository(ESAFRepository):
                     conn.execute(
                         """INSERT OR IGNORE INTO esafs
                            (esaf_id, title, beamline, year, start_date, local_id,
-                            technique, pi_badge, pi_name, pi_institution,
+                            research_subject, pi_badge, pi_name, pi_institution,
                             status, last_synced, created_at, updated_at)
                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (
@@ -2169,7 +2173,7 @@ class SQLiteESAFRepository(ESAFRepository):
                             first.get("beamline", ""),
                             year, first.get("posted_date", ""),
                             first.get("local_id", ""),
-                            first.get("technique", ""),
+                            first.get("research_subject", ""),
                             pi_badge, pi_name, pi_inst,
                             "Approved", now, now, now,
                         ),

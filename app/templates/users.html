@@ -91,6 +91,7 @@
         <th title="Career stage — Employment Level from the master-file import">Career stage</th>
         <th>Email</th>
         <th>Techniques</th>
+        <th title="Research Subject from the master-file import">Research subjects</th>
         <th class="text-end" title="Number of Approved ESAFs this person is listed on"># ESAFs</th>
         <th>First experiment</th>
         <th>Last experiment</th>
@@ -132,6 +133,9 @@
             <span class="text-muted">—</span>
           {% endfor %}
         </td>
+        <td class="small">
+          {% for r in u.research_subjects %}<span class="badge bg-light text-dark border">{{ r }}</span> {% else %}<span class="text-muted">—</span>{% endfor %}
+        </td>
         <td class="text-end">{{ u.esaf_count }}</td>
         <td class="text-nowrap small">{{ u.first_experiment or '—' }}</td>
         <td class="text-nowrap small">
@@ -139,10 +143,10 @@
           <span class="float-end text-muted small expand-icon">▶</span>
         </td>
       </tr>
-      <tr class="user-detail-row" data-follow-prev><td colspan="10" class="p-0"></td></tr>
+      <tr class="user-detail-row" data-follow-prev><td colspan="11" class="p-0"></td></tr>
     {% else %}
       <tr>
-        <td colspan="10" class="text-muted text-center py-4">
+        <td colspan="11" class="text-muted text-center py-4">
           No users found for the selected filters.
         </td>
       </tr>
