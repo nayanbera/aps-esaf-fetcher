@@ -43,6 +43,16 @@ def latest_level(slots: list[dict]) -> str:
     return max(got)[1] if got else ""
 
 
+def stage_history(slots: list[dict]) -> list[str]:
+    """Career stages in time order, consecutive repeats collapsed: ['Post-doc', 'Faculty / professional staff']."""
+    out: list[str] = []
+    for s in sorted(slots, key=lambda x: x.get("start") or ""):
+        lv = (s.get("level") or "").strip()
+        if lv and (not out or out[-1] != lv):
+            out.append(lv)
+    return out
+
+
 def merge(slots: list[dict]) -> list[dict]:
     """One row per unique user (badge + institution), sorted by name."""
     mains = main_keys(slots)
@@ -64,6 +74,7 @@ def merge(slots: list[dict]) -> list[dict]:
             "country": max((s.get("country") or "" for s in g), default=""),
             "email": max((s.get("email") or "" for s in g), default=""),
             "employment_level": latest_level(g),
+            "stage_history": stage_history(g),
             "techniques": sorted({s["technique"] for s in g if s.get("technique")}),
             "research_subjects": sorted({x.strip() for s in g if s.get("subject") for x in s["subject"].split(",") if x.strip()}),
             "esaf_count": len({s["esaf_id"] for s in g}),

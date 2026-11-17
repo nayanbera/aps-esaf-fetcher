@@ -109,7 +109,10 @@
         <td>{{ u.name }}</td>
         <td>{{ u.institution or '—' }}</td>
         <td>{{ u.country or '—' }}</td>
-        <td class="text-nowrap">{{ (u.employment_level or '').strip() or '—' }}</td>
+        <td class="text-nowrap" {% if u.stage_history | length > 1 %}title="Career stage over time (oldest to latest)"{% endif %}>
+          {% if u.stage_history | length > 1 %}{{ u.stage_history | join(' → ') }}
+          {% else %}{{ (u.employment_level or '').strip() or '—' }}{% endif %}
+        </td>
         <td>
           {% if u.email %}
             <a href="mailto:{{ u.email }}" class="text-decoration-none small"
