@@ -1222,7 +1222,9 @@ class MongoESAFRepository(ESAFRepository):
                 ch = {f: (str(cur_users[b].get(f) or ""), u[f])
                       for f in (*self._IMPORT_USER_FIELDS, "user_type")
                       if u[f] and u[f] != str(cur_users[b].get(f) or "")
-                      and not (attached and cur_users[b].get(f))}
+                      and not (attached and cur_users[b].get(f)
+                               and not (f == "institution"      # the master records where they were at the time
+                                        and inst_key(u[f]) != inst_key(cur_users[b].get(f))))}
                 if ch:
                     user_updates[b] = ch
             plan.append({"esaf_id": eid, "doc": doc, "fields": fields, "fs_add": fs_add,

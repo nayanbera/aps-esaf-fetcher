@@ -2360,14 +2360,20 @@ class SQLiteESAFRepository(ESAFRepository):
                     continue
                 role = "pi" if r.get("spokesperson", "").upper() == "Y" else "user"
                 user_type = r.get("user_type", "")
-                if r.get("_attached"):          # keep APS role/affiliation; fill what is blank
+                if r.get("_attached"):          # keep APS role; fill blanks; the master's affiliation wins
+                    cur = conn.execute("SELECT institution FROM esaf_users WHERE esaf_id=? AND badge=?",
+                                       (esaf_id, badge)).fetchone()
+                    new_inst = r.get("institution", "")
+                    cur_inst = (cur[0] or "") if cur else ""
+                    if new_inst and (not cur_inst or uu_rules.inst_key(cur_inst) != uu_rules.inst_key(new_inst)):
+                        cur_inst = new_inst
                     conn.execute(
                         """UPDATE esaf_users SET
                                user_type = CASE WHEN COALESCE(user_type,'') = '' THEN ? ELSE user_type END,
-                               institution = CASE WHEN COALESCE(institution,'') = '' THEN ? ELSE institution END,
+                               institution = ?,
                                employment_level = CASE WHEN COALESCE(employment_level,'') = '' THEN ? ELSE employment_level END
                            WHERE esaf_id=? AND badge=?""",
-                        (user_type, r.get("institution", ""), r.get("employment_level", ""), esaf_id, badge))
+                        (user_type, cur_inst, r.get("employment_level", ""), esaf_id, badge))
                     continue
                 conn.execute(
                     """INSERT INTO esaf_users (esaf_id, badge, role, user_type, institution, employment_level)
