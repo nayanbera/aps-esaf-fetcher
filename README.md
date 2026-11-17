@@ -129,14 +129,13 @@ ESAF, so user fields are compared and written per ESAF, and an ESAF that already
 
 Clicking **Preview Changes** shows a diff before committing. Click **Apply** to write.
 
-### C — User list (no badge)
+### C — User list (career stage only)
 
-A sheet of `Last Name`, `First Name`, `Institution`, `E-mail`, `Institutional Role`,
-`Funding…` and an optional PI / SP column (e.g. sheet `2026-3` of the ChemMatCARS user list).
-Use **Import user list** on `/upload`, type the sheet name, preview, then apply.
-People are matched to existing users by e-mail, then name; only *empty* e-mail, institution
-and career-stage fields of matches are filled. Everyone is saved to **/user-list**
-(role, funding, sheet) whether or not they have an ESAF yet.
+A sheet with `Last Name`, `First Name`, optional `E-mail` and `Institutional Role`
+(e.g. sheet `2026-3` of the ChemMatCARS user list). Use **Update career stage from a user
+list** on `/upload`, type the sheet name, preview (old → new per user), then apply.
+Users are matched by e-mail, then name; only the career stage is changed, people not in the
+database are skipped, and ambiguous names are reported and skipped.
 
 ### B — Simple ESAF file
 

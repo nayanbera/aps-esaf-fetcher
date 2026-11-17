@@ -1,27 +1,21 @@
-"""Read a user-list sheet (Last Name, First Name, Institution, E-mail, Institutional Role,
-Funding 1-3, and an unnamed column holding PI / SP) and match people to existing users.
+"""Update users' career stage (Employment Level) from a user-list sheet.
 
-These lists carry no badge or ESAF ID, so people are matched by e-mail, then by name.
+The sheet (Last Name, First Name, Institution, E-mail, Institutional Role, ...) carries no
+badge, so people are matched to existing users by e-mail, then by name.  Only the
+Institutional Role is used; people who are not in the database are reported, not added.
 """
 
 from __future__ import annotations
 
 import io
-import re
 
 from openpyxl import load_workbook
 
 from .pi_id_import import _inst_score, _same_person, _tokens
 
-_FILLABLE = ("email", "institution", "employment_level")
-
 
 def _s(v) -> str:
     return "" if v is None else str(v).strip()
-
-
-def sheet_names(data: bytes) -> list[str]:
-    return load_workbook(io.BytesIO(data), read_only=True).sheetnames
 
 
 def read_people(data: bytes, sheet: str = "") -> tuple[str, list[dict]]:
@@ -39,36 +33,23 @@ def read_people(data: bytes, sheet: str = "") -> tuple[str, list[dict]]:
     def col(*names):
         return next((i for i, h in enumerate(head) if h in names), None)
 
-    c_last, c_first = col("last name"), col("first name")
-    c_inst, c_mail = col("institution"), col("e-mail", "email")
-    c_role = col("institutional role", "role", "employment level")
-    c_fund = [i for i, h in enumerate(head) if h.startswith("funding")]
-    c_extra = [i for i, h in enumerate(head) if not h and i > max(c for c in (c_last, c_first, c_inst, c_role) if c is not None)]
+    c_last, c_first, c_inst = col("last name"), col("first name"), col("institution")
+    c_mail, c_role = col("e-mail", "email"), col("institutional role", "role", "employment level")
+    if c_role is None:
+        raise ValueError('No "Institutional Role" column found.')
 
     people = []
     for r in rows[hi + 1:]:
         get = lambda i: _s(r[i]) if i is not None and i < len(r) else ""
-        last, first = get(c_last), get(c_first)
-        if not last and not first:
-            continue
-        funding = []
-        for i in c_fund:
-            for f in re.split(r";", get(i)):
-                if f.strip() and f.strip() not in funding:
-                    funding.append(f.strip())
-        extra = [get(i) for i in c_extra if get(i)]
-        flag = next((e for e in extra if e.upper() in ("PI", "SP")), "")
-        note = "; ".join(e for e in extra if e != flag)
-        if not flag and note.upper().startswith("PI"):
-            flag, note = "PI", note
-        people.append({"last_name": last, "first_name": first, "institution": get(c_inst),
-                       "email": get(c_mail).lower(), "employment_level": get(c_role),
-                       "funding": funding, "role_flag": flag, "note": note})
+        if get(c_last) or get(c_first):
+            people.append({"last_name": get(c_last), "first_name": get(c_first),
+                           "institution": get(c_inst), "email": get(c_mail).lower(),
+                           "employment_level": get(c_role)})
     return ws.title, people
 
 
 def match(people: list[dict], users: list[dict]) -> list[dict]:
-    """Add 'status' (matched / new / ambiguous), 'badge' and 'fills' {field: value} to each person."""
+    """Add 'status' (matched / unchanged / empty / new / ambiguous), 'badge' and 'old' to each person."""
     by_email = {}
     for u in users:
         if u.get("email"):
@@ -85,12 +66,17 @@ def match(people: list[dict], users: list[dict]) -> list[dict]:
             best = max(_inst_score(p["institution"], u.get("institution", "")) for u in cands)
             cands = [u for u in cands if _inst_score(p["institution"], u.get("institution", "")) == best]
         badges = {u["badge"] for u in cands}
-        q = dict(p, badge="", fills={}, status="new", matches=[])
+        q = dict(p, badge="", old="", status="new", matches=sorted(badges))
         if len(badges) > 1:
-            q.update(status="ambiguous", matches=sorted(badges))
+            q["status"] = "ambiguous"
         elif badges:
             u = cands[0]
-            q.update(status="matched", badge=u["badge"], matches=[u["badge"]],
-                     fills={f: p[f] for f in _FILLABLE if p[f] and not (u.get(f) or "").strip()})
+            q.update(badge=u["badge"], old=(u.get("employment_level") or "").strip())
+            if not p["employment_level"]:
+                q["status"] = "empty"                   # no role in the sheet - leave the user alone
+            elif p["employment_level"].lower() == q["old"].lower():
+                q["status"] = "unchanged"
+            else:
+                q["status"] = "matched"                 # will be updated
         out.append(q)
     return out

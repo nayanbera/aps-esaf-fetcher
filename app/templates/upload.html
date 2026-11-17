@@ -63,15 +63,14 @@
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-header fw-semibold">
-        <i class="bi bi-person-lines-fill me-1"></i>Import user list (no badge)
+        <i class="bi bi-person-lines-fill me-1"></i>Update career stage from a user list
       </div>
       <div class="card-body">
         <p class="text-muted small">
-          A sheet with <code>Last Name</code>, <code>First Name</code>, <code>Institution</code>,
-          <code>E-mail</code>, <code>Institutional Role</code> and <code>Funding</code> columns, plus an optional PI / SP column.
-          People are matched to existing users by e-mail, then by name. Empty e-mail, institution and
-          career-stage fields of matches are filled; everyone is kept in the
-          <a href="/user-list">User list</a>.
+          A sheet with <code>Last Name</code>, <code>First Name</code>, <code>E-mail</code> (optional) and
+          <code>Institutional Role</code> columns (no badge needed). Users are matched by e-mail, then by name,
+          and their <strong>career stage</strong> is updated from the Institutional Role. Nothing else is
+          changed, and people not in the database are skipped.
         </p>
         <form hx-post="/upload/preview/userlist" hx-encoding="multipart/form-data"
               hx-target="#preview-userlist" hx-swap="innerHTML" hx-indicator="#userlist-spinner">
