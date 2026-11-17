@@ -122,6 +122,11 @@ ESAFs not yet in the DB are inserted as stubs (`ESAF {id} (imported)`).
 Existing ESAFs and users are updated field-by-field; user-edited notes and
 custom fields are never touched.
 
+The header row may sit below title rows (as in the APS user-report export); footer rows
+such as "Total uniques users count" are ignored. On MongoDB, users are embedded in each
+ESAF, so user fields are compared and written per ESAF, and an ESAF that already has a PI
+(from the APS sync) keeps it.
+
 Clicking **Preview Changes** shows a diff before committing. Click **Apply** to write.
 
 ### B — Simple ESAF file

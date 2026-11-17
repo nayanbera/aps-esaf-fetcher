@@ -1023,11 +1023,200 @@ class MongoESAFRepository(ESAFRepository):
     def apply_user_import(self, records: list[dict]) -> int:
         return 0
 
+    # ------------------------------------------------------------------
+    # Master-file (ChemMatCARS) ESAF import — same file formats as SQLite.
+    # Users are embedded in each ESAF document, so user fields are compared
+    # and written per ESAF (the institution a user had at that time).
+    # ------------------------------------------------------------------
+
+    _IMPORT_USER_FIELDS = ("first_name", "last_name", "institution",
+                           "email", "gender", "employment_level")
+    _SIMPLE_FIELDS = ("technique", "notes", "pi_group", "local_id")
+
+    def _institution_ror_col(self) -> Collection:
+        return self._client[self._db_name]["institution_ror"]
+
+    def _combined_plan(self, normed: list[dict]) -> list[dict]:
+        by_esaf: dict[str, list[dict]] = {}
+        for r in normed:
+            if r.get("esaf_id"):
+                by_esaf.setdefault(r["esaf_id"], []).append(r)
+        existing = {d["esaf_id"]: d for d in self._esafs().find(
+            {"esaf_id": {"$in": list(by_esaf)}}, {"_id": 0, "raw_json": 0})}
+
+        plan = []
+        for eid, rows in by_esaf.items():
+            doc = existing.get(eid)
+            first = rows[0]
+            try:
+                year = int(first.get("year", ""))
+            except (ValueError, TypeError):
+                year = None
+
+            fields: dict = {}
+            for field, val in (("beamline", first.get("beamline", "")), ("year", year),
+                               ("start_date", first.get("posted_date", "")),
+                               ("local_id", first.get("local_id", "")),
+                               ("technique", first.get("technique", ""))):
+                if val in ("", None):
+                    continue
+                old = str((doc or {}).get(field) or "")
+                if field == "start_date" and old[:10] == str(val)[:10]:
+                    continue                      # same day, APS format differs
+                if old != str(val):
+                    fields[field] = val
+
+            # PI = spokesperson; an ESAF that already has a PI keeps it
+            pi_row = next((r for r in rows if r.get("spokesperson", "").upper() == "Y"), rows[0])
+            pi = {"pi_badge": pi_row.get("badge", ""),
+                  "pi_name": f"{pi_row.get('first_name', '')} {pi_row.get('last_name', '')}".strip(),
+                  "pi_institution": pi_row.get("institution", "")}
+            if doc is None or not doc.get("pi_badge"):
+                fields.update({k: v for k, v in pi.items() if v})
+
+            fs_new = {x.strip() for x in first.get("funding_source", "").split(",") if x.strip()}
+            fs_add = sorted(fs_new - set((doc or {}).get("funding_sources") or []))
+
+            file_users: dict[str, dict] = {}
+            for r in rows:
+                b = r.get("badge", "")
+                if b and b not in file_users:
+                    u = {f: r.get(f, "") for f in self._IMPORT_USER_FIELDS}
+                    u.update({"badge": b, "country": "", "state": "", "orcid_id": "",
+                              "role": "pi" if r.get("spokesperson", "").upper() == "Y" else "user",
+                              "user_type": r.get("user_type", "")})
+                    file_users[b] = u
+            cur_users = {u.get("badge", ""): u for u in ((doc or {}).get("users") or [])}
+            user_adds = [u for b, u in file_users.items() if b not in cur_users]
+            user_updates: dict[str, dict] = {}
+            for b, u in file_users.items():
+                if b not in cur_users:
+                    continue
+                ch = {f: (str(cur_users[b].get(f) or ""), u[f])
+                      for f in (*self._IMPORT_USER_FIELDS, "user_type")
+                      if u[f] and u[f] != str(cur_users[b].get(f) or "")}
+                if ch:
+                    user_updates[b] = ch
+            plan.append({"esaf_id": eid, "doc": doc, "fields": fields, "fs_add": fs_add,
+                         "user_adds": user_adds, "user_updates": user_updates,
+                         "file_users": file_users})
+        return plan
+
+    @staticmethod
+    def _inst_type_map(normed: list[dict]) -> dict[str, str]:
+        return {r["institution"]: r["institution_type"] for r in normed
+                if r.get("institution") and r.get("institution_type")}
+
     def preview_esaf_import(self, records: list[dict]) -> list[dict]:
-        return []
+        from .sqlite_backend import SQLiteESAFRepository as _S
+        normed = [_S._norm_import_record(r) for r in records]
+        changes: list[dict] = []
+
+        if not _S._is_combined_format(records):
+            for rec in normed:
+                doc = self._esafs().find_one({"esaf_id": rec.get("esaf_id", "")}) if rec.get("esaf_id") else None
+                for f in self._SIMPLE_FIELDS:
+                    new = rec.get(f, "")
+                    if doc and new and new != str(doc.get(f) or ""):
+                        changes.append({"id": rec["esaf_id"], "field": f, "action": "update",
+                                        "old_value": str(doc.get(f) or ""), "new_value": new})
+            return changes
+
+        for p in self._combined_plan(normed):
+            eid, doc = p["esaf_id"], p["doc"]
+            action = "update" if doc else "add"
+            for f, v in p["fields"].items():
+                changes.append({"id": eid, "field": f"esaf.{f}", "action": action,
+                                "old_value": str((doc or {}).get(f) or ""), "new_value": str(v)})
+            for s in p["fs_add"]:
+                changes.append({"id": eid, "field": "funding_source", "action": "add",
+                                "old_value": "", "new_value": s})
+            if doc is None:
+                changes.append({"id": eid, "field": "esaf.users", "action": "add", "old_value": "",
+                                "new_value": f"{len(p['user_adds'])} user(s)"})
+            else:
+                for u in p["user_adds"]:
+                    changes.append({"id": eid, "field": "esaf.user", "action": "add", "old_value": "",
+                                    "new_value": f"{u['first_name']} {u['last_name']} ({u['badge']})"})
+            for b, ch in p["user_updates"].items():
+                for f, (old, new) in ch.items():
+                    changes.append({"id": f"{eid} / {b}", "field": f"user.{f}", "action": "update",
+                                    "old_value": old, "new_value": new})
+
+        ror = {d["name"]: d for d in self._institution_ror_col().find(
+            {"name": {"$in": list(self._inst_type_map(normed))}}, {"name": 1, "manual_types": 1})}
+        for inst, itype in self._inst_type_map(normed).items():
+            cur = ror.get(inst)
+            cur_types = (cur or {}).get("manual_types") or []
+            cur_str = ", ".join(cur_types) if isinstance(cur_types, list) else ""
+            if cur is None or cur_str.lower() != itype.lower():
+                changes.append({"id": inst, "field": "institution.type",
+                                "action": "update" if cur_types else "add",
+                                "old_value": cur_str, "new_value": itype})
+        return changes
 
     def apply_esaf_import(self, records: list[dict]) -> int:
-        return 0
+        from pymongo import InsertOne, UpdateOne
+        from .sqlite_backend import SQLiteESAFRepository as _S
+        normed = [_S._norm_import_record(r) for r in records]
+        now = _now_iso()
+        ops: list = []
+        touched = 0
+
+        if not _S._is_combined_format(records):
+            for rec in normed:
+                sets = {f: rec[f] for f in self._SIMPLE_FIELDS if rec.get(f)}
+                if rec.get("esaf_id") and sets:
+                    ops.append(UpdateOne({"esaf_id": rec["esaf_id"]}, {"$set": sets}))
+            if ops:
+                self._esafs().bulk_write(ops, ordered=False)
+            return len(ops)
+
+        for p in self._combined_plan(normed):
+            eid, doc = p["esaf_id"], p["doc"]
+            if doc is None:
+                f = p["fields"]
+                ops.append(InsertOne({
+                    "esaf_id": eid, "title": f"ESAF {eid} (imported)", "description": "",
+                    "sector": "", "beamline": f.get("beamline", ""), "year": f.get("year"),
+                    "status": "Approved", "start_date": f.get("start_date", ""), "end_date": "",
+                    "doi": "", "pi_badge": f.get("pi_badge", ""), "pi_name": f.get("pi_name", ""),
+                    "pi_institution": f.get("pi_institution", ""), "raw_json": {},
+                    "users": list(p["file_users"].values()), "funding_sources": p["fs_add"],
+                    "technique": f.get("technique", ""), "local_id": f.get("local_id", ""),
+                    "notes": "", "custom_fields": {}, "pi_group": "", "gup_id": "",
+                    "last_synced": now, "created_at": now, "updated_at": now}))
+                touched += 1
+                continue
+            if not (p["fields"] or p["fs_add"] or p["user_adds"] or p["user_updates"]):
+                continue
+            sets = dict(p["fields"])
+            if p["user_adds"] or p["user_updates"]:
+                users = [dict(u) for u in (doc.get("users") or [])]
+                for u in users:
+                    for f, (_old, new) in p["user_updates"].get(u.get("badge", ""), {}).items():
+                        u[f] = new
+                users += p["user_adds"]
+                sets["users"] = users
+            sets["updated_at"] = now
+            upd: dict = {"$set": sets}
+            if p["fs_add"]:
+                upd["$addToSet"] = {"funding_sources": {"$each": p["fs_add"]}}
+            ops.append(UpdateOne({"esaf_id": eid}, upd))
+            touched += 1
+        if ops:
+            self._esafs().bulk_write(ops, ordered=False)
+
+        iops = [UpdateOne({"name": inst},
+                          {"$set": {"imported_type": itype, "manual_types": [itype]},
+                           "$setOnInsert": {"status": "pending", "ror_id": "", "ror_name": "",
+                                            "org_types": [], "country": "", "website": "",
+                                            "score": 0.0, "looked_up_at": ""}},
+                          upsert=True)
+                for inst, itype in self._inst_type_map(normed).items()]
+        if iops:
+            self._institution_ror_col().bulk_write(iops, ordered=False)
+        return touched
 
     # ------------------------------------------------------------------
     # Generic records (publications, facility awards)
