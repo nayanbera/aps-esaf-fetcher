@@ -788,7 +788,8 @@ class SQLiteESAFRepository(ESAFRepository):
                 if r[2]: prev_level[r[0]] = r[2]
                 if r[3]: prev_inst[r[0]] = r[3]
             conn.execute("DELETE FROM esaf_users WHERE esaf_id=?", (data["esaf_id"],))
-            conn.execute("DELETE FROM funding_sources WHERE esaf_id=?", (data["esaf_id"],))
+            if data.get("funding_sources"):          # the APS sync has none: keep what GUP/ESAF PDFs and imports stored
+                conn.execute("DELETE FROM funding_sources WHERE esaf_id=?", (data["esaf_id"],))
 
             for u in data.get("users", []):
                 conn.execute(
@@ -1515,6 +1516,12 @@ class SQLiteESAFRepository(ESAFRepository):
                 "UPDATE esafs SET gup_id=?, updated_at=datetime('now') WHERE esaf_id=?",
                 (gup_id, esaf_id),
             )
+
+    def set_esaf_funding(self, esaf_id: str, funding_strings: list[str]) -> None:
+        with self._db() as conn:
+            conn.execute("DELETE FROM funding_sources WHERE esaf_id = ?", (esaf_id,))
+            for src in funding_strings:
+                conn.execute("INSERT OR IGNORE INTO funding_sources (esaf_id, source) VALUES (?,?)", (esaf_id, src))
 
     def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:
         with self._db() as conn:

@@ -210,6 +210,10 @@ def apply_career_stage(updates: list[dict], since: str = "") -> int:
     return _r().apply_career_stage(updates, since)
 
 
+def set_esaf_funding(esaf_id: str, funding_strings: list[str]) -> None:
+    _r().set_esaf_funding(esaf_id, funding_strings)
+
+
 def list_unique_users(
     year_from: Optional[int] = None,
     year_to: Optional[int] = None,

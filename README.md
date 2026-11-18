@@ -142,6 +142,10 @@ to also merge stubs whose nearest real ESAFs are tied (twin ESAFs of one visit).
 stages that sit between two identical known stages of the same person can be filled with
 `python backfill_career_stage.py` (dry run; `--apply` after a backup).
 
+**Funding sources** come from the GUP PDFs (pushed to linked ESAFs), ESAF PDFs and the master file; the APS sync has none,
+so it leaves an ESAF's funding as it is. Earlier versions emptied it on every sync: `python restore_funding.py` (dry run;
+`--apply` after a backup) refills ESAFs that now have none from their linked GUP and never changes ESAFs that have funding.
+
 ### C — User list (career stage only)
 
 A sheet with `Last Name`, `First Name`, optional `E-mail` and `Institutional Role`

@@ -37,7 +37,8 @@ def build_gup_data(result: dict, pdf_path: str) -> dict:
     }
 
 
-def propagate_funding(gup_id: str, funding_sources: list[dict]) -> None:
+def funding_labels(funding_sources: list[dict]) -> list[str]:
+    """'Agency — grant (NN%)' strings, the form stored on an ESAF."""
     labels = []
     for fs in funding_sources:
         parts = [fs.get("agency", "").strip()]
@@ -48,6 +49,11 @@ def propagate_funding(gup_id: str, funding_sources: list[dict]) -> None:
             label += f" ({fs['percentage']}%)"
         if label:
             labels.append(label)
+    return labels
+
+
+def propagate_funding(gup_id: str, funding_sources: list[dict]) -> None:
+    labels = funding_labels(funding_sources)
     if labels:
         count = db.propagate_gup_funding(gup_id, labels)
         if count:

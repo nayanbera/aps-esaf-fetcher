@@ -168,6 +168,11 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
+    def set_esaf_funding(self, esaf_id: str, funding_strings: list[str]) -> None:
+        """Replace the funding sources of one ESAF."""
+        ...
+
+    @abstractmethod
     def list_unique_users(
         self,
         year_from: Optional[int] = None,

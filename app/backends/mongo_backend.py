@@ -253,7 +253,7 @@ class MongoESAFRepository(ESAFRepository):
             {"esaf_id": esaf_id},
             # Fetch ALL user-editable fields so replace_one never silently drops them.
             {"notes": 1, "custom_fields": 1, "technique": 1, "research_subject": 1, "experiment_ids": 1, "local_id": 1,
-             "pi_group": 1, "gup_id": 1, "created_at": 1, "users": 1},
+             "pi_group": 1, "gup_id": 1, "created_at": 1, "users": 1, "funding_sources": 1},
         )
 
         # Build doc from DM API fields only.
@@ -290,6 +290,8 @@ class MongoESAFRepository(ESAFRepository):
             doc["pi_group"]      = existing.get("pi_group", "")
             doc["gup_id"]        = existing.get("gup_id", "")
             doc["created_at"]    = existing.get("created_at", now)
+            if not doc.get("funding_sources"):       # the APS sync has none: keep what GUP/ESAF PDFs and imports stored
+                doc["funding_sources"] = existing.get("funding_sources", [])
             # Preserve orcid_id / institution set by previous enrichment
             existing_users = {u.get("badge", ""): u for u in (existing.get("users") or [])}
             for u in doc.get("users", []):
@@ -818,6 +820,10 @@ class MongoESAFRepository(ESAFRepository):
     def set_esaf_gup(self, esaf_id: str, gup_id: str) -> None:
         self._esafs().update_one(
             {"esaf_id": esaf_id}, {"$set": {"gup_id": gup_id, "updated_at": _now_iso()}})
+
+    def set_esaf_funding(self, esaf_id: str, funding_strings: list[str]) -> None:
+        self._esafs().update_one({"esaf_id": esaf_id},
+                                 {"$set": {"funding_sources": list(funding_strings), "updated_at": _now_iso()}})
 
     def propagate_gup_funding(self, gup_id: str, funding_strings: list[str]) -> int:
         result = self._esafs().update_many(
