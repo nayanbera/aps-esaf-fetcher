@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import io
 import re
-from typing import Union
+from typing import Optional, Union
 
 
 def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
@@ -41,6 +41,7 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
 
         funding_rows: list[dict] = []
         beamlines: list[str] = []
+        columns = _page1_columns(pages[0]) if pages else None
 
         for page in pages:
             tables = page.extract_tables()
@@ -91,6 +92,8 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
 
     # Page-1 structured fields (two-column layout)
     _parse_page1_into(raw_text, extracted, confidence)
+    if columns:
+        _apply_page1_columns(columns, extracted, confidence)
 
     # Abstract — between "Abstract\n" heading and "Funding Sources" or "ETR"
     m = re.search(
@@ -317,6 +320,107 @@ def _parse_page1_into(raw_text: str, extracted: dict, confidence: dict) -> None:
     if review_val:
         extracted["review_panel"] = review_val
         confidence["review_panel"] = 0.9
+
+
+# ---------------------------------------------------------------------------
+# Page-1 column reader
+#
+# Page 1 is a two-column table.  extract_text() merges the columns line by line, so a long
+# Co-PI list, a lower-case PI name or the page footer end up inside the wrong field.  Reading the
+# words by x position keeps each column's lines together.
+# ---------------------------------------------------------------------------
+
+_FOOTER = re.compile(r"Pre-Decisional|Page\s+\d+\s+of\s+\d+|^\d{2}:\d{2}:\d{2}$|^Proposal\s+\d{5,7}\b")
+_ORG_WORDS = re.compile(
+    r"\b(university|universit[a\u00e4\u00e9]t?|institute|institut|laborator(y|ies)|college|center|centre|school|"
+    r"department|national|corp|inc|ltd|company|academy|foundation|hospital|technology)\b", re.IGNORECASE)
+_LEFT_HEADS = ("Proposal Call", "Type", "Primary Area of Research", "Additional Areas of Research", "Review Panel")
+_RIGHT_HEADS = ("Principal Investigator", "Co-Principal Investigator", "Co-Proposers", "Keywords")
+_ALL_STOPS = _LEFT_HEADS + _RIGHT_HEADS + ("Abstract", "Funding Sources")
+
+
+def _page1_columns(page) -> Optional[dict]:
+    """-> {"left": [lines], "right": [lines]} for page 1, or None when the layout is not recognised."""
+    words = page.extract_words()
+    pi_head = next((w for w in words if w["text"] == "Principal"), None)
+    if pi_head is None:
+        return None
+    split = pi_head["x0"] - 5
+    out: dict = {"left": [], "right": []}
+    for side, keep in (("left", lambda w: w["x0"] < split), ("right", lambda w: w["x0"] >= split)):
+        ws = sorted((w for w in words if keep(w)), key=lambda w: (w["top"], w["x0"]))
+        lines: list[list] = []
+        for w in ws:
+            if lines and abs(lines[-1][0]["top"] - w["top"]) <= 3:
+                lines[-1].append(w)
+            else:
+                lines.append([w])
+        out[side] = [" ".join(x["text"] for x in sorted(l, key=lambda w: w["x0"])) for l in lines]
+    return out
+
+
+def _section(lines: list[str], heading: str) -> list[str]:
+    """Lines after `heading` up to the next heading; footer lines are dropped."""
+    try:
+        i = lines.index(heading)
+    except ValueError:
+        return []
+    got = []
+    for ln in lines[i + 1:]:
+        if ln in _ALL_STOPS:
+            break
+        if not _FOOTER.search(ln):
+            got.append(ln)
+    return got
+
+
+def _person_start(line: str) -> bool:
+    """'Firstname Lastname, Institution' - a new person, as opposed to a wrapped institution line."""
+    head, sep, tail = line.partition(",")
+    toks = head.split()
+    return bool(sep and tail.strip() and 1 <= len(toks) <= 5 and not _ORG_WORDS.search(head)
+                and all(re.fullmatch(r"[^\W\d_][\w.\u2019'-]*", t) for t in toks))
+
+
+def _people(lines: list[str]) -> list[tuple[str, str]]:
+    people: list[list[str]] = []
+    for ln in lines:
+        if _person_start(ln) or not people:
+            name, _, inst = ln.partition(",")
+            people.append([name.strip(), inst.strip()])
+        else:
+            people[-1][1] = (people[-1][1] + " " + ln).strip()
+    return [(n.title() if n.islower() else n, i) for n, i in people if n]
+
+
+def _apply_page1_columns(cols: dict, extracted: dict, confidence: dict) -> None:
+    left, right = cols["left"], cols["right"]
+
+    def put(key, value, conf):
+        if value:
+            extracted[key] = value
+            confidence[key] = conf
+
+    pi = _people(_section(right, "Principal Investigator"))
+    if pi:
+        put("pi_name", pi[0][0], 0.95)
+        put("pi_institution", pi[0][1], 0.95)
+    for key, head in (("co_pi", "Co-Principal Investigator"), ("co_proposers", "Co-Proposers")):
+        ppl = _people(_section(right, head))
+        if ppl:
+            put(key, "; ".join(f"{n}, {i}" for n, i in ppl), 0.95)
+        else:
+            extracted.pop(key, None)
+            confidence.pop(key, None)
+    put("proposal_call", " ".join(_section(left, "Proposal Call")), 0.95)
+    put("proposal_type", " ".join(_section(left, "Type")), 0.95)
+    put("primary_area", " ".join(_section(left, "Primary Area of Research")), 0.95)
+    put("additional_areas", ", ".join(_section(left, "Additional Areas of Research")), 0.9)
+    put("review_panel", " ".join(_section(left, "Review Panel")), 0.9)
+    if extracted.get("review_panel"):        # the value can come from the text parser, with the page footer in it
+        extracted["review_panel"] = re.sub(r"Proposal\s+\d{5,7}\s+Pre-Decisional.*?Page\s+\d+\s+of\s+\d+\s*", "",
+                                           extracted["review_panel"], flags=re.DOTALL).strip()
+    put("keywords", " ".join(_section(right, "Keywords")), 0.9)
 
 
 # ---------------------------------------------------------------------------
