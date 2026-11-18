@@ -21,6 +21,7 @@ _env = Environment(
 _env.globals["url_quote"] = quote
 
 from . import config as _config
+_env.globals["esaf_system_url"] = _config.ESAF_SYSTEM_URL
 _env.globals["db_backend"] = "MongoDB" if _config.MONGODB_URI else "SQLite"
 
 

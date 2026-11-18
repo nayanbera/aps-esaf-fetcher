@@ -56,6 +56,7 @@ bash launch.sh
 | `DM_URL` | `https://catdtn03.aps.anl.gov:11337` | DM API base URL |
 | `STATION_ID` | `CHMCARS` | APS station ID |
 | `BEAMLINE_NAMES` | `15-ID-C,D` | Comma-separated beamline name strings |
+| `ESAF_SYSTEM_URL` | APS ESAF start page | Link shown on the ESAF page (opens the APS login; ESAF pages there need a session). Empty = hide |
 | `SYNC_YEARS` | current + previous year | Comma-separated years to sync (1998 – present supported) |
 | `SYNC_INTERVAL_HOURS` | `24` | Auto-sync interval (0 = disabled) |
 | `DB_PATH` | `~/.aps-esaf-fetcher/esaf.db` | SQLite database path (ignored when MongoDB is used) |

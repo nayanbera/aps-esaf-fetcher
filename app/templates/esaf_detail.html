@@ -30,6 +30,18 @@
         <i class="bi bi-link-45deg"></i> GUP {{ esaf.gup_id }}
       </a>
     {% endif %}
+    {% if esaf_system_url %}
+      <a href="{{ esaf_system_url }}" target="_blank" rel="noopener"
+         class="badge bg-light text-muted border ms-1 text-decoration-none"
+         title="Open the APS ESAF system (log in, then search for this ESAF number)">
+        <i class="bi bi-box-arrow-up-right"></i> APS ESAF system
+      </a>
+      <button type="button" class="badge bg-light text-muted border ms-1" style="cursor:pointer"
+              title="Copy the ESAF number to paste into the APS ESAF search"
+              onclick="navigator.clipboard.writeText('{{ esaf.esaf_id }}'); this.innerHTML='<i class=&quot;bi bi-check2&quot;></i> Copied'">
+        <i class="bi bi-clipboard"></i> Copy {{ esaf.esaf_id }}
+      </button>
+    {% endif %}
     {% if esaf.pdf_path %}
       <a href="/esafs/{{ esaf.esaf_id }}/pdf" target="_blank" rel="noopener"
          class="badge bg-light text-muted border ms-1 text-decoration-none" title="View PDF">
