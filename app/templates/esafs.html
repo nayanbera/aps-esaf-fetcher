@@ -11,6 +11,12 @@
   <span class="text-muted small me-auto">
     Showing {{ offset + 1 }}–{{ [offset + per_page, total] | min }} of {{ total }} records
   </span>
+  <span id="sync-funding-result" class="me-2"></span>
+  <button class="btn btn-outline-secondary btn-sm me-2" hx-post="/esafs/sync-funding"
+          hx-target="#sync-funding-result" hx-swap="innerHTML"
+          title="Give every ESAF that has no funding the funding of its linked GUP (ESAFs with funding are not changed)">
+    <i class="bi bi-arrow-repeat me-1"></i>Sync funding from GUPs
+  </button>
   <a class="btn btn-outline-secondary btn-sm"
      data-bs-toggle="collapse" href="#importPanel" role="button">
     <i class="bi bi-folder2-open me-1"></i>Import PDFs

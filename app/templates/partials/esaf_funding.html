@@ -1,0 +1,24 @@
+<div class="card h-100" id="esaf-funding">
+  <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-cash-coin me-1"></i>Funding Sources</span>
+    {% if esaf.gup_id %}
+      <button class="btn btn-outline-secondary btn-sm py-0"
+              hx-post="/esafs/{{ esaf.esaf_id }}/sync-funding" hx-target="#esaf-funding" hx-swap="outerHTML"
+              title="Copy the funding sources of GUP {{ esaf.gup_id }} onto this ESAF">
+        <i class="bi bi-arrow-repeat me-1"></i>Sync from GUP
+      </button>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if note %}<div class="small text-muted mb-2">{{ note }}</div>{% endif %}
+    {% if esaf.funding_sources %}
+      <ul class="mb-0">
+        {% for src in esaf.funding_sources %}
+          <li>{{ src }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <span class="text-muted">None recorded</span>
+    {% endif %}
+  </div>
+</div>

@@ -12,7 +12,7 @@ funding are never changed.  Dry run by default; works with SQLite and MongoDB (s
 import argparse
 
 from app import db
-from app.gup_import import funding_labels
+from app.gup_import import fill_funding_from_gups
 
 
 def main():
@@ -22,25 +22,8 @@ def main():
     a = ap.parse_args()
 
     db.init_db()
-    labels_by_gup: dict[str, list[str]] = {}
-    restore, no_gup_data, no_link, have = [], {}, [], 0
-    for row in db.list_esaf_gup_rows():
-        if (row.get("title") or "").endswith("(imported)"):
-            continue
-        eid, gid = row["esaf_id"], (row.get("gup_id") or "").strip()
-        if (db.get_esaf(eid) or {}).get("funding_sources"):
-            have += 1
-            continue
-        if not gid:
-            no_link.append(eid)
-            continue
-        if gid not in labels_by_gup:
-            labels_by_gup[gid] = funding_labels((db.get_gup(gid) or {}).get("funding_sources") or [])
-        if labels_by_gup[gid]:
-            restore.append((eid, gid))
-        else:
-            no_gup_data.setdefault(gid, []).append(eid)
-
+    r = fill_funding_from_gups(apply=False)
+    have, restore, no_gup_data, no_link, labels_by_gup = r["have"], r["restore"], r["no_gup_data"], r["no_link"], r["labels"]
     print(f"{have} ESAFs already have funding.")
     print(f"{len(restore)} ESAFs have none but are linked to a GUP with funding -> can be refilled "
           f"(from {len({g for _, g in restore})} GUPs).")
@@ -53,8 +36,7 @@ def main():
     print(f"{len(no_link)} ESAFs have none and no GUP link (upload the ESAF PDF, or link the GUP).")
 
     if a.apply:
-        for eid, gid in restore:
-            db.set_esaf_funding(eid, labels_by_gup[gid])
+        fill_funding_from_gups(apply=True)
         print(f"\nRefilled {len(restore)} ESAFs.")
     elif restore:
         print("\nNothing written. Run with --apply to refill these.")

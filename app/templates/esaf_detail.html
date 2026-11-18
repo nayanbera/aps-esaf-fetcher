@@ -111,22 +111,7 @@
 
   <!-- Funding sources -->
   <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header fw-semibold">
-        <i class="bi bi-cash-coin me-1"></i>Funding Sources
-      </div>
-      <div class="card-body">
-        {% if esaf.funding_sources %}
-          <ul class="mb-0">
-            {% for src in esaf.funding_sources %}
-              <li>{{ src }}</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <span class="text-muted">None recorded</span>
-        {% endif %}
-      </div>
-    </div>
+    {% set note = "" %}{% include "partials/esaf_funding.html" %}
   </div>
 </div>
 

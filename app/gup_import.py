@@ -52,6 +52,33 @@ def funding_labels(funding_sources: list[dict]) -> list[str]:
     return labels
 
 
+def fill_funding_from_gups(apply: bool = False) -> dict:
+    """ESAFs linked to a GUP that have NO funding get that GUP's funding (ESAFs with funding are never changed).
+
+    -> {have, restore: [(esaf_id, gup_id)], labels: {gup_id: [...]}, no_gup_data: {gup_id: [esaf_id]}, no_link: [esaf_id]}"""
+    labels: dict[str, list[str]] = {}
+    out = {"have": 0, "restore": [], "labels": labels, "no_gup_data": {}, "no_link": []}
+    for row in db.list_esaf_gup_rows():
+        if (row.get("title") or "").endswith("(imported)"):
+            continue
+        eid, gid = row["esaf_id"], (row.get("gup_id") or "").strip()
+        if (db.get_esaf(eid) or {}).get("funding_sources"):
+            out["have"] += 1
+        elif not gid:
+            out["no_link"].append(eid)
+        else:
+            if gid not in labels:
+                labels[gid] = funding_labels((db.get_gup(gid) or {}).get("funding_sources") or [])
+            if labels[gid]:
+                out["restore"].append((eid, gid))
+            else:
+                out["no_gup_data"].setdefault(gid, []).append(eid)
+    if apply:
+        for eid, gid in out["restore"]:
+            db.set_esaf_funding(eid, labels[gid])
+    return out
+
+
 def propagate_funding(gup_id: str, funding_sources: list[dict]) -> None:
     labels = funding_labels(funding_sources)
     if labels:

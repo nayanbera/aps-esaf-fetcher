@@ -12,7 +12,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse
 from typing import Annotated
 
-from .. import config, db, esaf_import
+from .. import config, db, esaf_import, gup_import
 from ..esaf_pdf_parser import parse_esaf_pdf
 from ..templates_env import templates
 
@@ -113,6 +113,48 @@ def api_list_pi_groups() -> list[str]:
 
 
 _VALID_TECHNIQUES = {"", "Surf", "Xtal", "ASWAXS", "Beamline"}
+
+
+@router.post("/esafs/sync-funding", response_class=HTMLResponse)
+def sync_funding_all():
+    """Link ESAFs to their GUP through sibling ESAFs where unambiguous, then give ESAFs with no
+    funding the funding of their linked GUP.  ESAFs that already have funding are left alone."""
+    from ..gup_inference import fill_gup_from_siblings
+    linked, _details = fill_gup_from_siblings()
+    r = gup_import.fill_funding_from_gups(apply=True)
+    parts = [f"{len(r['restore'])} ESAF(s) got funding from their GUP"]
+    if linked:
+        parts.append(linked)
+    left = sum(map(len, r["no_gup_data"].values()))
+    if left:
+        parts.append(f"{left} ESAF(s) have a GUP with no funding data (upload that GUP's PDF)")
+    if r["no_link"]:
+        parts.append(f"{len(r['no_link'])} ESAF(s) have no funding and no GUP link")
+    return HTMLResponse('<span class="text-success small"><i class="bi bi-check-lg me-1"></i>'
+                        + html.escape("; ".join(parts)) + ".</span>")
+
+
+@router.post("/esafs/{esaf_id}/sync-funding", response_class=HTMLResponse)
+def sync_funding(request: Request, esaf_id: str):
+    """Copy the linked GUP's funding sources onto this ESAF (replaces the ESAF's current list)."""
+    esaf = db.get_esaf(esaf_id)
+    if esaf is None:
+        raise HTTPException(404, "ESAF not found")
+    gup = db.get_gup(esaf.get("gup_id") or "") if esaf.get("gup_id") else None
+    labels = gup_import.funding_labels((gup or {}).get("funding_sources") or [])
+    note = ""
+    if not esaf.get("gup_id"):
+        note = "This ESAF is not linked to a GUP."
+    elif gup is None:
+        note = f"GUP {esaf['gup_id']} has not been imported yet."
+    elif not labels:
+        note = f"GUP {esaf['gup_id']} has no funding sources recorded (upload its PDF)."
+    else:
+        db.set_esaf_funding(esaf_id, labels)
+        esaf = db.get_esaf(esaf_id)
+        note = f"Copied {len(labels)} funding source(s) from GUP {esaf['gup_id']}."
+    return templates.TemplateResponse("partials/esaf_funding.html",
+                                      {"request": request, "esaf": esaf, "note": note})
 
 
 @router.post("/esafs/{esaf_id}/set-technique", response_class=HTMLResponse)

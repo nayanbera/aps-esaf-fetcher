@@ -145,6 +145,8 @@ stages that sit between two identical known stages of the same person can be fil
 **Funding sources** come from the GUP PDFs (pushed to linked ESAFs), ESAF PDFs and the master file; the APS sync has none,
 so it leaves an ESAF's funding as it is. Earlier versions emptied it on every sync: `python restore_funding.py` (dry run;
 `--apply` after a backup) refills ESAFs that now have none from their linked GUP and never changes ESAFs that have funding.
+The same refill is in the app: **Sync from GUP** on an ESAF's Funding card copies its GUP's funding onto that ESAF, and
+**Sync funding from GUPs** on the ESAFs page links sibling ESAFs to their GUP and fills every ESAF that has no funding.
 
 ### C — User list (career stage only)
 
