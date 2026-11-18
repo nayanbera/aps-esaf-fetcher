@@ -22,6 +22,18 @@ _env.globals["url_quote"] = quote
 
 from . import config as _config
 _env.globals["esaf_system_url"] = _config.ESAF_SYSTEM_URL
+
+
+def _aps_url(esaf) -> str:
+    """Login-and-open link for the ESAF in the APS ESAF system; '' for '(imported)' stubs (not APS ESAF numbers)."""
+    from .esaf_matching import is_stub
+    eid = str(esaf.get("esaf_id") or "")
+    if not _config.ESAF_URL or not eid.isdigit() or is_stub(esaf):
+        return ""
+    return _config.ESAF_URL.replace("{esaf_id}", eid)
+
+
+_env.filters["aps_url"] = _aps_url
 _env.globals["db_backend"] = "MongoDB" if _config.MONGODB_URI else "SQLite"
 
 

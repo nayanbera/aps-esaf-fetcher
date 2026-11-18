@@ -31,9 +31,9 @@
       </a>
     {% endif %}
     {% if esaf_system_url %}
-      <a href="{{ esaf_system_url }}" target="_blank" rel="noopener"
+      <a href="{{ (esaf | aps_url) or esaf_system_url }}" target="_blank" rel="noopener"
          class="badge bg-light text-muted border ms-1 text-decoration-none"
-         title="Open the APS ESAF system: log in, choose Edit/View Existing ESAF, then enter this ESAF number">
+         title="{% if esaf | aps_url %}Open this ESAF in the APS ESAF system (asks you to log in){% else %}Open the APS ESAF system: log in, choose Edit/View Existing ESAF, then enter the ESAF number{% endif %}">
         <i class="bi bi-box-arrow-up-right"></i> APS ESAF system
       </a>
       <button type="button" class="badge bg-light text-muted border ms-1" style="cursor:pointer"

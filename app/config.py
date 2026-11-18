@@ -23,8 +23,10 @@ DM_USERNAME: str = os.getenv("DM_USERNAME", "").strip()
 DM_PASSWORD: str = os.getenv("DM_PASSWORD", "").strip()
 DM_URL: str = os.getenv("DM_URL", "https://catdtn03.aps.anl.gov:11337")
 STATION_ID: str = os.getenv("STATION_ID", "CHMCARS")
-# Start page of the APS ESAF system (asks for a login); ESAF pages there need a login session, so no per-ESAF links.
+# APS ESAF system: the start page asks for a login and then opens the ESAF given in i_attrib.
+# ({esaf_id} is replaced; the page after login carries a per-session i_pid, so only this entry link can be shared.)
 ESAF_SYSTEM_URL: str = os.getenv("ESAF_SYSTEM_URL", "https://beam.aps.anl.gov/pls/apsweb/esaf0001.start_page").strip()
+ESAF_URL: str = os.getenv("ESAF_URL", ESAF_SYSTEM_URL + "?i_attrib={esaf_id}").strip()
 
 # Pipe-separated list of beamline name strings e.g. "15-ID-C,D|15-ID-E"
 BEAMLINE_NAMES: list[str] = [
