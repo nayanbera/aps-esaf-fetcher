@@ -70,7 +70,7 @@
             </tr>
             <tr><th class="text-nowrap">Beamline</th><td>{{ esaf.beamline or '—' }}</td></tr>
             <tr><th>Sector</th><td>{{ esaf.sector or '—' }}</td></tr>
-            <tr><th>Year</th><td>{{ esaf.year or '—' }}</td></tr>
+            <tr><th>Run cycle</th><td>{{ esaf | run_cycle or '—' }}</td></tr>
             <tr><th>Start date</th><td>{{ esaf.start_date or '—' }}</td></tr>
             <tr><th>End date</th><td>{{ esaf.end_date or '—' }}</td></tr>
             <tr><th>PI</th><td>{{ esaf.pi_name or '—' }}</td></tr>

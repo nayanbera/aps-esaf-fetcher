@@ -143,7 +143,7 @@
         <th>Institution</th>
         <th>PI Group</th>
         <th>Beamline</th>
-        <th>Year</th>
+        <th>Run cycle</th>
         <th>Status</th>
         <th>Technique</th>
         <th>GUP</th>
@@ -163,7 +163,7 @@
         <td class="text-truncate" style="max-width:160px">{{ e.pi_institution or '—' }}</td>
         <td class="text-truncate" style="max-width:140px">{{ e.pi_group or '' }}</td>
         <td>{{ e.beamline or '—' }}</td>
-        <td>{{ e.year or '—' }}</td>
+        <td class="text-nowrap">{{ e | run_cycle or '—' }}</td>
         <td>
           {% if e.status == 'Approved' %}
             <span class="badge bg-success">{{ e.status }}</span>
