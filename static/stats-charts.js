@@ -18,7 +18,7 @@
   // 1) Approved ESAFs per year
   if (data.years.length) {
     Plotly.newPlot("chart-years", [{
-      type: "bar", x: data.years.map(r => String(r.year)), y: data.years.map(r => r.count),
+      type: "bar", x: data.years.map(r => r.label), y: data.years.map(r => r.count),
       marker: { color: BLUE, cornerradius: 4 },
       hovertemplate: "%{x}: <b>%{y}</b> approved ESAFs<extra></extra>", hoverlabel: hover,
     }], Object.assign({}, base, {

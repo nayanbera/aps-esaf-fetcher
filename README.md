@@ -147,6 +147,7 @@ career stage and ESAFs per funding agency (pies), and unique users per US state 
 unique users (badge + institution); their country and state are the ones stored on the user (ISO country codes or names
 are both understood). Users without a recognisable country or state are not drawn; the number left out is printed
 under the map. The charts load Plotly from a CDN, so the browser needs internet access.
+The **Calendar years / Fiscal years (Oct–Sep)** switch at the top chooses what a year means for the per-year chart and the year filters; both are worked out from each ESAF's start date (FY2026 = Oct 2025 – Sep 2026), so the stored `year` field is not used.
 Each chart has a **PNG** button that saves it as an image, and a **How the numbers are obtained** card (also on the Excel Summary sheet) explains how every number is counted.
 
 **Download all statistics (Excel)** on the same page gives every table as its own sheet (summary, ESAFs per year, career stage,

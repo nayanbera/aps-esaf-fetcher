@@ -18,7 +18,7 @@ _GREY = "#a8a7a1"
 _STAGE_ORDER = ["Undergraduate student", "Graduate student", "Post-doc", "Faculty / professional staff", "Other"]
 
 
-def _charts(stats: dict) -> dict:
+def _charts(stats: dict, basis: str = "calendar") -> dict:
     """Plain data for the Statistics charts (colours are decided here, once)."""
     # Career stage: a stage keeps its colour whatever the filters show.
     stages = []
@@ -33,7 +33,9 @@ def _charts(stats: dict) -> dict:
     if len(groups) > 7:
         funding.append({"label": "Other", "value": sum(g["count"] for g in groups[7:]), "color": _GREY})
     return {
-        "years": [{"year": r["year"], "count": r["count"]} for r in sorted(stats["by_year"], key=lambda r: r["year"] or 0)],
+        "year_label": "Fiscal year" if basis == "fiscal" else "Year",
+        "years": [{"year": r["year"], "label": f'FY{r["year"]}' if basis == "fiscal" else str(r["year"]), "count": r["count"]}
+                  for r in sorted(stats["by_year"], key=lambda r: r["year"] or 0)],
         "stages": stages,
         "funding": funding,
         "countries": stats.get("by_country", []),
@@ -55,20 +57,31 @@ def _parse_year(v: Optional[str]) -> Optional[int]:
         return None
 
 
-def _range(from_year, from_month, to_year, to_month) -> dict:
-    """Year/month filter inputs -> get_stats kwargs.
+def _basis(v: Optional[str]) -> str:
+    return "fiscal" if v == "fiscal" else "calendar"
 
-    A bound with a month becomes an exact date bound on the ESAF start date
-    (to-month is inclusive); a bound with only a year keeps the plain year filter.
+
+def _range(from_year, from_month, to_year, to_month, basis: str = "calendar") -> dict:
+    """Year/month filter inputs -> get_stats kwargs: bounds on the ESAF start date.
+
+    A year means a calendar year (Jan-Dec) or, for basis 'fiscal', a fiscal year (Oct-Sep: FY2026 is Oct 2025 - Sep 2026).
+    A month chosen with the year is a month of that year; in fiscal mode Oct-Dec belong to the previous calendar year.
     """
     fy, fm = _parse_year(from_year), _parse_month(from_month)
     ty, tm = _parse_year(to_year),   _parse_month(to_month)
-    kw: dict = {"year_from": fy, "year_to": ty, "start_from": None, "start_before": None}
-    if fy is not None and fm:
-        kw.update(year_from=None, start_from=f"{fy:04d}-{fm:02d}-01")
-    if ty is not None and tm:
-        ny, nm = (ty + 1, 1) if tm == 12 else (ty, tm + 1)
-        kw.update(year_to=None, start_before=f"{ny:04d}-{nm:02d}-01")
+    fiscal = basis == "fiscal"
+    cal = lambda y, m: y - 1 if (fiscal and m >= 10) else y          # calendar year of month m of year y
+    kw: dict = {"year_from": None, "year_to": None, "start_from": None, "start_before": None, "year_basis": basis}
+    if fy is not None:
+        kw["start_from"] = (f"{cal(fy, fm):04d}-{fm:02d}-01" if fm
+                            else f"{fy - 1:04d}-10-01" if fiscal else f"{fy:04d}-01-01")
+    if ty is not None:
+        if tm:
+            y = cal(ty, tm)
+            ny, nm = (y + 1, 1) if tm == 12 else (y, tm + 1)
+            kw["start_before"] = f"{ny:04d}-{nm:02d}-01"
+        else:
+            kw["start_before"] = f"{ty:04d}-10-01" if fiscal else f"{ty + 1:04d}-01-01"
     return kw
 
 
@@ -88,9 +101,10 @@ def api_stats(
     to_month:           Optional[str] = None,
     technique:          Optional[str] = None,
     exclude_scientists: Optional[str] = None,
+    year_basis:         Optional[str] = None,
 ):
     return db.get_stats(
-        **_range(from_year, from_month, to_year, to_month),
+        **_range(from_year, from_month, to_year, to_month, _basis(year_basis)),
         technique=technique or None,
         exclude_scientists=bool(exclude_scientists),
     )
@@ -105,19 +119,21 @@ def stats_page(
     to_month:           Optional[str] = None,
     technique:          Optional[str] = None,
     exclude_scientists: Optional[str] = None,
+    year_basis:         Optional[str] = None,
 ):
     from_yr  = _parse_year(from_year)
     to_yr    = _parse_year(to_year)
     tech     = technique or None
     exc_sci  = exclude_scientists == "1"
     stats = db.get_stats(
-        **_range(from_year, from_month, to_year, to_month),
+        **_range(from_year, from_month, to_year, to_month, _basis(year_basis)),
         technique=tech, exclude_scientists=exc_sci,
     )
     return templates.TemplateResponse("stats.html", {
         "request":            request,
         "stats":              stats,
-        "charts":             _charts(stats),
+        "charts":             _charts(stats, _basis(year_basis)),
+        "year_basis":         _basis(year_basis),
         "notes":              stats_export.NOTES,
         "from_year":          from_yr,
         "to_year":            to_yr,
@@ -141,6 +157,7 @@ async def stats_data(
     to_month:           Optional[str] = None,
     technique:          Optional[str] = None,
     exclude_scientists: Optional[str] = None,
+    year_basis:         Optional[str] = None,
 ):
     """Everything on the Statistics page as an Excel workbook (one sheet per table, charts where Excel has them)."""
     fy, ty = _parse_year(from_year), _parse_year(to_year)
@@ -148,13 +165,15 @@ async def stats_data(
     tm = _parse_month(to_month) if ty else None
     exc = exclude_scientists == "1"
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    text = (f"Approved ESAFs from {months[fm - 1] + ' ' if fm else ''}{fy or 'the beginning'} to "
-            f"{months[tm - 1] + ' ' if tm else ''}{ty or 'present'}"
+    yp = "FY" if _basis(year_basis) == "fiscal" else ""
+    text = (f"Approved ESAFs from {months[fm - 1] + ' ' if fm else ''}{(yp + str(fy)) if fy else 'the beginning'} to "
+            f"{months[tm - 1] + ' ' if tm else ''}{(yp + str(ty)) if ty else 'present'}"
+            + ("; fiscal years (Oct-Sep)" if yp else "; calendar years")
             + (f"; technique {technique}" if technique else "") + ("; beamline scientists excluded" if exc else ""))
     stats = await run_in_threadpool(lambda: db.get_stats(
-        **_range(from_year, from_month, to_year, to_month), technique=technique or None, exclude_scientists=exc))
-    content = await run_in_threadpool(stats_export.build_stats_workbook, stats, _charts(stats), text)
-    name = f"ESAF_statistics_{fy or 'all'}-{ty or 'present'}.xlsx"
+        **_range(from_year, from_month, to_year, to_month, _basis(year_basis)), technique=technique or None, exclude_scientists=exc))
+    content = await run_in_threadpool(stats_export.build_stats_workbook, stats, _charts(stats, _basis(year_basis)), text)
+    name = f"ESAF_statistics_{(yp + str(fy)) if fy else 'all'}-{(yp + str(ty)) if ty else 'present'}.xlsx"
     return Response(
         content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

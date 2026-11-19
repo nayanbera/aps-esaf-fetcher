@@ -24,6 +24,15 @@ def parse_date(s) -> Optional[date]:
     return date(int(m.group(3)), int(m.group(1)), int(m.group(2))) if m else None
 
 
+def esaf_year(start, stored=None, basis: str = "calendar"):
+    """Year an ESAF is counted in, from its start date: the calendar year, or the fiscal year (Oct-Sep, so
+    Nov 2025 is FY2026).  Falls back to the stored year when there is no usable start date."""
+    d = parse_date(start)
+    if d is None:
+        return stored
+    return d.year + 1 if basis == "fiscal" and d.month >= 10 else d.year
+
+
 def is_stub(esaf: dict) -> bool:
     return (esaf.get("title") or "").endswith(STUB_SUFFIX)
 

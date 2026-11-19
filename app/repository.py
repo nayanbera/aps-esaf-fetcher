@@ -119,6 +119,7 @@ class ESAFRepository(ABC):
         exclude_scientists: bool = False,
         start_from:   Optional[str] = None,
         start_before: Optional[str] = None,
+        year_basis:   str = "calendar",
     ) -> dict: ...
 
     @abstractmethod

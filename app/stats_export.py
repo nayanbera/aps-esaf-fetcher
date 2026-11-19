@@ -21,12 +21,13 @@ BLUE = "2A78D6"
 NOTES: list[tuple[str, str]] = [
     ("What is counted",
      "Only Approved ESAFs are counted. The filters at the top (from/to year and month, technique, exclude beamline "
-     "scientists) apply to every chart and table: a year bound keeps ESAFs whose year is in range, a month bound keeps "
-     "ESAFs whose start date is in range."),
+     "scientists) apply to every chart and table, and an ESAF is kept when its start date is inside the range. 'Calendar "
+     "years' means Jan-Dec; 'Fiscal years' means Oct-Sep, so a start in Nov 2025 is FY2026. A month chosen with a year is "
+     "a month of that year (in fiscal mode Oct-Dec belong to the previous calendar year)."),
     ("Approved ESAFs per year",
-     "The number of Approved ESAFs for each ESAF year. For ESAFs synced from APS the year is the calendar year of the start "
-     "date; for ESAFs that exist only through the master-file import it is the master file's Exp FY (fiscal year), so an "
-     "imported ESAF starting in Oct-Dec can fall in the next year."),
+     "The number of Approved ESAFs whose start date falls in each year (calendar or fiscal, as chosen at the top). For ESAFs "
+     "from the master-file import the start date is the file's Posted Date; an ESAF with no usable start date is counted in "
+     "its stored year."),
     ("Unique users",
      "A unique user is a badge at one institution: the same badge at another institution is a different user, and ESAF "
      "rows with no institution join the badge's most frequent one. Each unique user is counted once, however many ESAFs "
@@ -117,7 +118,7 @@ def build_stats_workbook(stats: dict, charts: dict, filters_text: str) -> bytes:
 
     ws = wb.create_sheet("ESAFs per year")
     years = charts["years"]
-    _table(ws, 1, 1, ["Year", "Approved ESAFs"], [[str(r["year"]), r["count"]] for r in years], [10, 16])
+    _table(ws, 1, 1, [charts.get("year_label", "Year"), "Approved ESAFs"], [[r.get("label") or str(r["year"]), r["count"]] for r in years], [12, 16])
     if years:
         _bar(ws, "Approved ESAFs per year", len(years), "D2", "Approved ESAFs")
 

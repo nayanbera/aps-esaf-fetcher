@@ -7,6 +7,11 @@
 
   <!-- Filters -->
   <form method="get" action="/stats" class="d-flex align-items-center gap-2 flex-wrap">
+    <select name="year_basis" class="form-select form-select-sm" style="width:auto"
+            title="What a year means. Both are worked out from each ESAF's start date. Fiscal year = Oct-Sep (FY2026 = Oct 2025 - Sep 2026).">
+      <option value="calendar" {% if year_basis != 'fiscal' %}selected{% endif %}>Calendar years</option>
+      <option value="fiscal" {% if year_basis == 'fiscal' %}selected{% endif %}>Fiscal years (Oct–Sep)</option>
+    </select>
     <label class="form-label mb-0 small fw-semibold text-nowrap">From:</label>
     <select name="from_month" class="form-select form-select-sm" style="width:auto" title="Month (optional)">
       <option value="">Month</option>
@@ -17,7 +22,7 @@
     <select name="from_year" class="form-select form-select-sm" style="width:auto">
       <option value="">All years</option>
       {% for y in stats.all_years %}
-        <option value="{{ y }}" {% if from_year == y %}selected{% endif %}>{{ y }}</option>
+        <option value="{{ y }}" {% if from_year == y %}selected{% endif %}>{{ 'FY' if year_basis == 'fiscal' else '' }}{{ y }}</option>
       {% endfor %}
     </select>
     <span class="text-muted small">to</span>
@@ -30,7 +35,7 @@
     <select name="to_year" class="form-select form-select-sm" style="width:auto">
       <option value="">Present</option>
       {% for y in stats.all_years %}
-        <option value="{{ y }}" {% if to_year == y %}selected{% endif %}>{{ y }}</option>
+        <option value="{{ y }}" {% if to_year == y %}selected{% endif %}>{{ 'FY' if year_basis == 'fiscal' else '' }}{{ y }}</option>
       {% endfor %}
     </select>
 
@@ -76,6 +81,7 @@
   Showing <strong>Approved</strong> ESAFs
   {% set fm = months[from_month - 1] ~ ' ' if from_month else '' %}
   {% set tm = months[to_month - 1] ~ ' ' if to_month else '' %}
+  {% set fm = fm ~ ('FY' if year_basis == 'fiscal' else '') %}{% set tm = tm ~ ('FY' if year_basis == 'fiscal' else '') %}
   {% if from_year and to_year %}
     from <strong>{{ fm }}{{ from_year }}</strong> to <strong>{{ tm }}{{ to_year }}</strong>
   {% elif from_year %}

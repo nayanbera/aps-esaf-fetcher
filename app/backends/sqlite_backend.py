@@ -871,6 +871,7 @@ class SQLiteESAFRepository(ESAFRepository):
         exclude_scientists: bool = False,
         start_from:   Optional[str] = None,
         start_before: Optional[str] = None,
+        year_basis:   str = "calendar",
     ) -> dict:
         # Build shared WHERE clause fragments
         direct_clause = ""   # for direct esafs table (no alias)
@@ -936,14 +937,14 @@ class SQLiteESAFRepository(ESAFRepository):
                 conn, f"e.status = 'Approved'{join_clause}{sci_u}".replace("u.badge", "eu.badge"), join_params))
             unique_users = _ustats["unique_users"]
 
-            by_year = [
-                dict(r) for r in conn.execute(
-                    f"""SELECT year, COUNT(*) AS count FROM esafs
-                        WHERE status = 'Approved'{direct_clause}
-                        GROUP BY year ORDER BY year DESC""",
-                    direct_params,
-                ).fetchall()
-            ]
+            _counts: dict = {}
+            for sd, yr in conn.execute(
+                f"SELECT start_date, year FROM esafs WHERE status = 'Approved'{direct_clause}", direct_params
+            ).fetchall():
+                y = esaf_matching.esaf_year(sd, yr, year_basis)
+                if y is not None:
+                    _counts[y] = _counts.get(y, 0) + 1
+            by_year = [{"year": y, "count": n} for y, n in sorted(_counts.items(), reverse=True)]
             by_beamline = [
                 dict(r) for r in conn.execute(
                     f"""SELECT beamline, COUNT(*) AS count FROM esafs
@@ -999,11 +1000,8 @@ class SQLiteESAFRepository(ESAFRepository):
                 ).fetchall()
             ]
             top_users = _ustats["top_users"]
-            all_years = [
-                r[0] for r in conn.execute(
-                    "SELECT DISTINCT year FROM esafs WHERE year IS NOT NULL ORDER BY year"
-                ).fetchall()
-            ]
+            all_years = sorted({y for y in (esaf_matching.esaf_year(sd, yr, year_basis) for sd, yr in conn.execute(
+                "SELECT start_date, year FROM esafs").fetchall()) if y is not None})
             all_techniques = [
                 r[0] for r in conn.execute(
                     """SELECT DISTINCT technique FROM esafs
@@ -1036,6 +1034,7 @@ class SQLiteESAFRepository(ESAFRepository):
             "start_before":        start_before,
             "technique":           technique,
             "exclude_scientists":  exclude_scientists,
+            "year_basis":          year_basis,
         }
 
     # ------------------------------------------------------------------

@@ -359,6 +359,7 @@ class MongoESAFRepository(ESAFRepository):
         exclude_scientists: bool = False,
         start_from:   Optional[str] = None,
         start_before: Optional[str] = None,
+        year_basis:   str = "calendar",
     ) -> dict:
         yr: dict = {}
         if year_from is not None:
@@ -377,7 +378,8 @@ class MongoESAFRepository(ESAFRepository):
             _approved["technique"]   = technique
             _any_status["technique"] = technique
 
-        all_years = sorted(y for y in self._esafs().distinct("year") if y is not None)
+        all_years = sorted({y for y in (esaf_matching.esaf_year(d.get("start_date"), d.get("year"), year_basis)
+                                        for d in self._esafs().find({}, {"start_date": 1, "year": 1})) if y is not None})
         all_techniques = sorted(
             t for t in self._esafs().distinct("technique") if t
         )
@@ -385,12 +387,12 @@ class MongoESAFRepository(ESAFRepository):
         total_esafs     = self._esafs().count_documents(_approved)
         total_all_esafs = self._esafs().count_documents(_any_status)
 
-        by_year = list(self._esafs().aggregate([
-            {"$match": _approved},
-            {"$group": {"_id": "$year", "count": {"$sum": 1}}},
-            {"$sort":  {"_id": -1}},
-            {"$project": {"year": "$_id", "count": 1, "_id": 0}},
-        ]))
+        _counts: dict = {}
+        for d in self._esafs().find(_approved, {"start_date": 1, "year": 1}):
+            y = esaf_matching.esaf_year(d.get("start_date"), d.get("year"), year_basis)
+            if y is not None:
+                _counts[y] = _counts.get(y, 0) + 1
+        by_year = [{"year": y, "count": n} for y, n in sorted(_counts.items(), reverse=True)]
 
         # participation_slots: total (user, ESAF) assignments in Approved ESAFs
         ps = list(self._esafs().aggregate([
@@ -481,6 +483,7 @@ class MongoESAFRepository(ESAFRepository):
             "start_before":        start_before,
             "technique":           technique,
             "exclude_scientists":  exclude_scientists,
+            "year_basis":          year_basis,
         }
 
     def set_user_career_stage(self, esaf_id: str, badge: str, level: str) -> bool:
