@@ -54,6 +54,12 @@
   </form>
 </div>
 
+<div class="mb-2">
+  <a class="btn btn-success btn-sm" href="/stats/data.xlsx?{{ request.url.query }}"
+     title="All the tables on this page as one Excel workbook (one sheet each, with bar/pie charts), for the filters currently applied">
+    <i class="bi bi-file-earmark-excel me-1"></i>Download all statistics (Excel)
+  </a>
+</div>
 <form method="get" action="/stats/report.xlsx" class="d-flex align-items-center gap-2 mb-3">
   <label class="form-label mb-0 small fw-semibold text-nowrap" for="rep-py">Excel user report:</label>
   <select name="py" id="rep-py" class="form-select form-select-sm" style="width:auto"

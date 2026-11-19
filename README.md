@@ -147,6 +147,10 @@ career stage and ESAFs per funding agency (pies), and unique users per US state 
 unique users (badge + institution); their country and state are the ones stored on the user (ISO country codes or names
 are both understood). Users without a recognisable country or state are not drawn; the number left out is printed
 under the map. The charts load Plotly from a CDN, so the browser needs internet access.
+**Download all statistics (Excel)** on the same page gives every table as its own sheet (summary, ESAFs per year, career stage,
+funding, funding detail, users per US state / country, institutions, top users, beamlines, ESAF status), for the filters applied.
+The bar and pie charts are native Excel charts on their sheets; the two maps are not (Excel cannot be written with map charts), so
+those sheets hold the tables only.
 
 **Funding sources** come from the GUP PDFs (pushed to linked ESAFs), ESAF PDFs and the master file; the APS sync has none,
 so it leaves an ESAF's funding as it is. Earlier versions emptied it on every sync: `python restore_funding.py` (dry run;

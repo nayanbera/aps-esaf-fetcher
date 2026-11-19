@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from starlette.concurrency import run_in_threadpool
 
-from .. import db, report
+from .. import db, report, stats_export
 from ..templates_env import templates
 
 router = APIRouter()
@@ -130,6 +130,35 @@ def stats_page(
         "report_years":       list(range(1, report.project_year_of(datetime.now().date()) + 1)),
         "report_default":     max(1, report.project_year_of(datetime.now().date()) - 1),
     })
+
+
+@router.get("/stats/data.xlsx")
+async def stats_data(
+    from_year:          Optional[str] = str(_DEFAULT_FROM),
+    to_year:            Optional[str] = None,
+    from_month:         Optional[str] = None,
+    to_month:           Optional[str] = None,
+    technique:          Optional[str] = None,
+    exclude_scientists: Optional[str] = None,
+):
+    """Everything on the Statistics page as an Excel workbook (one sheet per table, charts where Excel has them)."""
+    fy, ty = _parse_year(from_year), _parse_year(to_year)
+    fm = _parse_month(from_month) if fy else None
+    tm = _parse_month(to_month) if ty else None
+    exc = exclude_scientists == "1"
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    text = (f"Approved ESAFs from {months[fm - 1] + ' ' if fm else ''}{fy or 'the beginning'} to "
+            f"{months[tm - 1] + ' ' if tm else ''}{ty or 'present'}"
+            + (f"; technique {technique}" if technique else "") + ("; beamline scientists excluded" if exc else ""))
+    stats = await run_in_threadpool(lambda: db.get_stats(
+        **_range(from_year, from_month, to_year, to_month), technique=technique or None, exclude_scientists=exc))
+    content = await run_in_threadpool(stats_export.build_stats_workbook, stats, _charts(stats), text)
+    name = f"ESAF_statistics_{fy or 'all'}-{ty or 'present'}.xlsx"
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
 
 
 @router.get("/stats/report.xlsx")
