@@ -118,6 +118,7 @@ def stats_page(
         "request":            request,
         "stats":              stats,
         "charts":             _charts(stats),
+        "notes":              stats_export.NOTES,
         "from_year":          from_yr,
         "to_year":            to_yr,
         "from_month":         _parse_month(from_month) if from_yr else None,

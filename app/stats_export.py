@@ -17,6 +17,36 @@ _LINE = Side(style="thin", color="BFBFBF")
 _BOX = Border(left=_LINE, right=_LINE, top=_LINE, bottom=_LINE)
 BLUE = "2A78D6"
 
+# How the numbers are obtained - shown on the Statistics page and in the Excel Summary sheet.
+NOTES: list[tuple[str, str]] = [
+    ("What is counted",
+     "Only Approved ESAFs are counted. The filters at the top (from/to year and month, technique, exclude beamline "
+     "scientists) apply to every chart and table: a year bound keeps ESAFs whose year is in range, a month bound keeps "
+     "ESAFs whose start date is in range."),
+    ("Approved ESAFs per year",
+     "The number of Approved ESAFs for each ESAF year. For ESAFs synced from APS the year is the calendar year of the start "
+     "date; for ESAFs that exist only through the master-file import it is the master file's Exp FY (fiscal year), so an "
+     "imported ESAF starting in Oct-Dec can fall in the next year."),
+    ("Unique users",
+     "A unique user is a badge at one institution: the same badge at another institution is a different user, and ESAF "
+     "rows with no institution join the badge's most frequent one. Each unique user is counted once, however many ESAFs "
+     "they are on. 'Participation slots' count every (user, ESAF) pair."),
+    ("Users by career stage",
+     "Each unique user takes the career stage of their most recent ESAF (by start date) that has one; users with none are "
+     "Unknown. Stages come from the master-file import, the user-list import and manual edits on the Users page. "
+     "Slice numbers are unique users; the percentage is the share of the users in the chart."),
+    ("ESAFs by funding agency",
+     "Funding sources of each Approved ESAF (from GUP PDFs, ESAF PDFs and the master file) are grouped by agency "
+     "(NSF, DOE, ...). An ESAF counts once per agency, so an ESAF funded by two agencies is in both slices and the slices "
+     "can add up to more than the number of ESAFs; ESAFs with no funding recorded are not in the chart. The seven largest "
+     "agencies are shown, the rest together as Other."),
+    ("Maps (US states, countries)",
+     "Each unique user is placed by the country (and, for US users, the state) saved on the user - from the e-mail "
+     "domain / institution lookup or a manual edit. Country codes and names are both understood. Users with no "
+     "recognisable country or state are not drawn; their number is printed under the map. The number on a region is its "
+     "unique users, the percentage is its share of the users drawn on that map, and the shading is on a log scale."),
+]
+
 
 def _table(ws, top: int, left: int, headers: list[str], rows: list[list], widths: list[int] | None = None) -> int:
     """Write a header + rows at (top, left); returns the last row used."""
@@ -75,6 +105,15 @@ def build_stats_workbook(stats: dict, charts: dict, filters_text: str) -> bytes:
         ["Users without a known country", stats.get("users_no_country", 0)],
         ["US users without a state", stats.get("us_users_no_state", 0)],
     ], [44, 14])
+    ws.cell(row=13, column=1, value="How the numbers are obtained").font = Font(bold=True)
+    for i, (title, text) in enumerate(NOTES):
+        r = 14 + i
+        ws.cell(row=r, column=1, value=title).font = Font(bold=True)
+        c = ws.cell(row=r, column=2, value=text); c.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.cell(row=r, column=1).alignment = Alignment(vertical="top", wrap_text=True)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
+        ws.row_dimensions[r].height = 15 * (len(text) // 70 + 1)
+    ws.column_dimensions["C"].width = 60
 
     ws = wb.create_sheet("ESAFs per year")
     years = charts["years"]

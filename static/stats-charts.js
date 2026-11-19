@@ -7,7 +7,7 @@
   const RAMP = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
     .map((c, i, a) => [i / (a.length - 1), c]);
   const base = {
-    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    paper_bgcolor: SURFACE, plot_bgcolor: "rgba(0,0,0,0)",
     font: { family: "system-ui, -apple-system, 'Segoe UI', sans-serif", size: 12, color: INK },
     margin: { l: 44, r: 12, t: 8, b: 36 },
   };
@@ -34,7 +34,7 @@
     Plotly.newPlot(id, [{
       type: "pie", labels: rows.map(r => r.label), values: rows.map(r => r.value), sort: false,
       marker: { colors: rows.map(r => r.color), line: { color: SURFACE, width: 2 } },   // 2px gap between slices
-      textinfo: "value", textposition: "inside", insidetextorientation: "horizontal",      // counts on the slices; % in the tooltip
+      texttemplate: "%{value}<br>(%{percent:.1%})", textposition: "inside", insidetextorientation: "horizontal",
       hovertemplate: "%{label}<br><b>%{value}</b> " + noun + " (%{percent})<extra></extra>", hoverlabel: hover,
     }], Object.assign({}, base, {
       margin: { l: 8, r: 8, t: 8, b: 8 },
@@ -51,19 +51,21 @@
     const ticks = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].filter(t => t <= max);
     if (ticks.length === 0 || max / ticks[ticks.length - 1] > 1.5) ticks.push(max);   // no crowded top labels
     const locs = rows.map(r => r[key]), logMax = Math.max(Math.log10(max), 0.01);
+    const total = rows.reduce((a, r) => a + r.unique_users, 0);
+    const pct = r => (100 * r.unique_users / total).toFixed(1) + "%";
     const labels = {            // the user count written on each region; white on the dark cells, dark on the light ones
       type: "scattergeo", mode: "text", locations: locs, locationmode: geo.locationmode,
-      text: rows.map(r => String(r.unique_users)), hoverinfo: "skip", showlegend: false,
-      textfont: { size: 10, color: rows.map(r => Math.log10(r.unique_users) / logMax > 0.55 ? "#ffffff" : "#0b0b0b") },
+      text: rows.map(r => r.unique_users + "<br>(" + pct(r) + ")"), hoverinfo: "skip", showlegend: false,
+      textfont: { size: 9, color: rows.map(r => Math.log10(r.unique_users) / logMax > 0.55 ? "#ffffff" : "#0b0b0b") },
     };
     Plotly.newPlot(id, [{
       type: "choropleth", locations: locs, z: rows.map(r => Math.log10(r.unique_users)),
-      text: rows.map(r => r[name]), customdata: rows.map(r => r.unique_users),
+      text: rows.map(r => r[name]), customdata: rows.map(r => [r.unique_users, pct(r)]),
       locationmode: geo.locationmode, zmin: 0, zmax: logMax,
       colorscale: RAMP, marker: { line: { color: SURFACE, width: 0.6 } },
       colorbar: { thickness: 10, len: 0.7, title: { text: "Users", side: "top" }, outlinewidth: 0,
                   tickvals: ticks.map(Math.log10), ticktext: ticks.map(String), tickfont: { size: 11 } },
-      hovertemplate: "%{text}: <b>%{customdata}</b> user(s)<extra></extra>", hoverlabel: hover,
+      hovertemplate: "%{text}: <b>%{customdata[0]}</b> user(s) (%{customdata[1]})<extra></extra>", hoverlabel: hover,
     }, labels], Object.assign({}, base, {
       margin: { l: 0, r: 0, t: 0, b: 0 },
       geo: Object.assign({ bgcolor: "rgba(0,0,0,0)", showland: true, landcolor: LAND, showlakes: false,
@@ -76,4 +78,11 @@
   map("chart-countries", data.countries, "iso3", "country",
       { locationmode: "ISO-3", geo: { projection: { type: "natural earth" }, lataxis: { range: [-58, 85] } } },
       "No users with a known country in this range.");
+
+  // PNG buttons: <button data-png="chart-id" data-name="file name" data-size="width,height">
+  document.querySelectorAll("[data-png]").forEach(btn => btn.addEventListener("click", () => {
+    const [w, h] = btn.dataset.size.split(",").map(Number);
+    Plotly.downloadImage(document.getElementById(btn.dataset.png),
+      { format: "png", filename: btn.dataset.name, width: w, height: h, scale: 2 });
+  }));
 })();

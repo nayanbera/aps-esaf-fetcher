@@ -132,25 +132,41 @@
 <div class="row g-3 mb-4">
   <div class="col-lg-6">
     <div class="card h-100">
-      <div class="card-header fw-semibold">Approved ESAFs per year</div>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span>Approved ESAFs per year</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm py-0" data-png="chart-years" data-name="approved_esafs_per_year" data-size="1100,520"
+                title="Save this chart as a PNG image"><i class="bi bi-image me-1"></i>PNG</button>
+      </div>
       <div class="card-body p-2"><div id="chart-years" style="height:320px"></div></div>
     </div>
   </div>
   <div class="col-lg-3 col-md-6">
     <div class="card h-100">
-      <div class="card-header fw-semibold">Users by career stage</div>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span>Users by career stage</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm py-0" data-png="chart-stages" data-name="users_by_career_stage" data-size="800,720"
+                title="Save this chart as a PNG image"><i class="bi bi-image me-1"></i>PNG</button>
+      </div>
       <div class="card-body p-2"><div id="chart-stages" style="height:320px"></div></div>
     </div>
   </div>
   <div class="col-lg-3 col-md-6">
     <div class="card h-100">
-      <div class="card-header fw-semibold">ESAFs by funding agency</div>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span>ESAFs by funding agency</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm py-0" data-png="chart-funding" data-name="esafs_by_funding_agency" data-size="800,720"
+                title="Save this chart as a PNG image"><i class="bi bi-image me-1"></i>PNG</button>
+      </div>
       <div class="card-body p-2"><div id="chart-funding" style="height:320px"></div></div>
     </div>
   </div>
   <div class="col-lg-6">
     <div class="card h-100">
-      <div class="card-header fw-semibold">Users per US state</div>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span>Users per US state</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm py-0" data-png="chart-states" data-name="users_per_us_state" data-size="1200,760"
+                title="Save this chart as a PNG image"><i class="bi bi-image me-1"></i>PNG</button>
+      </div>
       <div class="card-body p-2"><div id="chart-states" style="height:380px"></div></div>
       <div class="card-footer small text-muted">
         Unique users (badge + institution) by the state of their institution.
@@ -167,7 +183,11 @@
   </div>
   <div class="col-lg-6">
     <div class="card h-100">
-      <div class="card-header fw-semibold">Users per country</div>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span>Users per country</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm py-0" data-png="chart-countries" data-name="users_per_country" data-size="1400,760"
+                title="Save this chart as a PNG image"><i class="bi bi-image me-1"></i>PNG</button>
+      </div>
       <div class="card-body p-2"><div id="chart-countries" style="height:380px"></div></div>
       <div class="card-footer small text-muted">
         Unique users (badge + institution) by the country of their institution.
@@ -181,6 +201,19 @@
         {% endif %}
       </div>
     </div>
+  </div>
+</div>
+
+<!-- How the numbers are obtained -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>How the numbers are obtained</div>
+  <div class="card-body small">
+    <dl class="mb-0 row">
+      {% for title, text in notes %}
+        <dt class="col-md-3">{{ title }}</dt>
+        <dd class="col-md-9 mb-2">{{ text }}</dd>
+      {% endfor %}
+    </dl>
   </div>
 </div>
 
