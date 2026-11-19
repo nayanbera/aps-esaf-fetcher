@@ -8,6 +8,7 @@ from datetime import datetime
 
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, PieChart, Reference
+from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
@@ -48,6 +49,9 @@ def _pie(ws, title: str, n_rows: int, colors: list[str], anchor: str, col: int =
     ch = PieChart(); ch.title = title; ch.height = 9; ch.width = 14
     ch.add_data(Reference(ws, min_col=col, min_row=top, max_row=top + n_rows), titles_from_data=True)
     ch.set_categories(Reference(ws, min_col=label_col, min_row=top + 1, max_row=top + n_rows))
+    ch.dataLabels = DataLabelList(); ch.dataLabels.showVal = True      # the counts on the slices, as on the page
+    ch.dataLabels.showPercent = False; ch.dataLabels.showCatName = False
+    ch.dataLabels.showSerName = False; ch.dataLabels.showLegendKey = False
     for i, color in enumerate(colors):                       # same colours as the page
         pt = DataPoint(idx=i); pt.graphicalProperties.solidFill = color.lstrip("#").upper()
         pt.graphicalProperties.line.solidFill = "FFFFFF"
