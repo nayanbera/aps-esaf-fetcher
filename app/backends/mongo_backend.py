@@ -461,6 +461,10 @@ class MongoESAFRepository(ESAFRepository):
             "total_all_esafs":     total_all_esafs,
             "participation_slots": participation_slots,
             "unique_users":        unique_users,
+            "by_country":          _ustats["by_country"],
+            "users_no_country":    _ustats["users_no_country"],
+            "by_state":            _ustats["by_state"],
+            "us_users_no_state":   _ustats["us_users_no_state"],
             "by_year":             by_year,
             "by_beamline":         by_beamline,
             "by_status":           by_status,
@@ -580,7 +584,7 @@ class MongoESAFRepository(ESAFRepository):
         return [{"badge": r["u"].get("badge", ""),
                  "name": f'{r["u"].get("first_name", "")} {r["u"].get("last_name", "")}'.strip(),
                  "institution": r["u"].get("institution") or "", "country": r["u"].get("country") or "",
-                 "email": r["u"].get("email") or "", "level": r["u"].get("employment_level") or "",
+                 "state": r["u"].get("state") or "", "email": r["u"].get("email") or "", "level": r["u"].get("employment_level") or "",
                  "esaf_id": r["esaf_id"], "start": r.get("start") or "", "end": r.get("end") or "",
                  "technique": r.get("technique") or "", "subject": r.get("subject") or ""}
                 for r in rows if r["u"].get("badge")]

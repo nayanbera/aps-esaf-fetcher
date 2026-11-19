@@ -1016,6 +1016,10 @@ class SQLiteESAFRepository(ESAFRepository):
             "total_all_esafs":     total_all_esafs,
             "participation_slots": participation_slots,
             "unique_users":        unique_users,
+            "by_country":          _ustats["by_country"],
+            "users_no_country":    _ustats["users_no_country"],
+            "by_state":            _ustats["by_state"],
+            "us_users_no_state":   _ustats["us_users_no_state"],
             "by_year":             by_year,
             "by_beamline":         by_beamline,
             "by_status":           by_status,
@@ -1069,7 +1073,7 @@ class SQLiteESAFRepository(ESAFRepository):
         rows = conn.execute(f"""
             SELECT eu.badge, u.first_name || ' ' || u.last_name AS name,
                    COALESCE(NULLIF(eu.institution, ''), u.institution, '') AS institution,
-                   COALESCE(u.country, '') AS country, COALESCE(u.email, '') AS email,
+                   COALESCE(u.country, '') AS country, COALESCE(u.state, '') AS state, COALESCE(u.email, '') AS email,
                    COALESCE(eu.employment_level, '') AS level,
                    e.esaf_id, COALESCE(e.start_date, '') AS start, COALESCE(e.end_date, '') AS end,
                    COALESCE(e.technique, '') AS technique, COALESCE(e.research_subject, '') AS subject

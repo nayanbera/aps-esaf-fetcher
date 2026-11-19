@@ -122,6 +122,62 @@
   </div>
 </div>
 
+<!-- Charts -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Approved ESAFs per year</div>
+      <div class="card-body p-2"><div id="chart-years" style="height:320px"></div></div>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Users by career stage</div>
+      <div class="card-body p-2"><div id="chart-stages" style="height:320px"></div></div>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">ESAFs by funding agency</div>
+      <div class="card-body p-2"><div id="chart-funding" style="height:320px"></div></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Users per US state</div>
+      <div class="card-body p-2"><div id="chart-states" style="height:380px"></div></div>
+      <div class="card-footer small text-muted">
+        Unique users (badge + institution) by the state of their institution.
+        {% if charts.us_no_state %}{{ charts.us_no_state }} US user(s) without a state are not shown.{% endif %}
+        {% if charts.states %}
+        <details class="mt-1"><summary>Table</summary>
+          <table class="table table-sm mb-0"><tbody>
+            {% for r in charts.states %}<tr><td>{{ r.name }}</td><td class="text-end">{{ r.unique_users }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Users per country</div>
+      <div class="card-body p-2"><div id="chart-countries" style="height:380px"></div></div>
+      <div class="card-footer small text-muted">
+        Unique users (badge + institution) by the country of their institution.
+        {% if charts.no_country %}{{ charts.no_country }} user(s) without a known country are not shown.{% endif %}
+        {% if charts.countries %}
+        <details class="mt-1"><summary>Table</summary>
+          <table class="table table-sm mb-0"><tbody>
+            {% for r in charts.countries %}<tr><td>{{ r.country }}</td><td class="text-end">{{ r.unique_users }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row g-4">
 
   <!-- ESAFs by year -->
@@ -354,4 +410,8 @@
   </div>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.0.1/plotly.min.js"></script>
+<script id="chart-data" type="application/json">{{ charts | tojson }}</script>
+<script src="/static/stats-charts.js?v=1"></script>
 {% endblock %}

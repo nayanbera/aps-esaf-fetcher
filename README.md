@@ -142,6 +142,12 @@ to also merge stubs whose nearest real ESAFs are tied (twin ESAFs of one visit).
 stages that sit between two identical known stages of the same person can be filled with
 `python backfill_career_stage.py` (dry run; `--apply` after a backup).
 
+**Statistics charts** (Statistics page, same filters as the tables): Approved ESAFs per year (bars), unique users per
+career stage and ESAFs per funding agency (pies), and unique users per US state and per country (maps). Users are the
+unique users (badge + institution); their country and state are the ones stored on the user (ISO country codes or names
+are both understood). Users without a recognisable country or state are not drawn; the number left out is printed
+under the map. The charts load Plotly from a CDN, so the browser needs internet access.
+
 **Funding sources** come from the GUP PDFs (pushed to linked ESAFs), ESAF PDFs and the master file; the APS sync has none,
 so it leaves an ESAF's funding as it is. Earlier versions emptied it on every sync: `python restore_funding.py` (dry run;
 `--apply` after a backup) refills ESAFs that now have none from their linked GUP and never changes ESAFs that have funding.

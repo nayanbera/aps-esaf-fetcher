@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from . import geo
+
 _STOP = {"the", "of", "at", "in", "for", "and"}
 
 
@@ -72,6 +74,7 @@ def merge(slots: list[dict]) -> list[dict]:
             "name": next((s["name"] for s in g if (s.get("name") or "").strip()), ""),
             "institution": max(insts, key=insts.get) if insts else "",
             "country": max((s.get("country") or "" for s in g), default=""),
+            "state": max((s.get("state") or "" for s in g), default=""),
             "email": max((s.get("email") or "" for s in g), default=""),
             "employment_level": latest_level(g),
             "stage_history": stage_history(g),
@@ -97,8 +100,29 @@ def stats(slots: list[dict]) -> dict:
         lv = (s.get("level") or "").strip() or "Unknown"
         by_level.setdefault(lv, {"employment_level": lv, "unique_users": 0, "esaf_slots": 0})["esaf_slots"] += 1
     top = sorted(users, key=lambda u: -u["esaf_count"])[:20]
+    countries: dict[str, int] = {}
+    states: dict[str, int] = {}
+    no_country = us_no_state = 0
+    for u in users:
+        st = geo.us_state(u.get("state", ""))
+        c3 = geo.iso3(u.get("country", "")) or ("USA" if st else "")   # a US state with no country = a US user
+        if not c3:
+            no_country += 1
+            continue
+        countries[c3] = countries.get(c3, 0) + 1
+        if c3 == "USA":
+            if st:
+                states[st] = states.get(st, 0) + 1
+            else:
+                us_no_state += 1
     return {
         "unique_users": len(users),
+        "by_country": sorted(({"iso3": c, "country": geo.country_name(c), "unique_users": n}
+                              for c, n in countries.items()), key=lambda r: (-r["unique_users"], r["country"])),
+        "users_no_country": no_country,
+        "by_state": sorted(({"state": s, "name": geo.US_STATES[s], "unique_users": n}
+                            for s, n in states.items()), key=lambda r: (-r["unique_users"], r["name"])),
+        "us_users_no_state": us_no_state,
         "by_employment": sorted(by_level.values(), key=lambda r: -r["unique_users"]),
         "top_users": [{"name": u["name"], "institution": u["institution"], "experiments": u["esaf_count"]} for u in top],
     }

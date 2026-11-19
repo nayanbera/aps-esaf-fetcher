@@ -12,6 +12,36 @@ from ..templates_env import templates
 
 router = APIRouter()
 
+# Categorical slots 1-8 of the validated default palette (light mode), in fixed order; grey = Unknown / Other.
+_SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+_GREY = "#a8a7a1"
+_STAGE_ORDER = ["Undergraduate student", "Graduate student", "Post-doc", "Faculty / professional staff", "Other"]
+
+
+def _charts(stats: dict) -> dict:
+    """Plain data for the Statistics charts (colours are decided here, once)."""
+    # Career stage: a stage keeps its colour whatever the filters show.
+    stages = []
+    for r in stats["by_employment"]:
+        lv = r["employment_level"]
+        known = lv in _STAGE_ORDER
+        stages.append({"label": lv, "value": r["unique_users"],
+                       "color": _SERIES[_STAGE_ORDER.index(lv)] if known else _GREY})
+    # Funding: the biggest agencies in order; the rest fold into Other.
+    groups = sorted(stats.get("funding_groups", []), key=lambda g: -g["count"])
+    funding = [{"label": g["agency"], "value": g["count"], "color": _SERIES[i]} for i, g in enumerate(groups[:7])]
+    if len(groups) > 7:
+        funding.append({"label": "Other", "value": sum(g["count"] for g in groups[7:]), "color": _GREY})
+    return {
+        "years": [{"year": r["year"], "count": r["count"]} for r in sorted(stats["by_year"], key=lambda r: r["year"] or 0)],
+        "stages": stages,
+        "funding": funding,
+        "countries": stats.get("by_country", []),
+        "states": stats.get("by_state", []),
+        "no_country": stats.get("users_no_country", 0),
+        "us_no_state": stats.get("us_users_no_state", 0),
+    }
+
 _DEFAULT_FROM = 2024
 
 
@@ -87,6 +117,7 @@ def stats_page(
     return templates.TemplateResponse("stats.html", {
         "request":            request,
         "stats":              stats,
+        "charts":             _charts(stats),
         "from_year":          from_yr,
         "to_year":            to_yr,
         "from_month":         _parse_month(from_month) if from_yr else None,
