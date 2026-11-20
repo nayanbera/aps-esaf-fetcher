@@ -1,8 +1,8 @@
 {# GUP instruments (Experiment Time Requests); etr_rows etc. come from the page context #}
 <div class="card mt-3">
   <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-    <span><i class="bi bi-cpu me-1"></i>Instrument{% if etr_gup %} <span class="fw-normal text-muted small">(requested in GUP <a href="/gups/{{ etr_gup }}">{{ etr_gup }}</a>)</span>{% endif %}</span>
-    {% if etr_suggested and esaf.technique != etr_suggested %}
+    <span><i class="bi bi-cpu me-1"></i>Instrument{% if etr_gup and esaf is defined %} <span class="fw-normal text-muted small">(requested in GUP <a href="/gups/{{ etr_gup }}">{{ etr_gup }}</a>)</span>{% endif %}</span>
+    {% if etr_suggested and esaf is defined and esaf.technique != etr_suggested %}
       <button class="btn btn-outline-primary btn-sm py-0" hx-post="/esafs/{{ esaf.esaf_id }}/apply-instrument-technique"
               hx-confirm="Set the technique of this ESAF to {{ etr_suggested }}?"
               title="The instrument says {{ etr_suggested }}; this ESAF has {{ esaf.technique or 'no technique' }}">
@@ -21,7 +21,7 @@
         <tbody>
         {% for r in etr_rows %}
           <tr class="{{ 'table-warning' if r.this_cycle else '' }}">
-            <td class="text-nowrap">{{ r.run_cycle }}{% if r.this_cycle %} <span class="badge bg-warning text-dark">this ESAF</span>{% endif %}</td>
+            <td class="text-nowrap">{{ r.run_cycle }}{% if r.this_cycle %} <span class="badge bg-warning text-dark">{{ cycle_label | default("this ESAF") }}</span>{% endif %}</td>
             <td class="text-nowrap">{{ r.resource }}</td>
             <td>{{ r.instrument }}</td>
             <td class="text-muted small">{{ r.technique }}</td>
@@ -46,7 +46,7 @@
     </div>
     {% elif etr_gup %}
       <div class="p-3 text-muted small">GUP {{ etr_gup }} has no instrument information yet (its PDF has to be imported again).</div>
-    {% else %}
+    {% elif esaf is defined %}
       <div class="p-3 text-muted small">This ESAF is not linked to a GUP, so there is no instrument information.</div>
     {% endif %}
   </div>

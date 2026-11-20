@@ -14,7 +14,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from .. import config, db, gup_import
+from .. import config, db, gup_import, instruments
 from ..gup_pdf_parser import parse_gup_pdf
 from ..templates_env import templates
 
@@ -154,10 +154,15 @@ def gup_detail(request: Request, gup_id: str):
     if gup is None:
         raise HTTPException(404, f"GUP {gup_id} not found")
     linked_esafs = db.get_esafs_for_gup(gup_id)
+    etr = gup.get("etr") or []
+    tech, why = instruments.suggest("", etr, cycle=gup.get("run_cycle", "")) if etr else ("", "")
     return templates.TemplateResponse("gup_detail.html", {
         "request":      request,
         "gup":          gup,
         "linked_esafs": linked_esafs,
+        "etr_rows":     [dict(r, technique_code=instruments.technique_of(r.get("instrument", "")),
+                              this_cycle=r.get("run_cycle") == gup.get("run_cycle")) for r in etr],
+        "etr_gup":      gup_id, "etr_suggested": tech, "etr_why": why, "cycle_label": "proposal cycle",
     })
 
 

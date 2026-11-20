@@ -135,9 +135,14 @@ def sync_funding_all():
     r = gup_import.fill_funding_from_gups(apply=True)
     t = gup_import.update_techniques(apply=True)
     parts = [f"{len(r['restore'])} ESAF(s) got funding from their GUP"]
-    parts.append(f"{len(t['set'])} ESAF(s) got a technique from their GUP's instrument")
+    parts.append(f"technique from the GUP's 15-ID instrument: {len(t['set'])} ESAF(s) set, {t['same']} already match")
     if t["differs"]:
         parts.append(f"{len(t['differs'])} ESAF(s) have a technique set by hand that differs from the instrument (left as is)")
+    if t["unclear"]:
+        parts.append(f"{t['unclear']} ESAF(s) left alone: their GUP lists no single 15-ID instrument")
+    g = t["gups"]
+    parts.append(f"GUP technique: {len(g['set'])} set, {g['same']} already match"
+                 + (f", {len(g['differs'])} set by hand differ" if g["differs"] else ""))
     if linked:
         parts.append(linked)
     left = sum(map(len, r["no_gup_data"].values()))

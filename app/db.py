@@ -106,8 +106,8 @@ def clear_pi_group_assignments(group_name: str) -> int:
     return _r().clear_pi_group_assignments(group_name)
 
 
-def set_gup_technique(gup_id: str, technique: str) -> None:
-    _r().set_gup_technique(gup_id, technique)
+def set_gup_technique(gup_id: str, technique: str, source: str = "") -> None:
+    _r().set_gup_technique(gup_id, technique, source)
 
 
 def set_pi_group_technique(name: str, technique: str) -> None:

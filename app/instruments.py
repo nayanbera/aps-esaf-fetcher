@@ -44,7 +44,7 @@ def flatten_etr(rows: list[dict]) -> list[dict]:
     return out
 
 
-def suggest(start_date: str, etr: list[dict]) -> tuple[str, str]:
+def suggest(start_date: str, etr: list[dict], cycle: str = "") -> tuple[str, str]:
     """Technique an ESAF should have from its GUP's instruments -> (technique or '', why).
 
     The ETR rows of the ESAF's own run cycle count first; without any, all the GUP's 15-ID rows."""
@@ -52,7 +52,7 @@ def suggest(start_date: str, etr: list[dict]) -> tuple[str, str]:
     mapped = [(r, t) for r, t in mapped if t]
     if not mapped:
         return "", "no 15-ID instrument on the GUP"
-    cyc = run_cycle(start_date)
+    cyc = cycle or run_cycle(start_date)
     same = [t for r, t in mapped if cyc and r.get("run_cycle") == cyc]
     pool = same or [t for _r, t in mapped]
     techs = set(pool)

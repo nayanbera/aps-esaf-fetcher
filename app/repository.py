@@ -299,7 +299,7 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
-    def set_gup_technique(self, gup_id: str, technique: str) -> None:
+    def set_gup_technique(self, gup_id: str, technique: str, source: str = "") -> None:
         """Set the technique classification on a GUP."""
         ...
 

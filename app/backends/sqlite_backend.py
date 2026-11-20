@@ -393,6 +393,7 @@ class SQLiteESAFRepository(ESAFRepository):
                 ("co_pi",          "TEXT DEFAULT ''"),
                 ("co_proposers",   "TEXT DEFAULT ''"),
                 ("additional_areas", "TEXT DEFAULT ''"),
+                ("technique_source", "TEXT DEFAULT ''"),      # 'instrument' when set from the ETR table, '' by hand
             ]:
                 try:
                     conn.execute(f"ALTER TABLE gups ADD COLUMN {col} {defn}")
@@ -1588,11 +1589,11 @@ class SQLiteESAFRepository(ESAFRepository):
             ).fetchall()
         return [r[0] for r in rows]
 
-    def set_gup_technique(self, gup_id: str, technique: str) -> None:
+    def set_gup_technique(self, gup_id: str, technique: str, source: str = "") -> None:
         with self._db() as conn:
             conn.execute(
-                "UPDATE gups SET technique=?, updated_at=datetime('now') WHERE gup_id=?",
-                (technique, gup_id),
+                "UPDATE gups SET technique=?, technique_source=?, updated_at=datetime('now') WHERE gup_id=?",
+                (technique, source, gup_id),
             )
 
     def set_pi_group_technique(self, name: str, technique: str) -> None:

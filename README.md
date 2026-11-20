@@ -162,6 +162,7 @@ X-ray Scattering = ASWAXS): the ETR rows of the ESAF's run cycle count first, ot
 has no technique or where this rule set it before; a technique chosen by hand is kept, and the card offers **Use <technique>** to replace it.
 It runs after a GUP or ESAF PDF import and with **Sync funding & technique from GUPs** on the ESAFs page. GUPs that request two different 15-ID
 instruments in the same cycle are left alone. GUPs imported before this feature need their PDF imported again to get their instruments.
+The GUP's own technique (GUPs page) follows its instrument the same way (the proposal's run cycle first) and keeps what was set by hand; a GUP re-import keeps a GUP's technique. The GUP's Beamlines column is the Resource column of the same table.
 
 **Funding sources** come from the GUP PDFs (pushed to linked ESAFs), ESAF PDFs and the master file; the APS sync has none,
 so it leaves an ESAF's funding as it is. Earlier versions emptied it on every sync: `python restore_funding.py` (dry run;

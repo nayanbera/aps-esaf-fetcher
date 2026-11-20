@@ -798,6 +798,8 @@ class MongoESAFRepository(ESAFRepository):
         if existing:
             doc["notes"]      = existing.get("notes", "")
             doc["created_at"] = existing.get("created_at", now)
+            doc["technique"]        = existing.get("technique", "")           # set by hand or from the instrument:
+            doc["technique_source"] = existing.get("technique_source", "")    # a re-import must not erase them
             self._gups().replace_one({"gup_id": gup_id}, doc)
             return "updated"
         else:
@@ -849,10 +851,10 @@ class MongoESAFRepository(ESAFRepository):
         )
         return cycles
 
-    def set_gup_technique(self, gup_id: str, technique: str) -> None:
+    def set_gup_technique(self, gup_id: str, technique: str, source: str = "") -> None:
         self._gups().update_one(
             {"gup_id": gup_id},
-            {"$set": {"technique": technique, "updated_at": _now_iso()}},
+            {"$set": {"technique": technique, "technique_source": source, "updated_at": _now_iso()}},
         )
 
     def set_pi_group_technique(self, name: str, technique: str) -> None:

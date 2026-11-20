@@ -13,6 +13,9 @@ log = logging.getLogger(__name__)
 
 def build_gup_data(result: dict, pdf_path: str) -> dict:
     ex = result["extracted"]
+    etr = instruments.flatten_etr(result.get("etr", []))
+    # the requested beamlines are the Resource column of the ETR table; the text fallback is only for PDFs without one
+    beamlines = ", ".join(dict.fromkeys(r["resource"] for r in etr if r["resource"])) or ", ".join(result.get("beamlines", []))
     return {
         "gup_id":           ex.get("gup_id", "").strip(),
         "title":            ex.get("title", ""),
@@ -28,13 +31,13 @@ def build_gup_data(result: dict, pdf_path: str) -> dict:
         "co_proposers":     ex.get("co_proposers", ""),
         "keywords":         ex.get("keywords", ""),
         "abstract":         ex.get("abstract", ""),
-        "beamlines":        ", ".join(result.get("beamlines", [])),
+        "beamlines":        beamlines,
         "status":           ex.get("status", ""),
         "submitted_at":     ex.get("submitted_at", ""),
         "pdf_path":         pdf_path,
         "raw_fields":       ex,
         "funding_sources":  result.get("funding_sources", []),
-        "etr":              instruments.flatten_etr(result.get("etr", [])),
+        "etr":              etr,
     }
 
 
@@ -53,13 +56,40 @@ def funding_labels(funding_sources: list[dict]) -> list[str]:
     return labels
 
 
+def update_gup_techniques(gup_ids: set[str] | None = None, apply: bool = True) -> dict:
+    """The GUP's own technique from its 15-ID instrument (its proposal run cycle's rows first); a technique set by
+    hand is kept.  -> {set: [(gup_id, technique)], same: n, differs: [(gup_id, current, suggested)], unclear: n}"""
+    out = {"set": [], "same": 0, "differs": [], "unclear": 0}
+    for row in db.list_gups(limit=1_000_000):
+        gid = row["gup_id"]
+        if gup_ids is not None and gid not in gup_ids:
+            continue
+        gup = db.get_gup(gid) or {}
+        if not gup.get("etr"):
+            continue
+        tech, _why = instruments.suggest("", gup["etr"], cycle=gup.get("run_cycle", ""))
+        if not tech:
+            out["unclear"] += 1
+            continue
+        cur = (gup.get("technique") or "").strip()
+        if cur == tech:
+            out["same"] += 1
+        elif not cur or gup.get("technique_source") == "instrument":
+            out["set"].append((gid, tech))
+            if apply:
+                db.set_gup_technique(gid, tech, "instrument")
+        else:
+            out["differs"].append((gid, cur, tech))
+    return out
+
+
 def update_techniques(gup_ids: set[str] | None = None, apply: bool = True) -> dict:
     """Set each ESAF's technique from its GUP's 15-ID instrument (see instruments.py).
 
     Only ESAFs with no technique, or one set by this rule before, are changed; a technique set by hand is left
     and reported under 'differs'.  gup_ids limits it to the ESAFs of those GUPs.
     -> {set: [(esaf_id, technique)], same: n, differs: [(esaf_id, current, suggested)], unclear: n}"""
-    out = {"set": [], "same": 0, "differs": [], "unclear": 0}
+    out = {"set": [], "same": 0, "differs": [], "unclear": 0, "gups": update_gup_techniques(gup_ids, apply)}
     etr_by_gup: dict[str, list] = {}
     for row in db.list_esaf_gup_rows():
         gid = (row.get("gup_id") or "").strip()
