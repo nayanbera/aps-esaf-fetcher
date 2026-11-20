@@ -220,6 +220,12 @@ def run_sync(
         error_msg = str(exc)
         log.error("Sync failed: %s", exc)
 
+    if not dry_run and not error_msg:
+        try:                                             # new ESAFs may belong to GUPs we already have
+            from . import gup_linking
+            gup_linking.link_esafs_to_gups(apply=True)
+        except Exception as exc:
+            log.warning("GUP linking after sync failed: %s", exc)
     if not dry_run:
         db.log_sync(
             beamlines="|".join(bl),

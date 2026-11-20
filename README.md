@@ -155,6 +155,8 @@ funding, funding detail, users per US state / country, institutions, top users, 
 The bar and pie charts are native Excel charts on their sheets; the two maps are not (Excel cannot be written with map charts), so
 those sheets hold the tables only.
 
+**Linking ESAFs to GUPs.** An ESAF gets its GUP from its own PDF, from a sibling ESAF (same title and PI), or by matching: an unlinked ESAF whose PI and title equal a GUP's (a title that starts the same also counts) is linked to it, which also brings funding and technique. This runs when a GUP is imported, after each sync and with **Sync funding & technique from GUPs**. `python link_esafs_to_gups.py` (dry run; `--apply`, and `--likely` for ESAFs matched only by PI and run cycle) lists what would be linked; ESAFs that fit several GUPs are left alone.
+
 **GUP instruments and ESAF technique.** The Experiment Time Request table of each GUP PDF is stored on the GUP (ETR number, run cycle,
 resource, instrument, requested technique, shifts) and shown on the ESAF page in an *Instrument* card. The ESAF's own technique is set from
 the 15-ID instrument (`app/instruments.py`: 15-ID-D Crystallography = Xtal, 15-ID-C Liquid interface = Surf, 15-ID-D Anomalous Small Angle

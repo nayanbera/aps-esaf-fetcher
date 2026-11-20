@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from . import db, instruments
+from . import db, gup_linking, instruments
 from .folder_import import FolderImporter
 from .gup_pdf_parser import parse_gup_pdf
 
@@ -160,6 +160,7 @@ def _process(pdf_path: str, now: str) -> str:
     action = db.upsert_gup(data, now)
     propagate_funding(data["gup_id"], data["funding_sources"])
     update_techniques({data["gup_id"]})
+    gup_linking.link_esafs_to_gups(apply=True, gup_ids={data["gup_id"]})
     return action
 
 

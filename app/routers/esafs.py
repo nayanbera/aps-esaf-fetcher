@@ -12,7 +12,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse
 from typing import Annotated
 
-from .. import config, db, esaf_import, esaf_matching, gup_import, instruments
+from .. import config, db, esaf_import, esaf_matching, gup_import, gup_linking, instruments
 from ..esaf_pdf_parser import parse_esaf_pdf
 from ..templates_env import templates
 
@@ -132,9 +132,13 @@ def sync_funding_all():
     funding the funding of their linked GUP.  ESAFs that already have funding are left alone."""
     from ..gup_inference import fill_gup_from_siblings
     linked, _details = fill_gup_from_siblings()
+    by_pi = gup_linking.link_esafs_to_gups(apply=True)
     r = gup_import.fill_funding_from_gups(apply=True)
     t = gup_import.update_techniques(apply=True)
-    parts = [f"{len(r['restore'])} ESAF(s) got funding from their GUP"]
+    parts = [f"{len(by_pi['sure'])} ESAF(s) linked to a GUP (same PI and title)"]
+    if by_pi["likely"]:
+        parts.append(f"{len(by_pi['likely'])} more look like a match by PI and run cycle only: run link_esafs_to_gups.py to review them")
+    parts.append(f"{len(r['restore'])} ESAF(s) got funding from their GUP")
     parts.append(f"technique from the GUP's 15-ID instrument: {len(t['set'])} ESAF(s) set, {t['same']} already match")
     if t["differs"]:
         parts.append(f"{len(t['differs'])} ESAF(s) have a technique set by hand that differs from the instrument (left as is)")

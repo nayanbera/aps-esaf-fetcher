@@ -14,7 +14,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from .. import config, db, gup_import, instruments
+from .. import config, db, gup_import, gup_linking, instruments
 from ..gup_pdf_parser import parse_gup_pdf
 from ..templates_env import templates
 
@@ -203,6 +203,7 @@ async def upload_gup_pdf(request: Request, pdf_file: UploadFile = File(...)):
     action = db.upsert_gup(data, now)
     _propagate_funding(gup_id, result.get("funding_sources", []))
     gup_import.update_techniques({gup_id})
+    gup_linking.link_esafs_to_gups(apply=True, gup_ids={gup_id})
 
     verb = "Added" if action == "added" else "Updated"
     return HTMLResponse(
