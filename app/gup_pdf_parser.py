@@ -21,6 +21,7 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
             "confidence":       {field: float, ...},
             "funding_sources":  [{"agency", "details", "grant_number", "percentage"}, ...],
             "beamlines":        [str, ...],
+            "etr":              [{etr, run_cycle, resources, entries: [{instrument, technique}], requested, minimum, lifetime}, ...],
             "raw_text":         str,
         }
     """
@@ -42,6 +43,7 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
         funding_rows: list[dict] = []
         beamlines: list[str] = []
         columns = _page1_columns(pages[0]) if pages else None
+        etr = _etr_rows(pages)
 
         for page in pages:
             tables = page.extract_tables()
@@ -116,6 +118,7 @@ def parse_gup_pdf(pdf_path_or_bytes: Union[str, bytes]) -> dict:
         "confidence": confidence,
         "funding_sources": funding_rows,
         "beamlines": beamlines,
+        "etr": etr,
         "raw_text": raw_text,
     }
 
@@ -421,6 +424,154 @@ def _apply_page1_columns(cols: dict, extracted: dict, confidence: dict) -> None:
         extracted["review_panel"] = re.sub(r"Proposal\s+\d{5,7}\s+Pre-Decisional.*?Page\s+\d+\s+of\s+\d+\s*", "",
                                            extracted["review_panel"], flags=re.DOTALL).strip()
     put("keywords", " ".join(_section(right, "Keywords")), 0.9)
+
+
+# ---------------------------------------------------------------------------
+# Experiment Time Requests (ETR) table: ETR Number | Run Cycle | Resource | Instrument | Technique | shifts
+#
+# The table is read by word position under its header (pdfplumber's table finder misses rows or merges
+# them).  Cells are centred vertically, so each word goes to the nearest ETR number; the table can start at
+# the bottom of one page and continue on the next.
+# ---------------------------------------------------------------------------
+
+_ETR_NUM = re.compile(r"^\d{6,8}$")
+_STATION = re.compile(r"^\d{1,2}-[A-Z]{2}-[A-Z](,[A-Z])?$")          # 15-ID-D, 12-ID-E, 9-ID-B,C
+_ETR_HEAD = {"ETR", "Number", "Run", "Cycle", "Resource", "Instrument", "Technique", "Requested", "Minimum",
+             "Lifetime", "Shifts"}
+
+
+def _join_lines(words: list) -> str:
+    """Words of one cell in reading order; a hyphen at a line end joins without a space ('small-' 'angle')."""
+    lines: list[list] = []
+    for w in sorted(words, key=lambda w: (w["top"], w["x0"])):
+        if lines and abs(lines[-1][0]["top"] - w["top"]) <= 3:
+            lines[-1].append(w)
+        else:
+            lines.append([w])
+    out = ""
+    for ln in lines:
+        txt = " ".join(x["text"] for x in sorted(ln, key=lambda w: w["x0"]))
+        out = out + txt if out.endswith("-") else (out + " " + txt).strip()
+    return out
+
+
+def _resources(words: list) -> list[str]:
+    """Resource column lines -> ['15-ID-C,D', '12-ID-E']: a line ending in a hyphen continues on the next line."""
+    out: list[str] = []
+    cont = False
+    for w in sorted(words, key=lambda w: (w["top"], w["x0"])):
+        out[-1:] = [out[-1] + w["text"]] if cont and out else out[-1:]
+        if not (cont and out):
+            out.append(w["text"])
+        cont = w["text"].endswith("-")
+    return out
+
+
+_CYCLE = re.compile(r"^\d{4}-\d$")
+
+
+def _line_tops(words: list) -> list[float]:
+    """Vertical positions of the text lines in `words`, top to bottom."""
+    tops: list[float] = []
+    for t in sorted(w["top"] for w in words):
+        if not tops or t - tops[-1] > 3:
+            tops.append(t)
+    return tops
+
+
+def _etr_rows(pages) -> list[dict]:
+    """Experiment Time Requests -> [{etr, run_cycle, resources, entries: [{instrument, technique}], requested,
+    minimum, lifetime}].  One ETR can request several instruments (stacked inside its cells), and a row can be
+    cut by a page break (its tail sits at the top of the next page)."""
+    bounds = None                                    # x boundaries between the columns, from the header
+    recs: list[dict] = []                            # {etr, anchor, cells: {col: [words]}}
+    for pno, pg in enumerate(pages):
+        words = [dict(w, top=w["top"] + pno * 1000) for w in pg.extract_words()]    # one vertical axis for all pages
+        lines: dict[int, list] = {}
+        for w in words:
+            lines.setdefault(round(w["top"] / 3), []).append(w)
+        top_limit = -1.0
+        head = next((ln for ln in lines.values() if {"Instrument", "Technique", "Resource"} <= {w["text"] for w in ln}), None)
+        if head is not None:
+            t0 = head[0]["top"]
+            hw = [w for w in words if abs(w["top"] - t0) <= 16 and w["text"] in _ETR_HEAD]      # header can be 2 lines tall
+            xs: dict[str, float] = {}
+            for w in sorted(hw, key=lambda w: w["x0"]):
+                xs.setdefault(w["text"], w["x0"])
+            try:
+                starts = [xs["ETR"], xs["Run"], xs["Resource"], xs["Instrument"], xs["Technique"], xs["Requested"],
+                          xs["Minimum"], xs["Lifetime"]]
+            except KeyError:
+                continue
+            bounds = [x - 3 for x in starts[1:]]
+            top_limit = max(w["top"] for w in hw) + 4
+        elif bounds is None:
+            continue
+        margin = bounds[0] - 30                      # section headings sit at the left margin, left of the table
+        body, stop = [], False
+        for k in sorted(lines):
+            ln = sorted(lines[k], key=lambda w: w["x0"])
+            text = " ".join(w["text"] for w in ln)
+            if ln[0]["top"] <= top_limit or _FOOTER.search(text) or all(w["text"] in _ETR_HEAD for w in ln):
+                continue                                  # (a header split by a page break leaves header-only lines)
+            if ln[0]["x0"] < margin and not _ETR_NUM.match(ln[0]["text"]):
+                stop = True
+                break
+            body += ln
+        anchors = sorted((w for w in body if _ETR_NUM.match(w["text"]) and w["x0"] < bounds[0]), key=lambda w: w["top"])
+        col = lambda w: sum(1 for b in bounds if w["x0"] >= b)
+
+        # words above this page's first ETR number: the tail of a row cut by the page break
+        lead: list = []
+        if head is None and recs:
+            prev = recs[-1]
+            first = anchors[0]["top"] if anchors else 1e9
+            above = [w for w in body if w["top"] < first]
+            tops = _line_tops(above)
+            limit = -1.0
+            if not any(_CYCLE.match(w["text"]) for w in prev["cells"].get(1, [])):
+                # the run cycle ('APS:' / '2026-1') is unfinished: the tail runs to the line holding it
+                cyc = [w for w in above if col(w) == 1 and _CYCLE.match(w["text"])]
+                limit = max(w["top"] for w in cyc) + 3 if cyc else (1e9 if not anchors else -1.0)
+            else:
+                # cells are centred on the ETR number: as many lines below it as above it
+                mine = _line_tops([w for ws in prev["cells"].values() for w in ws])
+                if mine:
+                    ia = min(range(len(mine)), key=lambda i: abs(mine[i] - prev["anchor"]))
+                    need = ia - (len(mine) - 1 - ia)
+                    if need > 0 and tops:
+                        limit = tops[min(need, len(tops)) - 1] + 3
+            lead = [w for w in above if w["top"] <= limit]
+            for w in lead:
+                prev["cells"].setdefault(col(w), []).append(w)
+        taken = {id(w) for w in lead}
+        mine = [{"etr": a["text"], "anchor": a["top"], "cells": {}} for a in anchors]
+        for w in body:
+            if id(w) in taken or not mine:
+                continue
+            r = min(mine, key=lambda r: abs(r["anchor"] - w["top"]))
+            r["cells"].setdefault(col(w), []).append(w)
+        recs += mine
+        if stop:
+            break
+
+    rows = []
+    for r in recs:
+        c = r["cells"]
+        text = lambda i: _join_lines(c.get(i, []))
+        inst, tech = c.get(3, []), c.get(4, [])
+        lefts = min((w["x0"] for w in inst), default=0)
+        begins = sorted(w["top"] for w in inst if _STATION.match(w["text"]) and w["x0"] <= lefts + 4) or \
+                 ([min(w["top"] for w in inst)] if inst else [])
+        entries = []
+        for i, t in enumerate(begins):
+            lo, hi = t - 2, (begins[i + 1] - 2 if i + 1 < len(begins) else 1e12)
+            pick = lambda ws: [w for w in ws if lo <= w["top"] < hi]
+            entries.append({"instrument": _join_lines(pick(inst)), "technique": _join_lines(pick(tech))})
+        rows.append({"etr": r["etr"], "run_cycle": re.sub(r"^APS:?\s*", "", text(1)).strip(),
+                     "resources": _resources(c.get(2, [])), "entries": entries,
+                     "requested": text(5), "minimum": text(6), "lifetime": text(7)})
+    return rows
 
 
 # ---------------------------------------------------------------------------
