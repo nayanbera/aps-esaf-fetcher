@@ -103,6 +103,17 @@ def active_awards(awards: list[dict], d: date | None) -> list[str]:
     return out
 
 
+def facility_in(award: str, fac: list[str]) -> str:
+    """The facility award one award string refers to, whatever the publisher wrote around the number:
+    'CHE-2335833', 'NSF/CHE-2335833', 'NSF/CHE- 2335833', '2335833' -> 'CHE-2335833'.  '' when it is another award."""
+    t = re.sub(f"[{_DASH}]", "-", award or "")
+    for f in fac:
+        num = f.rsplit("-", 1)[-1]
+        if num.isdigit() and re.search(rf"(?<!\d){num}(?!\d)", t):
+            return f
+    return ""
+
+
 def _award_regex(number: str) -> re.Pattern:
     m = re.fullmatch(r"([A-Z]+)-(\d+)", canon_award(number))
     if not m:
@@ -117,7 +128,12 @@ _NSF_CODE_RE = re.compile(
 def analyze_text(text: str, facility_numbers: list[str]) -> dict:
     """Facility awards and NSF award codes mentioned in *text*."""
     fac = [canon_award(n) for n in facility_numbers]
-    found_fac = [n for n in fac if _award_regex(n).search(text or "")]
+    found_fac = []
+    for n in fac:
+        num = n.rsplit("-", 1)[-1]
+        bare = rf"(?:NSF|National Science Foundation|award|grant)[^.\n]{{0,60}}(?<!\d){num}(?!\d)"
+        if _award_regex(n).search(text or "") or (num.isdigit() and re.search(bare, text or "", re.I)):
+            found_fac.append(n)
     nsf = []
     for m in _NSF_CODE_RE.finditer(text or ""):
         code = f"{m[1]}-{m[2]}"
@@ -195,9 +211,14 @@ def classify_funders(funders: list[dict], facility_numbers: list[str]) -> dict:
     facility, nsf, other = [], [], []
     for f in funders:
         name = f.get("name", "")
-        awards = [canon_award(a) for a in f.get("awards", [])]
-        facility += [a for a in awards if a in fac and a not in facility]
-        rest = [a for a in awards if a not in fac]
+        rest = []
+        for raw in f.get("awards", []):
+            hit = facility_in(raw, fac)
+            if hit:
+                if hit not in facility:
+                    facility.append(hit)
+            else:
+                rest.append(canon_award(raw))
         if re.search(r"National Science Foundation|\bNSF\b", name):
             nsf += [a for a in rest if a not in nsf]
         elif name:
@@ -797,6 +818,57 @@ def search_literature(mode: str, query: str, sources: list[str], from_date: str 
 # ---------------------------------------------------------------------------
 # Ingest (shared by DOI list, EndNote file and PDF imports)
 # ---------------------------------------------------------------------------
+
+def recheck_one(p: dict, fac: list[str]) -> dict | None:
+    """The publication with facility awards moved out of its NSF / other award columns (and found in its stored
+    acknowledgment text) into 'facility_ack'; None when nothing changes."""
+    moved: list[str] = []
+    nsf = []
+    for item in [x.strip() for x in (p.get("nsf_awards") or "").split(";") if x.strip()]:
+        hit = facility_in(item, fac)
+        if hit:
+            moved.append(hit)
+        else:
+            nsf.append(item)
+    other = []
+    for seg in [x.strip() for x in (p.get("other_awards") or "").split(";") if x.strip()]:
+        m = re.fullmatch(r"(.*?)\s*\((.*)\)", seg)
+        if not m:
+            other.append(seg)
+            continue
+        inner = []
+        for a in [x.strip() for x in m[2].split(",") if x.strip()]:
+            hit = facility_in(a, fac)
+            if hit:
+                moved.append(hit)
+            else:
+                inner.append(a)
+        other.append(f"{m[1]} ({', '.join(inner)})" if inner else m[1])
+    text = " ".join(filter(None, [p.get("ack_text"), p.get("notes")]))
+    moved += analyze_text(text, fac)["facility_ack"]
+    merged = dict(p)
+    merged["facility_ack"] = _union(p.get("facility_ack"), ", ".join(dict.fromkeys(moved)), ",")
+    merged["nsf_awards"] = "; ".join(nsf)
+    merged["other_awards"] = "; ".join(other)
+    return merged if merged != p else None
+
+
+def recheck_awards() -> dict:
+    """Run recheck_one over every stored publication."""
+    fac = [canon_award(a["number"]) for a in facility_awards()]
+    out = {"checked": 0, "changed": 0, "gained": 0}
+    if not fac:
+        return out
+    for p in db.list_records(PUBS):
+        out["checked"] += 1
+        new = recheck_one(p, fac)
+        if new is not None:
+            if not (p.get("facility_ack") or "").strip() and (new.get("facility_ack") or "").strip():
+                out["gained"] += 1
+            db.save_record(PUBS, p["id"], new)
+            out["changed"] += 1
+    return out
+
 
 def _union(a: str, b: str, sep: str) -> str:
     items = [x.strip() for x in (a or "").split(sep) if x.strip()]

@@ -17,6 +17,12 @@
             title="Look for ESAF DOIs / ESAF numbers in the stored acknowledgments and fill ESAF and Team IDs">
       <i class="bi bi-diagram-3 me-1"></i>Link ESAFs
     </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm"
+            hx-post="/publications/recheck-awards" hx-target="#pub-result"
+            hx-on::after-request="window.pubRefresh && window.pubRefresh()"
+            title="Move facility award numbers that were filed under NSF or other awards (for example 'NSF/CHE-2335833' or a bare '2335833') into the facility-award column">
+      <i class="bi bi-award-fill me-1"></i>Re-check awards
+    </button>
     <a href="/facility-awards" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-award me-1"></i>Facility awards ({{ n_awards }})
     </a>

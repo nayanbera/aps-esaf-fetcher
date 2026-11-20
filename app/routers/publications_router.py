@@ -124,6 +124,16 @@ async def link_esafs_all():
                         f'from their stored acknowledgments.</div>')
 
 
+@router.post("/publications/recheck-awards", response_class=HTMLResponse)
+async def recheck_awards_all():
+    r = await run_in_threadpool(pubs.recheck_awards)
+    if not r["checked"]:
+        return HTMLResponse('<div class="alert alert-warning mb-2">No facility awards are defined yet (Facility awards page), '
+                            'or there are no publications.</div>')
+    return HTMLResponse(f'<div class="alert alert-success mb-2">{r["checked"]} publication(s) checked: facility awards were moved '
+                        f'out of the NSF / other award columns in {r["changed"]}, and {r["gained"]} now have a facility award acknowledged.</div>')
+
+
 @router.post("/publications/read-acks", response_class=HTMLResponse)
 async def read_acks_all():
     res = await run_in_threadpool(pubs.read_acknowledgments_all)
@@ -292,6 +302,7 @@ async def publication_refresh(pid: str):
     merged["facility_ack"] = pubs._union(p.get("facility_ack"), fund["facility_ack"], ",")
     merged["nsf_awards"] = pubs._union(p.get("nsf_awards"), fund["nsf_awards"], ";")
     merged["other_awards"] = p.get("other_awards") or fund["other_awards"]
+    merged = pubs.recheck_one(merged, [pubs.canon_award(a["number"]) for a in pubs.facility_awards()]) or merged
     db.save_record(pubs.PUBS, pid, merged)
     return RedirectResponse(f"/publications/{pid}/edit?saved=1", status_code=303)
 
