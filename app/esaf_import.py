@@ -11,7 +11,7 @@ import logging
 from . import db
 from .esaf_pdf_parser import parse_esaf_pdf
 from .folder_import import FolderImporter
-from .gup_import import propagate_funding
+from .gup_import import propagate_funding, update_techniques
 from .gup_inference import fill_gup_from_siblings
 
 log = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ def _process(pdf_path: str, now: str) -> str:
         gup = db.get_gup(gup_id)
         if gup and gup.get("funding_sources"):
             propagate_funding(gup_id, gup["funding_sources"])
+        update_techniques({gup_id})
     return "updated"
 
 

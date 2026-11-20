@@ -155,6 +155,14 @@ funding, funding detail, users per US state / country, institutions, top users, 
 The bar and pie charts are native Excel charts on their sheets; the two maps are not (Excel cannot be written with map charts), so
 those sheets hold the tables only.
 
+**GUP instruments and ESAF technique.** The Experiment Time Request table of each GUP PDF is stored on the GUP (ETR number, run cycle,
+resource, instrument, requested technique, shifts) and shown on the ESAF page in an *Instrument* card. The ESAF's own technique is set from
+the 15-ID instrument (`app/instruments.py`: 15-ID-D Crystallography = Xtal, 15-ID-C Liquid interface = Surf, 15-ID-D Anomalous Small Angle
+X-ray Scattering = ASWAXS): the ETR rows of the ESAF's run cycle count first, otherwise the GUP's 15-ID instrument. It is only set where the ESAF
+has no technique or where this rule set it before; a technique chosen by hand is kept, and the card offers **Use <technique>** to replace it.
+It runs after a GUP or ESAF PDF import and with **Sync funding & technique from GUPs** on the ESAFs page. GUPs that request two different 15-ID
+instruments in the same cycle are left alone. GUPs imported before this feature need their PDF imported again to get their instruments.
+
 **Funding sources** come from the GUP PDFs (pushed to linked ESAFs), ESAF PDFs and the master file; the APS sync has none,
 so it leaves an ESAF's funding as it is. Earlier versions emptied it on every sync: `python restore_funding.py` (dry run;
 `--apply` after a backup) refills ESAFs that now have none from their linked GUP and never changes ESAFs that have funding.

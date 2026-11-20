@@ -16,7 +16,7 @@ import logging
 import re
 
 from . import db
-from .gup_import import propagate_funding
+from .gup_import import propagate_funding, update_techniques
 
 log = logging.getLogger(__name__)
 
@@ -53,6 +53,9 @@ def fill_gup_from_siblings() -> tuple[str, list[str]]:
         gup = db.get_gup(gup_id)
         if gup and gup.get("funding_sources"):
             propagate_funding(gup_id, gup["funding_sources"])
+
+    if filled:
+        update_techniques({g for _, g in filled})
 
     for esaf_id, gup_id in filled:
         log.info("Inferred GUP %s for ESAF %s from sibling ESAFs", gup_id, esaf_id)

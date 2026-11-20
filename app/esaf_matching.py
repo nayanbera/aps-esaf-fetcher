@@ -33,6 +33,12 @@ def esaf_year(start, stored=None, basis: str = "calendar"):
     return d.year + 1 if basis == "fiscal" and d.month >= 10 else d.year
 
 
+def run_cycle(start) -> str:
+    """APS run cycle of a start date: 1 = Jan-Apr, 2 = May-Aug, 3 = Sep-Dec ('2026-3'); '' without a date."""
+    d = parse_date(start)
+    return f"{d.year}-{(d.month - 1) // 4 + 1}" if d else ""
+
+
 def is_stub(esaf: dict) -> bool:
     return (esaf.get("title") or "").endswith(STUB_SUFFIX)
 

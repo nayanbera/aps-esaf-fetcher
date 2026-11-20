@@ -1,0 +1,53 @@
+{# GUP instruments (Experiment Time Requests); etr_rows etc. come from the page context #}
+<div class="card mt-3">
+  <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-cpu me-1"></i>Instrument{% if etr_gup %} <span class="fw-normal text-muted small">(requested in GUP <a href="/gups/{{ etr_gup }}">{{ etr_gup }}</a>)</span>{% endif %}</span>
+    {% if etr_suggested and esaf.technique != etr_suggested %}
+      <button class="btn btn-outline-primary btn-sm py-0" hx-post="/esafs/{{ esaf.esaf_id }}/apply-instrument-technique"
+              hx-confirm="Set the technique of this ESAF to {{ etr_suggested }}?"
+              title="The instrument says {{ etr_suggested }}; this ESAF has {{ esaf.technique or 'no technique' }}">
+        <i class="bi bi-arrow-repeat me-1"></i>Use {{ etr_suggested }}
+      </button>
+    {% endif %}
+  </div>
+  <div class="card-body p-0">
+    {% if etr_rows %}
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light"><tr>
+          <th>Run cycle</th><th>Resource</th><th>Instrument</th><th>Requested technique</th>
+          <th class="text-end">Shifts</th><th>Sets technique</th>
+        </tr></thead>
+        <tbody>
+        {% for r in etr_rows %}
+          <tr class="{{ 'table-warning' if r.this_cycle else '' }}">
+            <td class="text-nowrap">{{ r.run_cycle }}{% if r.this_cycle %} <span class="badge bg-warning text-dark">this ESAF</span>{% endif %}</td>
+            <td class="text-nowrap">{{ r.resource }}</td>
+            <td>{{ r.instrument }}</td>
+            <td class="text-muted small">{{ r.technique }}</td>
+            <td class="text-end text-nowrap" title="requested / minimum / lifetime">{{ r.requested or '–' }} / {{ r.minimum or '–' }} / {{ r.lifetime or '–' }}</td>
+            <td>{% if r.technique_code %}<span class="badge bg-primary">{{ r.technique_code }}</span>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer small text-muted">
+      {% if etr_suggested %}
+        Technique from the instrument: <strong>{{ etr_suggested }}</strong> ({{ etr_why }}).
+        {% if esaf is defined and esaf.technique == etr_suggested %}
+          {% if esaf.technique_source == 'instrument' %}Set automatically from the GUP.{% else %}This ESAF already has it.{% endif %}
+        {% elif esaf is defined %}
+          {% if not esaf.technique %}It will be set automatically.{% elif esaf.technique_source == 'instrument' %}It will be updated automatically.{% else %}This ESAF has <strong>{{ esaf.technique }}</strong>, set by hand, so it was not changed.{% endif %}
+        {% endif %}
+      {% else %}
+        No technique is derived: {{ etr_why or 'no 15-ID instrument on the GUP' }}.
+      {% endif %}
+    </div>
+    {% elif etr_gup %}
+      <div class="p-3 text-muted small">GUP {{ etr_gup }} has no instrument information yet (its PDF has to be imported again).</div>
+    {% else %}
+      <div class="p-3 text-muted small">This ESAF is not linked to a GUP, so there is no instrument information.</div>
+    {% endif %}
+  </div>
+</div>

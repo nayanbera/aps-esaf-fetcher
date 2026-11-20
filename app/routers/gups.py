@@ -197,6 +197,7 @@ async def upload_gup_pdf(request: Request, pdf_file: UploadFile = File(...)):
     now = _now_iso()
     action = db.upsert_gup(data, now)
     _propagate_funding(gup_id, result.get("funding_sources", []))
+    gup_import.update_techniques({gup_id})
 
     verb = "Added" if action == "added" else "Updated"
     return HTMLResponse(

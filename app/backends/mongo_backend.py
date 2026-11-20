@@ -253,7 +253,7 @@ class MongoESAFRepository(ESAFRepository):
             {"esaf_id": esaf_id},
             # Fetch ALL user-editable fields so replace_one never silently drops them.
             {"notes": 1, "custom_fields": 1, "technique": 1, "research_subject": 1, "experiment_ids": 1, "local_id": 1,
-             "pi_group": 1, "gup_id": 1, "created_at": 1, "users": 1, "funding_sources": 1},
+             "pi_group": 1, "gup_id": 1, "created_at": 1, "users": 1, "funding_sources": 1, "technique_source": 1},
         )
 
         # Build doc from DM API fields only.
@@ -284,6 +284,7 @@ class MongoESAFRepository(ESAFRepository):
             doc["notes"]         = existing.get("notes", "")
             doc["custom_fields"] = existing.get("custom_fields", {})
             doc["technique"]     = existing.get("technique", "")
+            doc["technique_source"] = existing.get("technique_source", "")
             doc["research_subject"] = existing.get("research_subject", "")
             doc["experiment_ids"] = existing.get("experiment_ids", [])
             doc["local_id"]      = existing.get("local_id", "")
@@ -314,6 +315,7 @@ class MongoESAFRepository(ESAFRepository):
             doc["notes"]         = ""
             doc["custom_fields"] = {}
             doc["technique"]     = ""
+            doc["technique_source"] = ""
             doc["research_subject"] = ""
             doc["local_id"]      = ""
             doc["pi_group"]      = ""
@@ -790,6 +792,7 @@ class MongoESAFRepository(ESAFRepository):
             "pdf_path":         data.get("pdf_path", ""),
             "raw_fields":       data.get("raw_fields", {}),
             "funding_sources":  data.get("funding_sources", []),
+            "etr":              data.get("etr", []),
             "updated_at":       now,
         }
         if existing:
@@ -868,10 +871,10 @@ class MongoESAFRepository(ESAFRepository):
         new_csv = ",".join(t for t in _ORDER if t in current)
         self._pi_groups().update_one({"name": name}, {"$set": {"technique": new_csv}})
 
-    def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
+    def set_esaf_technique(self, esaf_id: str, technique: str, source: str = "") -> None:
         self._esafs().update_one(
             {"esaf_id": esaf_id},
-            {"$set": {"technique": technique, "updated_at": _now_iso()}},
+            {"$set": {"technique": technique, "technique_source": source, "updated_at": _now_iso()}},
         )
 
     def rename_pi_group(self, old_name: str, new_name: str) -> None:

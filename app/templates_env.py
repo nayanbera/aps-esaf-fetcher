@@ -56,9 +56,8 @@ _env.filters["replace_param"] = _replace_param
 def _run_cycle(esaf) -> str:
     """APS run cycle of an ESAF from its start date: 1 = Jan-Apr, 2 = May-Aug, 3 = Sep-Dec ('2026-3').
     Falls back to the year when the start date is missing."""
-    from .esaf_matching import parse_date
-    d = parse_date(esaf.get("start_date"))
-    return f"{d.year}-{(d.month - 1) // 4 + 1}" if d else str(esaf.get("year") or "")
+    from .esaf_matching import run_cycle
+    return run_cycle(esaf.get("start_date")) or str(esaf.get("year") or "")
 
 
 _env.filters["run_cycle"] = _run_cycle

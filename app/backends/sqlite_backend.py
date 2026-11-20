@@ -150,6 +150,20 @@ CREATE TABLE IF NOT EXISTS gup_funding_sources (
     percentage   INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS gup_etr (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    gup_id       TEXT NOT NULL REFERENCES gups(gup_id) ON DELETE CASCADE,
+    etr          TEXT DEFAULT '',
+    run_cycle    TEXT DEFAULT '',
+    resource     TEXT DEFAULT '',
+    instrument   TEXT DEFAULT '',
+    technique    TEXT DEFAULT '',
+    requested    TEXT DEFAULT '',
+    minimum      TEXT DEFAULT '',
+    lifetime     TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_gup_etr_gup_id ON gup_etr(gup_id);
+
 CREATE TABLE IF NOT EXISTS institution_ror (
     name         TEXT PRIMARY KEY,
     ror_id       TEXT DEFAULT '',
@@ -357,6 +371,7 @@ class SQLiteESAFRepository(ESAFRepository):
                 ("gup_id",   "TEXT DEFAULT ''"),
                 ("pdf_path", "TEXT DEFAULT ''"),
                 ("research_subject", "TEXT DEFAULT ''"),
+                ("technique_source", "TEXT DEFAULT ''"),      # 'instrument' when set from the GUP, '' when set by hand
             ]:
                 try:
                     conn.execute(f"ALTER TABLE esafs ADD COLUMN {col} {defn}")
@@ -461,6 +476,14 @@ class SQLiteESAFRepository(ESAFRepository):
                 CREATE INDEX IF NOT EXISTS idx_esafs_gup_id   ON esafs(gup_id);
                 CREATE INDEX IF NOT EXISTS idx_gups_run_cycle ON gups(run_cycle);
                 CREATE INDEX IF NOT EXISTS idx_gup_fs_gup_id ON gup_funding_sources(gup_id);
+                CREATE TABLE IF NOT EXISTS gup_etr (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    gup_id     TEXT NOT NULL REFERENCES gups(gup_id) ON DELETE CASCADE,
+                    etr TEXT DEFAULT '', run_cycle TEXT DEFAULT '', resource TEXT DEFAULT '',
+                    instrument TEXT DEFAULT '', technique TEXT DEFAULT '', requested TEXT DEFAULT '',
+                    minimum TEXT DEFAULT '', lifetime TEXT DEFAULT ''
+                );
+                CREATE INDEX IF NOT EXISTS idx_gup_etr_gup_id ON gup_etr(gup_id);
             """)
             # Admin + audit tables (migration-safe)
             conn.execute("""
@@ -1395,6 +1418,10 @@ class SQLiteESAFRepository(ESAFRepository):
                 "SELECT COUNT(*) FROM esafs WHERE gup_id = ?", (gup_id,)
             ).fetchone()[0]
         d["funding_sources"] = self._load_gup_funding(gup_id)
+        with self._db() as conn:
+            d["etr"] = [dict(r) for r in conn.execute(
+                "SELECT etr, run_cycle, resource, instrument, technique, requested, minimum, lifetime "
+                "FROM gup_etr WHERE gup_id = ? ORDER BY run_cycle, id", (gup_id,)).fetchall()]
         return d
 
     def _load_gup_funding(self, gup_id: str) -> list[dict]:
@@ -1472,6 +1499,14 @@ class SQLiteESAFRepository(ESAFRepository):
                     ),
                 )
                 action = "added"
+
+            conn.execute("DELETE FROM gup_etr WHERE gup_id = ?", (gup_id,))
+            for r in data.get("etr", []):
+                conn.execute(
+                    "INSERT INTO gup_etr (gup_id, etr, run_cycle, resource, instrument, technique, requested, minimum, lifetime) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (gup_id, r.get("etr", ""), r.get("run_cycle", ""), r.get("resource", ""), r.get("instrument", ""),
+                     r.get("technique", ""), r.get("requested", ""), r.get("minimum", ""), r.get("lifetime", "")))
 
             # Replace funding sources
             conn.execute("DELETE FROM gup_funding_sources WHERE gup_id = ?", (gup_id,))
@@ -1580,11 +1615,11 @@ class SQLiteESAFRepository(ESAFRepository):
             new_csv = ",".join(t for t in _ORDER if t in current)
             conn.execute("UPDATE pi_groups SET technique=? WHERE name=?", (new_csv, name))
 
-    def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
+    def set_esaf_technique(self, esaf_id: str, technique: str, source: str = "") -> None:
         with self._db() as conn:
             conn.execute(
-                "UPDATE esafs SET technique=?, updated_at=datetime('now') WHERE esaf_id=?",
-                (technique, esaf_id),
+                "UPDATE esafs SET technique=?, technique_source=?, updated_at=datetime('now') WHERE esaf_id=?",
+                (technique, source, esaf_id),
             )
 
     def rename_pi_group(self, old_name: str, new_name: str) -> None:

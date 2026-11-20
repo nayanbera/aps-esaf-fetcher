@@ -12,7 +12,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse
 from typing import Annotated
 
-from .. import config, db, esaf_import, gup_import
+from .. import config, db, esaf_import, esaf_matching, gup_import, instruments
 from ..esaf_pdf_parser import parse_esaf_pdf
 from ..templates_env import templates
 
@@ -99,8 +99,19 @@ def esaf_detail(request: Request, esaf_id: str):
         raise HTTPException(404, "ESAF not found")
     field_defs = db.list_field_definitions()
     return templates.TemplateResponse("esaf_detail.html", {
-        "request": request, "esaf": esaf, "field_defs": field_defs,
+        "request": request, "esaf": esaf, "field_defs": field_defs, **_instrument_context(esaf),
     })
+
+
+def _instrument_context(esaf: dict) -> dict:
+    """The linked GUP's instrument rows and the technique they imply, for the ESAF page."""
+    gup = db.get_gup(esaf["gup_id"]) if esaf.get("gup_id") else None
+    etr = (gup or {}).get("etr") or []
+    tech, why = instruments.suggest(esaf.get("start_date", ""), etr) if etr else ("", "")
+    cyc = esaf_matching.run_cycle(esaf.get("start_date"))
+    rows = [dict(r, technique_code=instruments.technique_of(r.get("instrument", "")), this_cycle=bool(cyc and r.get("run_cycle") == cyc))
+            for r in etr]
+    return {"etr_rows": rows, "etr_gup": esaf.get("gup_id") or "", "etr_suggested": tech, "etr_why": why}
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +133,11 @@ def sync_funding_all():
     from ..gup_inference import fill_gup_from_siblings
     linked, _details = fill_gup_from_siblings()
     r = gup_import.fill_funding_from_gups(apply=True)
+    t = gup_import.update_techniques(apply=True)
     parts = [f"{len(r['restore'])} ESAF(s) got funding from their GUP"]
+    parts.append(f"{len(t['set'])} ESAF(s) got a technique from their GUP's instrument")
+    if t["differs"]:
+        parts.append(f"{len(t['differs'])} ESAF(s) have a technique set by hand that differs from the instrument (left as is)")
     if linked:
         parts.append(linked)
     left = sum(map(len, r["no_gup_data"].values()))
@@ -132,6 +147,20 @@ def sync_funding_all():
         parts.append(f"{len(r['no_link'])} ESAF(s) have no funding and no GUP link")
     return HTMLResponse('<span class="text-success small"><i class="bi bi-check-lg me-1"></i>'
                         + html.escape("; ".join(parts)) + ".</span>")
+
+
+@router.post("/esafs/{esaf_id}/apply-instrument-technique")
+def apply_instrument_technique(esaf_id: str):
+    """Set the technique the GUP's instrument implies (replaces a technique set by hand) and reload the page."""
+    esaf = db.get_esaf(esaf_id)
+    if esaf is None:
+        raise HTTPException(404, "ESAF not found")
+    gup = db.get_gup(esaf["gup_id"]) if esaf.get("gup_id") else None
+    tech, _why = instruments.suggest(esaf.get("start_date", ""), (gup or {}).get("etr") or [])
+    if not tech:
+        raise HTTPException(409, "No technique can be derived from the GUP's instruments")
+    db.set_esaf_technique(esaf_id, tech, "instrument")
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
 
 
 @router.post("/esafs/{esaf_id}/sync-funding", response_class=HTMLResponse)
@@ -293,6 +322,7 @@ async def upload_esaf_pdf(request: Request, esaf_id: str, pdf_file: UploadFile =
             from .gups import _propagate_funding
             _propagate_funding(gup_id, gup["funding_sources"])
             msg += " Funding sources propagated from linked GUP."
+        gup_import.update_techniques({gup_id})
     return HTMLResponse(f'<div class="alert alert-success">{msg}</div>')
 
 

@@ -118,8 +118,9 @@ def add_pi_group_technique(name: str, technique: str) -> None:
     _r().add_pi_group_technique(name, technique)
 
 
-def set_esaf_technique(esaf_id: str, technique: str) -> None:
-    _r().set_esaf_technique(esaf_id, technique)
+def set_esaf_technique(esaf_id: str, technique: str, source: str = "") -> None:
+    """source: '' = set by hand, 'instrument' = set from the GUP's instrument (may be re-set automatically)."""
+    _r().set_esaf_technique(esaf_id, technique, source)
 
 
 def rename_pi_group(old_name: str, new_name: str) -> None:

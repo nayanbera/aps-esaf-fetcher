@@ -14,8 +14,8 @@
   <span id="sync-funding-result" class="me-2"></span>
   <button class="btn btn-outline-secondary btn-sm me-2" hx-post="/esafs/sync-funding"
           hx-target="#sync-funding-result" hx-swap="innerHTML"
-          title="Give every ESAF that has no funding the funding of its linked GUP (ESAFs with funding are not changed)">
-    <i class="bi bi-arrow-repeat me-1"></i>Sync funding from GUPs
+          title="Give every ESAF that has no funding the funding of its linked GUP, and set the technique from the GUP's 15-ID instrument where the ESAF has none (anything already set is not changed)">
+    <i class="bi bi-arrow-repeat me-1"></i>Sync funding &amp; technique from GUPs
   </button>
   <a class="btn btn-outline-secondary btn-sm"
      data-bs-toggle="collapse" href="#importPanel" role="button">

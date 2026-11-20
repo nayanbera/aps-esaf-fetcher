@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from . import db
+from . import db, instruments
 from .folder_import import FolderImporter
 from .gup_pdf_parser import parse_gup_pdf
 
@@ -34,6 +34,7 @@ def build_gup_data(result: dict, pdf_path: str) -> dict:
         "pdf_path":         pdf_path,
         "raw_fields":       ex,
         "funding_sources":  result.get("funding_sources", []),
+        "etr":              instruments.flatten_etr(result.get("etr", [])),
     }
 
 
@@ -50,6 +51,39 @@ def funding_labels(funding_sources: list[dict]) -> list[str]:
         if label:
             labels.append(label)
     return labels
+
+
+def update_techniques(gup_ids: set[str] | None = None, apply: bool = True) -> dict:
+    """Set each ESAF's technique from its GUP's 15-ID instrument (see instruments.py).
+
+    Only ESAFs with no technique, or one set by this rule before, are changed; a technique set by hand is left
+    and reported under 'differs'.  gup_ids limits it to the ESAFs of those GUPs.
+    -> {set: [(esaf_id, technique)], same: n, differs: [(esaf_id, current, suggested)], unclear: n}"""
+    out = {"set": [], "same": 0, "differs": [], "unclear": 0}
+    etr_by_gup: dict[str, list] = {}
+    for row in db.list_esaf_gup_rows():
+        gid = (row.get("gup_id") or "").strip()
+        if not gid or (gup_ids is not None and gid not in gup_ids) or (row.get("title") or "").endswith("(imported)"):
+            continue
+        if gid not in etr_by_gup:
+            etr_by_gup[gid] = (db.get_gup(gid) or {}).get("etr") or []
+        if not etr_by_gup[gid]:
+            continue
+        esaf = db.get_esaf(row["esaf_id"]) or {}
+        tech, _why = instruments.suggest(esaf.get("start_date", ""), etr_by_gup[gid])
+        if not tech:
+            out["unclear"] += 1
+            continue
+        cur = (esaf.get("technique") or "").strip()
+        if cur == tech:
+            out["same"] += 1
+        elif not cur or esaf.get("technique_source") == "instrument":
+            out["set"].append((row["esaf_id"], tech))
+            if apply:
+                db.set_esaf_technique(row["esaf_id"], tech, "instrument")
+        else:
+            out["differs"].append((row["esaf_id"], cur, tech))
+    return out
 
 
 def fill_funding_from_gups(apply: bool = False) -> dict:
@@ -95,6 +129,7 @@ def _process(pdf_path: str, now: str) -> str:
         return "ignored", "no GUP ID found in PDF"
     action = db.upsert_gup(data, now)
     propagate_funding(data["gup_id"], data["funding_sources"])
+    update_techniques({data["gup_id"]})
     return action
 
 

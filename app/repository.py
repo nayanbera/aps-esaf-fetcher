@@ -314,7 +314,7 @@ class ESAFRepository(ABC):
         ...
 
     @abstractmethod
-    def set_esaf_technique(self, esaf_id: str, technique: str) -> None:
+    def set_esaf_technique(self, esaf_id: str, technique: str, source: str = "") -> None:
         """Set the technique classification ('Surf', 'Xtal', 'ASWAXS', or '') on an ESAF."""
         ...
 
