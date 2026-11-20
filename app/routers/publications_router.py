@@ -52,6 +52,7 @@ def _row(p: dict, awards: list[dict]) -> dict:
     p["_date"] = d
     p["_py"] = report.project_year_of(d) if d else None
     p["_fac_pub"] = ", ".join(pubs.active_awards(awards, d))
+    p["_jkey"] = pubs.journal_key(p.get("venue"))
     return p
 
 
@@ -67,7 +68,7 @@ def publications_page(request: Request, py: str = ""):
     return templates.TemplateResponse("publications.html", {
         "request": request, "pubs": rows, "py_sel": py_sel,
         "report_years": list(range(1, now_py + 1)), "report_default": max(1, now_py - 1),
-        "n_awards": len(awards),
+        "n_awards": len(awards), "jif": pubs.impact_factors(),
     })
 
 
@@ -122,6 +123,20 @@ async def link_esafs_all():
     n = await run_in_threadpool(pubs.relink_all)
     return HTMLResponse(f'<div class="alert alert-success mb-2">ESAF / Team IDs added to {n} publication(s) '
                         f'from their stored acknowledgments.</div>')
+
+
+@router.post("/publications/update-impact-factors", response_class=HTMLResponse)
+async def update_impact_factors():
+    r = await run_in_threadpool(pubs.update_impact_factors)
+    body = f'{r["found"]} of {r["journals"]} journal(s) have an impact factor now'
+    cls = "success"
+    if r["failed"]:
+        cls = "warning"
+        body += f"; {r['failed']} lookup(s) failed (OpenAlex not reachable), try again later"
+    if r["missing"]:
+        li = "".join(f"<li>{html.escape(m)}</li>" for m in r["missing"][:25])
+        body += f". Not found in OpenAlex:<ul class='mb-0 mt-1'>{li}</ul>"
+    return HTMLResponse(f'<div class="alert alert-{cls} mb-2">{body}</div>')
 
 
 @router.post("/publications/recheck-awards", response_class=HTMLResponse)

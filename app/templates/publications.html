@@ -18,6 +18,12 @@
       <i class="bi bi-diagram-3 me-1"></i>Link ESAFs
     </button>
     <button type="button" class="btn btn-outline-secondary btn-sm"
+            hx-post="/publications/update-impact-factors" hx-target="#pub-result" hx-indicator="#pub-spin"
+            hx-on::after-request="window.pubRefresh && window.pubRefresh()"
+            title="Look up the current impact factor (OpenAlex 2-year mean citedness) of every journal in the list">
+      <i class="bi bi-graph-up me-1"></i>Update impact factors
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm"
             hx-post="/publications/recheck-awards" hx-target="#pub-result"
             hx-on::after-request="window.pubRefresh && window.pubRefresh()"
             title="Move facility award numbers that were filed under NSF or other awards (for example 'NSF/CHE-2335833' or a bare '2335833') into the facility-award column">
@@ -187,6 +193,7 @@
             <th>DOI</th>
             <th>Type</th>
             <th>Publication Name</th>
+            <th title="Journal impact factor: OpenAlex's 2-year mean citedness, a free current equivalent of the Clarivate JIF (official JIF values can differ)">Impact factor</th>
             <th title="Facility award acknowledged in the publication">Facility ack.</th>
             <th>NSF awards</th>
             <th>Other awards</th>
@@ -204,13 +211,15 @@
             <td class="small">{% if p.doi %}<a href="https://doi.org/{{ p.doi }}" target="_blank" rel="noopener">{{ p.doi }}</a>{% else %}—{% endif %}</td>
             <td class="small">{{ p.type or '—' }}</td>
             <td class="small">{{ p.venue or '—' }}</td>
+            {% set j = jif.get(p._jkey) %}
+            <td class="small text-end text-nowrap">{% if j and j.impact_factor is not none %}<span title="{{ 'OpenAlex 2-year mean citedness of ' ~ j.matched ~ ', ' ~ j.fetched if j.source == 'openalex' else 'Entered by hand' }}">{{ '%.2f' % j.impact_factor }}</span>{% else %}—{% endif %}</td>
             <td class="small text-nowrap">{{ p.facility_ack or '—' }}</td>
             <td class="small">{{ p.nsf_awards or '—' }}</td>
             <td class="small text-truncate" style="max-width:220px" title="{{ p.other_awards }}">{{ p.other_awards or '—' }}</td>
             <td class="text-end"><a href="/publications/{{ p.id }}/edit" class="btn btn-outline-secondary btn-sm py-0" title="Edit"><i class="bi bi-pencil"></i></a></td>
           </tr>
         {% else %}
-          <tr><td colspan="12" class="text-muted text-center py-4">No publications yet — add some above.</td></tr>
+          <tr><td colspan="13" class="text-muted text-center py-4">No publications yet — add some above.</td></tr>
         {% endfor %}
         </tbody>
       </table>

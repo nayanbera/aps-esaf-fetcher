@@ -819,6 +819,84 @@ def search_literature(mode: str, query: str, sources: list[str], from_date: str 
 # Ingest (shared by DOI list, EndNote file and PDF imports)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Journal impact factor.  The Clarivate JIF is licensed data; the free equivalent is OpenAlex's "2-year mean
+# citedness" of the journal (citations this year to the last two years' papers / those papers), kept current by
+# OpenAlex.  Values are cached per journal (records of kind JOURNALS); a record with source "manual" is never replaced.
+# ---------------------------------------------------------------------------
+
+JOURNALS = "journal_metrics"
+
+
+def journal_key(name: str) -> str:
+    t = re.sub(r"[^a-z0-9]+", " ", unicodedata.normalize("NFKD", name or "").lower()).strip()
+    return t[4:] if t.startswith("the ") else t
+
+
+def fetch_impact_factor(name: str) -> dict | None:
+    """OpenAlex 2-year mean citedness of the journal called *name* (exact name match only), or None."""
+    key = journal_key(name)
+    if not key:
+        return None
+    r = requests.get("https://api.openalex.org/sources", headers=_UA, timeout=20, params={
+        "search": name, "per-page": 10, "select": "display_name,type,works_count,issn_l,summary_stats"})
+    r.raise_for_status()
+    hits = [s for s in r.json().get("results", [])
+            if s.get("type") == "journal" and journal_key(s.get("display_name", "")) == key
+            and (s.get("summary_stats") or {}).get("2yr_mean_citedness") is not None]
+    if not hits:
+        return None
+    s = max(hits, key=lambda s: s.get("works_count") or 0)
+    return {"key": key, "name": name, "matched": s["display_name"], "issn": s.get("issn_l") or "",
+            "impact_factor": round(float(s["summary_stats"]["2yr_mean_citedness"]), 2),
+            "source": "openalex", "fetched": date.today().isoformat()}
+
+
+def impact_factors() -> dict[str, dict]:
+    return {r.get("key", ""): r for r in db.list_records(JOURNALS) if r.get("key")}
+
+
+def ensure_impact_factor(venue: str) -> None:
+    """Look the journal up once, when a publication from it is added (best effort)."""
+    key = journal_key(venue)
+    if key and key not in impact_factors():
+        try:
+            rec = fetch_impact_factor(venue)
+        except Exception:
+            return
+        db.save_record(JOURNALS, new_id(), rec or {"key": key, "name": venue, "impact_factor": None,
+                                                    "source": "openalex", "fetched": date.today().isoformat()})
+
+
+def update_impact_factors() -> dict:
+    """Refresh the impact factor of every journal in the publication list (manual values are kept)."""
+    have = impact_factors()
+    out = {"journals": 0, "found": 0, "missing": [], "failed": 0}
+    seen: set[str] = set()
+    for p in db.list_records(PUBS):
+        venue, key = (p.get("venue") or "").strip(), journal_key(p.get("venue"))
+        if not key or key in seen or (p.get("type") or "").lower() == "thesis":
+            continue
+        seen.add(key)
+        old = have.get(key)
+        if old and old.get("source") == "manual":
+            continue
+        out["journals"] += 1
+        try:
+            rec = fetch_impact_factor(venue)
+        except Exception:
+            out["failed"] += 1
+            continue
+        if rec:
+            out["found"] += 1
+        else:
+            out["missing"].append(venue)
+        data = rec or {"key": key, "name": venue, "impact_factor": None, "source": "openalex", "fetched": date.today().isoformat()}
+        db.save_record(JOURNALS, old["id"] if old else new_id(), data)
+        time.sleep(0.1)
+    return out
+
+
 def recheck_one(p: dict, fac: list[str]) -> dict | None:
     """The publication with facility awards moved out of its NSF / other award columns (and found in its stored
     acknowledgment text) into 'facility_ack'; None when nothing changes."""
@@ -898,6 +976,7 @@ def ingest(meta: dict, source: str, enrich: bool = True, extra_text: str = "",
     existing = find_existing(rec["doi"], rec["title"])
     if existing is None:
         db.save_record(PUBS, new_id(), rec)
+        ensure_impact_factor(rec.get("venue", ""))
         return "added", rec
     if source == "pdf" or extra_text or meta.get("link_text"):         # a PDF / full text adds acknowledgment evidence to a known paper
         merged = dict(existing)

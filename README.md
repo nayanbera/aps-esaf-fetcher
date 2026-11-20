@@ -157,6 +157,8 @@ those sheets hold the tables only.
 
 **Publication awards.** A facility award is recognised by its number, however the publisher wrote it (`CHE-2335833`, `NSF/CHE-2335833`, `NSF/CHE- 2335833`, a bare `2335833`), so it lands in *Facility ack.* instead of *NSF awards*. **Re-check awards** on the Publications page moves facility awards out of the NSF / other award columns of publications that were saved before.
 
+**Journal impact factor.** The Publications page has an *Impact factor* column. The Clarivate JIF is licensed data, so the value is OpenAlex's *2-year mean citedness* of the journal (the same calculation on OpenAlex's citation data; it is kept current and can differ from the official JIF). A journal is looked up when its first publication is added, and **Update impact factors** refreshes all of them. Theses are skipped and a journal OpenAlex does not know by its exact name shows a dash; a value with `source: manual` in the `journal_metrics` records is never overwritten.
+
 **Linking ESAFs to GUPs.** An ESAF gets its GUP from its own PDF, from a sibling ESAF (same title and PI), or by matching: an unlinked ESAF whose PI and title equal a GUP's (a title that starts the same also counts) is linked to it, which also brings funding and technique. This runs when a GUP is imported, after each sync and with **Sync funding & technique from GUPs**. `python link_esafs_to_gups.py` (dry run; `--apply`, and `--likely` for ESAFs matched only by PI and run cycle) lists what would be linked; ESAFs that fit several GUPs are left alone.
 
 **GUP instruments and ESAF technique.** The Experiment Time Request table of each GUP PDF is stored on the GUP (ETR number, run cycle,
